@@ -112,3 +112,40 @@ export function groupChatToolsBySource(tools: readonly string[]): ChatToolSource
     return names ? [{ source, label: SOURCE_LABELS[source], tools: [...names] }] : [];
   });
 }
+
+/** One `kind: "mcp"` event of a turn's stream, as far as its failures go. */
+export interface ChatToolEvent {
+  tool?: string;
+  status: string;
+  message?: string;
+}
+
+/**
+ * The failures a turn still stands by, by tool name ("" for a failure that
+ * names none), oldest first. A call of a tool clears that tool's failure: a
+ * model that reads an activity again after COROS's `1001 Service exceptions`
+ * and gets it has the run in full, and an answer that kept the first call's
+ * error under it told the athlete it had not. A call already under way when
+ * the failure arrives does not clear it — it may be reading something else.
+ */
+export function nextChatToolFailures(
+  failures: ReadonlyMap<string, string>,
+  event: ChatToolEvent
+): Map<string, string> {
+  const next = new Map(failures);
+  const key = event.tool ?? "";
+  if (/fail|error/i.test(event.status) || event.message) {
+    next.delete(key);
+    next.set(key, event.message ?? event.status);
+  } else if (event.status === "call" && event.tool) {
+    next.delete(key);
+  }
+  return next;
+}
+
+/** The failure an answer is left showing: the latest one still standing. */
+export function chatToolFailureNotice(failures: ReadonlyMap<string, string>): string | undefined {
+  let latest: string | undefined;
+  for (const message of failures.values()) latest = message;
+  return latest;
+}

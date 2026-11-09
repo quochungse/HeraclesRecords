@@ -216,7 +216,9 @@ import {
 } from "./chatTypes";
 import { formatTurnCost, formatTurnCostDetail } from "./turnCost";
 import {
+  chatToolFailureNotice,
   groupChatToolsBySource,
+  nextChatToolFailures,
   type ChatToolSource
 } from "../../electron/chatToolSources";
 import { getIntlLocale, plural, screenSentence, t } from "../i18n/core";
@@ -1594,6 +1596,8 @@ export function ChatView({
   const pendingSaveRef = useRef<(() => void) | null>(null);
   // Accumulates source info across the current stream's info events.
   const sourceRef = useRef<SourceInfo | null>(null);
+  /** The running turn's tool failures no later call of the same tool made up for. */
+  const toolFailuresRef = useRef<ReadonlyMap<string, string>>(new Map());
   const thinkingRef = useRef("");
   /**
    * The answer text streamed so far this turn, readable from an IPC handler.
@@ -2874,6 +2878,7 @@ export function ChatView({
       pendingCoachPromptsRef.current = [];
       setCurrentSource(null);
       sourceRef.current = null;
+      toolFailuresRef.current = new Map();
       // A turn that ends with nothing to show is told apart, from here, from
       // one still being answered on another device (`unansweredKind`).
       const endedEmpty = () => failTurn("noAnswer");
@@ -2994,6 +2999,7 @@ export function ChatView({
           advanceStep(payload.requestId, { kind: "passed" });
         }
         if (payload.kind === "context") {
+          toolFailuresRef.current = new Map();
           sourceRef.current = {
             snapshotIncluded: payload.snapshotIncluded,
             mcpEnabled: payload.mcpEnabled,
@@ -3069,16 +3075,14 @@ export function ChatView({
             mcpUsed: false,
             mcpTools: []
           };
+          toolFailuresRef.current = nextChatToolFailures(toolFailuresRef.current, payload);
           sourceRef.current = {
             ...base,
             mcpUsed: true,
             mcpTools: payload.tool
               ? [...base.mcpTools, payload.tool]
               : base.mcpTools,
-            mcpError:
-              /fail|error/i.test(payload.status) || payload.message
-                ? payload.message ?? payload.status
-                : base.mcpError
+            mcpError: chatToolFailureNotice(toolFailuresRef.current)
           };
           setCurrentSource(sourceRef.current);
         }
@@ -3116,6 +3120,7 @@ export function ChatView({
         setActiveTool(null);
         setCurrentSource(null);
         sourceRef.current = null;
+        toolFailuresRef.current = new Map();
         // A chart or a card on screen is output too: without it here, a turn
         // that broke after its cards kept them with no word of the failure.
         if (partialText || coachPrompts.length > 0 || turnMadeEntries()) {
@@ -3907,6 +3912,7 @@ export function ChatView({
     turnPipelineRef.current = Boolean(pipeline);
     resumedCoachPromptRef.current = originalPrompts;
     sourceRef.current = null;
+    toolFailuresRef.current = new Map();
     setCurrentSource(null);
     setTimeline(nextEntries);
     // Keep the unanswered card durable until the resumed turn completes. If

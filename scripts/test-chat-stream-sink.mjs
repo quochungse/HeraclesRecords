@@ -216,6 +216,60 @@ assert.deepEqual(
   ["activityVisual", "hrZoneSummary", "message", "planDraft", "scheduleChange", "fitnessTrend", "message"]
 );
 
+// A failed read the model made up for by reading again is not the answer's
+// failure: COROS answers `1001 Service exceptions` for a run it has not
+// finished, the next call reads it, and the answer is built on the whole run.
+{
+  const failure = (tool, message) => ["chat:streamInfo", { kind: "mcp", status: "failed", tool, message }];
+  const call = (tool) => ["chat:streamInfo", { kind: "mcp", status: "call", tool }];
+  const turn = (events) => {
+    const sink = createCollectorSink();
+    runStream(sink, [
+      ["chat:streamStart", {}],
+      ["chat:streamInfo", { kind: "context", snapshotIncluded: true, mcpEnabled: true }],
+      ...events,
+      ["chat:streamDone", { fullText: "Read." }]
+    ]);
+    return sink.entries().find((entry) => entry.kind === "message").source;
+  };
+  const retried = turn([
+    call("get_activity_detail"),
+    failure("get_activity_detail", "get_activity_detail failed: Service exceptions"),
+    call("get_activity_detail")
+  ]);
+  assert.equal(retried.mcpError, undefined, "a later call of the same tool clears its failure");
+  assert.equal("mcpError" in retried, false, "and leaves no key behind for the reload to disagree with");
+  assert.equal(
+    turn([
+      call("get_activity_detail"),
+      failure("get_activity_detail", "get_activity_detail failed: Service exceptions"),
+      call("list_scheduled_workouts")
+    ]).mcpError,
+    "get_activity_detail failed: Service exceptions",
+    "another tool's call makes up for nothing"
+  );
+  assert.equal(
+    turn([
+      call("get_activity_detail"),
+      call("get_activity_detail"),
+      failure("get_activity_detail", "get_activity_detail failed: Service exceptions")
+    ]).mcpError,
+    "get_activity_detail failed: Service exceptions",
+    "a call already under way when the failure lands does not clear it"
+  );
+  assert.equal(
+    turn([
+      call("get_sleep_summary"),
+      failure("get_sleep_summary", "sleep failed"),
+      call("get_activity_detail"),
+      failure("get_activity_detail", "detail failed"),
+      call("get_activity_detail")
+    ]).mcpError,
+    "sleep failed",
+    "the failure still standing is the one shown"
+  );
+}
+
 // --- a turn's charts are named in the order drawn --------------------------
 // The handle is the chart's place among the turn's stored charts, so it is
 // given when the chart is drawn and a chart drawn again keeps it.

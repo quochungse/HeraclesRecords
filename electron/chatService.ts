@@ -192,7 +192,7 @@ import {
 import { addTokenUsage, countableUsage } from "./tokenUsage";
 import { inlineSuggestionsSection } from "./chatCoachContext";
 import { COROS_WORKOUT_DESCRIPTION_MAX_BYTES } from "./corosTextLimits";
-import { WEB_SEARCH_TOOL } from "./chatToolSources";
+import { WEB_SEARCH_TOOL, chatToolFailureNotice, nextChatToolFailures } from "./chatToolSources";
 import { chartHandle, chartHandleNote, isChartKind, orderTurn } from "./chartPlacement";
 import {
   createChatSession,
@@ -1608,6 +1608,8 @@ export function createCollectorSink(
   const entries: PersistedChatEntry[] = [];
   let pendingCoachPrompts: CoachInputPrompt[] = [];
   let source: PersistedChatSource | null = null;
+  /** The turn's tool failures no later call of the same tool made up for. */
+  let toolFailures: ReadonlyMap<string, string> = new Map();
   let thinking = "";
   let streamedText = "";
   let finalText = "";
@@ -1623,6 +1625,7 @@ export function createCollectorSink(
   const reset = () => {
     pendingCoachPrompts = [];
     source = null;
+    toolFailures = new Map();
     thinking = "";
     streamedText = "";
   };
@@ -1631,6 +1634,7 @@ export function createCollectorSink(
     const kind = payload.kind;
 
     if (kind === "context") {
+      toolFailures = new Map();
       source = {
         snapshotIncluded: Boolean(payload.snapshotIncluded),
         mcpEnabled: Boolean(payload.mcpEnabled),
@@ -1658,12 +1662,11 @@ export function createCollectorSink(
       const status = typeof payload.status === "string" ? payload.status : "";
       const message =
         typeof payload.message === "string" ? payload.message : undefined;
-      const mcpError =
-        /fail|error/i.test(status) || message
-          ? message ?? status
-          : base.mcpError;
+      toolFailures = nextChatToolFailures(toolFailures, { tool, status, message });
+      const mcpError = chatToolFailureNotice(toolFailures);
+      const { mcpError: _settled, ...rest } = base;
       source = {
-        ...base,
+        ...rest,
         mcpUsed: true,
         mcpTools: tool ? [...base.mcpTools, tool] : base.mcpTools,
         // Omitted rather than set to undefined so the collected source matches
