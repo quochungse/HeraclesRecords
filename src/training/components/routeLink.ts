@@ -2,6 +2,7 @@ import L from "leaflet";
 import type { TrainingHubActivityPause } from "../../../electron/types";
 import { activeElapsed } from "../../../electron/activityMetrics";
 import { MIN_SELECTION_SECONDS, lapAt, sameSpan, type ActivityLink, type LinkSpan } from "../activityLink";
+import { ROUTE_LINE_WIDTHS } from "./routeColoring";
 import type { RouteReplay } from "./routeReplay";
 
 /*
@@ -26,17 +27,8 @@ export interface RouteLinkStyle {
   lightGround: boolean;
 }
 
-/**
- * How the route under the link is coloured: runs of one colour each between
- * point indices (a route coloured by pace, heart rate or height), `"glow"` for
- * the heatmap's canvas, or nothing for the plain line.
- */
-export type RouteLinkColours = readonly { from: number; to: number; color: string }[] | "glow" | null;
-
 export interface RouteLinkBinding {
   restyle: (style: RouteLinkStyle) => void;
-  /** The route was drawn again in other colours: the stretch takes them. */
-  recolour: () => void;
   remove: () => void;
 }
 
@@ -94,10 +86,14 @@ export function bindRouteLink(
   link: ActivityLink,
   pauses: readonly TrainingHubActivityPause[] | undefined,
   initialStyle: RouteLinkStyle,
-  /** Told the selected stretch's two ends, or null once it is let go. */
-  onStretchEnds?: (ends: { start: [number, number]; end: [number, number] } | null) => void,
-  /** What the route is coloured by now, asked each time the stretch is drawn. */
-  colours?: () => RouteLinkColours
+  /**
+   * Told the selected stretch — its two ends, and where it runs along the
+   * route's points — or null once it is let go. The map draws it: it is the
+   * route's own line, in whatever the route is coloured by.
+   */
+  onStretch?: (
+    stretch: { start: [number, number]; end: [number, number]; from: number; to: number } | null
+  ) => void
 ): RouteLinkBinding | null {
   const moments = routeMoments(route, pauses);
   if (!moments) {
@@ -144,7 +140,6 @@ export function bindRouteLink(
 
   let style = initialStyle;
   const casingColor = () => (style.lightGround ? "#ffffff" : "#05080b");
-  const brightColor = () => (style.lightGround ? "#0a5c44" : "#c2f7d4");
   const line = (options: L.PolylineOptions) =>
     L.polyline([], {
       pane: LINK_PANE,
@@ -159,14 +154,11 @@ export function bindRouteLink(
   // drawn: in its pace, its heart rate, its heat. Dimming the route's own
   // panes dimmed the stretch with them, and a line of one colour laid over it
   // hid the colours the athlete had asked for.
-  const veilBefore = line({ color: casingColor(), weight: 13, opacity: 0.68 });
-  const veilAfter = line({ color: casingColor(), weight: 13, opacity: 0.68 });
-  // On the plain route the stretch is also lifted: a casing and a brighter line.
-  const casing = line({ color: casingColor(), weight: 9, opacity: 1 });
-  const selected = line({ color: brightColor(), weight: 5, opacity: 1 });
-  // On a coloured route it is drawn again over the veil, run by run, so a pass
-  // the veil crosses — out and back on one road — still shows its colours.
-  const runs = L.layerGroup().addTo(map);
+  // As wide as the route's halo and a little more, so none of its glow shows round the veil.
+  const veil = { color: casingColor(), weight: ROUTE_LINE_WIDTHS.halo + 4, opacity: 0.7 };
+  const veilBefore = line(veil);
+  const veilAfter = line(veil);
+
   const cursor = L.marker(latLngs[0]!, {
     pane: CURSOR_PANE,
     icon: L.divIcon({
@@ -180,38 +172,17 @@ export function bindRouteLink(
   });
 
   const drawStretch = (selection: LinkSpan | null) => {
-    const how = colours?.() ?? null;
-    runs.clearLayers();
     if (!selection) {
-      for (const layer of [veilBefore, veilAfter, casing, selected]) {
-        layer.setLatLngs([]);
-      }
+      veilBefore.setLatLngs([]);
+      veilAfter.setLatLngs([]);
+      onStretch?.(null);
       return;
     }
     const from = positionOf(selection.from);
     const to = positionOf(selection.to);
     veilBefore.setLatLngs(between(0, from));
     veilAfter.setLatLngs(between(to, latLngs.length - 1));
-    const plain = how === null;
-    casing.setLatLngs(plain ? between(from, to) : []);
-    selected.setLatLngs(plain ? between(from, to) : []);
-    if (Array.isArray(how)) {
-      for (const run of how) {
-        const start = Math.max(run.from, from);
-        const end = Math.min(run.to, to);
-        if (end > start) {
-          L.polyline(between(start, end), {
-            pane: LINK_PANE,
-            color: run.color,
-            weight: 5,
-            opacity: 1,
-            lineCap: "round",
-            lineJoin: "round",
-            interactive: false
-          }).addTo(runs);
-        }
-      }
-    }
+    onStretch?.({ start: spot(selection.from), end: spot(selection.to), from, to });
   };
 
   let drawn: { selection: LinkSpan | null; preview: LinkSpan | null } = { selection: null, preview: null };
@@ -219,7 +190,6 @@ export function bindRouteLink(
     const { selection, preview, cursor: at } = link.getState();
     if (!sameSpan(selection, drawn.selection)) {
       drawStretch(selection);
-      onStretchEnds?.(selection ? { start: spot(selection.from), end: spot(selection.to) } : null);
     }
     const shownPreview = sameSpan(preview, selection) ? null : preview;
     if (!sameSpan(shownPreview, drawn.preview)) {
@@ -357,10 +327,7 @@ export function bindRouteLink(
       previewLine.setStyle({ color: next.routeColor });
       veilBefore.setStyle({ color: casingColor() });
       veilAfter.setStyle({ color: casingColor() });
-      casing.setStyle({ color: casingColor() });
-      selected.setStyle({ color: brightColor() });
     },
-    recolour: () => drawStretch(link.getState().selection),
     remove: () => {
       unsubscribe();
       onDragEnd();

@@ -62,8 +62,10 @@ the Activities pane. Each of the three sets them and draws them (`ActivityLinkPa
   changes — the map shown or hidden — and the lap ruler stands on those edges.
 - A selected stretch takes the map's start and finish markers to its own ends, and **keeps the
   colours the route is drawn in**: the rest of the route goes under a veil in the ground's colour
-  (`routeLink.ts`), never a dimmed pane or a one-colour line over the stretch. On a route
-  coloured by a metric the stretch is drawn again over the veil, run by run (`recolour`).
+  (`routeLink.ts`), never a dimmed pane or a one-colour line over the stretch. Over the veil the
+  stretch is drawn again **by the route's own `LinePainter`** cut to it (`only`), so it has the
+  route's halo, body and core in the route's colours; a hand-made line there lost the neon. The
+  heatmap is a canvas and gets the veil alone.
 - **Chart settings** (the head's one button) holds the axis (`activity.chart.axis`), one plot or
   two, and which channels have a chip (`activity.chart.hiddenChannels`) — as switches in a list,
   since a chip there read as the chip beside the plot. A route map offers no Street or Topo base map, and its

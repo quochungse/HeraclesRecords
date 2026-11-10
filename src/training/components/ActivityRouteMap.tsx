@@ -376,6 +376,8 @@ function headPosition(route: RouteReplay, progress: number): number {
 
 /** Below the route's lines, above the heatmap's pane (which never shows with them). */
 const LINE_HALO_PANE = "heraclesRouteHalo";
+/** The selected stretch drawn again: above the link's veil, below the start and finish. */
+const ROUTE_STRETCH_PANE = "heraclesRouteStretch";
 
 /**
  * Draws the route as runs of one colour each, up to the replay's head, along
@@ -399,7 +401,13 @@ class LinePainter implements Painter {
     private readonly route: RouteReplay,
     private readonly curve: SmoothPath,
     style: RouteStyle,
-    stretchColors: readonly (string | null)[] | undefined
+    stretchColors: readonly (string | null)[] | undefined,
+    /**
+     * Draw only this stretch of the route (positions along its points), in this
+     * pane: the selected stretch, drawn again over the veil laid on the rest —
+     * by this same painter, so it is the route's own line, halo and core.
+     */
+    private readonly only?: { from: number; to: number; pane: string }
   ) {
     if (!map.getPane(LINE_HALO_PANE)) {
       map.createPane(LINE_HALO_PANE).style.zIndex = "395";
@@ -415,7 +423,8 @@ class LinePainter implements Painter {
         lineCap: "round",
         lineJoin: "round",
         interactive: false,
-        ...options
+        ...options,
+        ...(only ? { pane: only.pane } : {})
       }).addTo(this.group);
     const runs = routeRuns(route.latLngs.length, stretchColors).filter(
       (run) => run.color !== null
@@ -456,6 +465,15 @@ class LinePainter implements Painter {
 
   paint(progress: number): PaintedEnds {
     const position = headPosition(this.route, progress);
+    if (this.only) {
+      // One stretch, whole: each run cut to it.
+      for (const entry of this.lines) {
+        const from = Math.max(entry.run.from, this.only.from);
+        const to = Math.min(entry.run.to, this.only.to);
+        this.draw(entry, from < to ? curveBetween(this.curve, from, to) : []);
+      }
+      return { start: curveHead(this.curve, this.only.from), head: curveHead(this.curve, this.only.to) };
+    }
     for (const entry of this.lines) {
       const { from, to } = entry.run;
       if (to <= position) {
@@ -902,30 +920,36 @@ function RouteMapCanvas({
     // A selected stretch takes the two markers to its own ends: where it began
     // and where it finished. Let go, they return to the route's.
     let stretchEnds: { start: [number, number]; end: [number, number] } | null = null;
+    let stretchAt: { from: number; to: number } | null = null;
+    let stretchPainter: LinePainter | null = null;
+    /**
+     * The selected stretch over the veil, drawn as the route is: the same
+     * painter, the same colours, cut to the stretch. The heatmap is a canvas
+     * and has no stretch to draw again; there the veil alone sets it apart.
+     */
+    const drawStretch = () => {
+      stretchPainter?.remove();
+      stretchPainter = null;
+      const shown = drawnRef.current;
+      if (!stretchAt || shown?.kind === "glow") {
+        return;
+      }
+      if (!map.getPane(ROUTE_STRETCH_PANE)) {
+        map.createPane(ROUTE_STRETCH_PANE).style.zIndex = "445";
+      }
+      stretchPainter = new LinePainter(map, route, curve, style, shown?.stretchColors, {
+        ...stretchAt,
+        pane: ROUTE_STRETCH_PANE
+      });
+      stretchPainter.paint(1);
+    };
     const routeLink: RouteLinkBinding | null = link
-      ? bindRouteLink(
-          map,
-          route,
-          link,
-          pauses,
-          style,
-          (next) => {
-            stretchEnds = next;
-            placeEnds?.();
-          },
-          () => {
-            const shown = drawnRef.current;
-            if (shown?.kind === "glow") {
-              return "glow";
-            }
-            if (!shown?.stretchColors) {
-              return null;
-            }
-            return routeRuns(route.latLngs.length, shown.stretchColors).flatMap((run) =>
-              run.color ? [{ from: run.from, to: run.to, color: run.color }] : []
-            );
-          }
-        )
+      ? bindRouteLink(map, route, link, pauses, style, (next) => {
+          stretchEnds = next ? { start: next.start, end: next.end } : null;
+          stretchAt = next ? { from: next.from, to: next.to } : null;
+          drawStretch();
+          placeEnds?.();
+        })
       : null;
     const routeEnds = ends ? bindRouteEnds(map) : undefined;
     // The heatmap's canvas is hidden through a zoom; the lines are not.
@@ -1028,12 +1052,13 @@ function RouteMapCanvas({
         ghostLine.setStyle({ opacity: ghostShown(next) ? style.ghostOpacity : 0 });
         showWhole();
         // After `drawnRef` is the new drawing: the redraw effect sets it first.
-        routeLink?.recolour();
+        drawStretch();
       },
       restyle: (next) => {
         style = next;
         painter.restyle(next);
         routeLink?.restyle(next);
+        drawStretch();
         ghostLine.setStyle({
           color: next.routeColor,
           opacity: ghostShown(drawingRef.current) ? next.ghostOpacity : 0
@@ -1053,6 +1078,7 @@ function RouteMapCanvas({
       window.cancelAnimationFrame(animationFrame);
       controlRef.current = null;
       routeLink?.remove();
+      stretchPainter?.remove();
       painter.remove();
       resizeObserver.disconnect();
       map.remove();
