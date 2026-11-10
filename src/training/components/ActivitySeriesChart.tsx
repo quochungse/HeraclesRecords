@@ -1,7 +1,7 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { Map as MapIcon, Settings2, X, ZoomIn, ZoomOut } from "lucide-react";
 import {
   Area,
-  Brush,
   CartesianGrid,
   ComposedChart,
   Line,
@@ -14,11 +14,15 @@ import {
 } from "recharts";
 import type { TooltipContentProps } from "recharts";
 import type {
+  CorosProfileZoneFamily,
   TrainingHubActivityLap,
+  TrainingHubActivityPause,
   TrainingHubActivitySeriesPoint,
+  TrainingHubActivityTrack,
   TrainingHubActivityZoneBucket,
   UnitSystem
 } from "../../../electron/types";
+import { isRecoveryLap, lapSections } from "../../../electron/lapSections";
 import { envelopeActivitySeries, smoothActivitySeries } from "../../../electron/activitySeries";
 import { OptionChips, OptionGroup } from "../../components/OptionGroup";
 import { useTheme } from "../../theme/ThemeProvider";
@@ -63,11 +67,37 @@ import {
   type ActivityMotion
 } from "../activityChannels";
 import { formatDecimal, t } from "../../i18n/core";
+import { zoneName } from "../../i18n/zoneNames";
+import {
+  distanceAtElapsed,
+  elapsedAtDistance,
+  linkClock,
+  stretchFigures,
+  wholeLaps,
+  type ActivityLink,
+  type StretchFigures
+} from "../activityLink";
+import { useLinkValue } from "../useActivityLink";
+import { heartRateZoneTime } from "../zoneTime";
+import {
+  LAP_RULER_MOST,
+  LapRuler,
+  LinkedPlotStage,
+  stretchTitle,
+  type PlotRect
+} from "./ActivityLinkParts";
+import { ActivityRouteMap, hasActivityRoute } from "./ActivityRouteMap";
+import type { RouteDetail } from "./routePerformance";
+import { zoneColor, zoneLabel } from "./routeColoring";
 import {
   defineSelectionPreference,
+  selectionIsArrayOf,
   selectionIsBoolean,
+  selectionIsOneOf,
   useSelectionPreference
 } from "../../preferences/selectionPreferences";
+import { formatDurationSpan } from "../formatters";
+import type { ZoneTimeRow } from "../zoneTime";
 
 /**
  * How many rows reach recharts.
@@ -85,8 +115,7 @@ const CHART_POINTS = 1000;
 const COMBINED_HEIGHT = 340;
 /**
  * Split, the movement plot is the shorter one: it draws no time axis of its own
- * (the body plot's, under it, is the same clock) and the brush sits under the
- * body plot.
+ * (the body plot's, under it, is the same clock).
  */
 const SPLIT_TOP_HEIGHT = 200;
 const SPLIT_BOTTOM_HEIGHT = 262;
@@ -105,14 +134,52 @@ const SPLIT_PREFERENCE = defineSelectionPreference<boolean>({
   validate: selectionIsBoolean
 });
 
+/** What the chart is read along, time or distance: one choice for every session. */
+const AXIS_PREFERENCE = defineSelectionPreference<ActivitySeriesAxis>({
+  key: "activity.chart.axis",
+  defaultValue: "elapsed",
+  validate: selectionIsOneOf(["elapsed", "distance"] as const)
+});
+
+/**
+ * The channels whose chips are put away. A run records a dozen, and a row of
+ * twelve chips is read past; the ones an athlete never draws are hidden once,
+ * for every session.
+ */
+const HIDDEN_CHANNELS_PREFERENCE = defineSelectionPreference<string[]>({
+  key: "activity.chart.hiddenChannels",
+  defaultValue: [],
+  validate: selectionIsArrayOf((value: unknown): value is string => typeof value === "string")
+});
+
+/** Whether the route map stands beside the chart, on every sport's page. */
+const MAP_PREFERENCE = defineSelectionPreference<boolean>({
+  key: "activity.chart.map",
+  defaultValue: true,
+  validate: selectionIsBoolean
+});
+
 interface ActivitySeriesChartProps {
   series: readonly TrainingHubActivitySeriesPoint[];
   laps: readonly TrainingHubActivityLap[];
   /** This run's own HR zone buckets, shaded behind the heart-rate line. */
   hrZones: readonly TrainingHubActivityZoneBucket[];
-  /** Set from the lap table; focuses the chart on one lap. */
-  focusLapIndex: number | null;
-  onFocusLapHandled: () => void;
+  /**
+   * The cursor and the selection this chart shares with the page's route map
+   * and lap table (`activityLink.ts`), on the clock `series` is on.
+   */
+  link: ActivityLink;
+  /**
+   * The route, drawn beside the chart and tied to it. Given by a page whose
+   * only other map is a picture; absent, the chart stands alone.
+   */
+  track?: TrainingHubActivityTrack;
+  /** The activity's detail, for the layers of that map. */
+  routeDetail?: RouteDetail;
+  /** The pauses `series` had taken out of its clock, which the route still counts. */
+  pauses?: readonly TrainingHubActivityPause[];
+  /** The model the heart-rate zones were scored on, to name a selection's zones. */
+  zoneFamily?: CorosProfileZoneFamily;
   /**
    * COROS's own activity time (`workoutTime`), stated for the whole run so the
    * unselected segment reads it directly rather than from the sample clock.
@@ -222,28 +289,6 @@ function formatAxisTick(
 }
 
 /**
- * Metres climbed in a stretch, as a barometric watch counts them: a rise is
- * only counted once it has held for 2 m, so the altimeter's own wobble on the
- * flat adds nothing.
- */
-function stretchGain(points: readonly ActivityChannelPoint[]): number | undefined {
-  let gain = 0;
-  let anchor: number | undefined;
-  for (const point of points) {
-    if (typeof point.altitude !== "number") continue;
-    if (anchor === undefined) {
-      anchor = point.altitude;
-    } else if (point.altitude - anchor >= 2) {
-      gain += point.altitude - anchor;
-      anchor = point.altitude;
-    } else if (anchor - point.altitude >= 2) {
-      anchor = point.altitude;
-    }
-  }
-  return anchor === undefined ? undefined : gain;
-}
-
-/**
  * Heart-rate zones as bands that meet.
  *
  * COROS states each zone's bounds in whole beats, so one zone ends a beat below
@@ -297,8 +342,11 @@ export function ActivitySeriesChart({
   series,
   laps,
   hrZones,
-  focusLapIndex,
-  onFocusLapHandled,
+  link,
+  track,
+  routeDetail,
+  pauses,
+  zoneFamily,
   activityTime,
   embedded = false,
   motion = "pace",
@@ -330,11 +378,20 @@ export function ActivitySeriesChart({
   const hasDistance = points.some((point) => typeof point.distance === "number");
   const hasElapsed = points.some((point) => typeof point.elapsed === "number");
 
-  const [axis, setAxis] = useState<ActivitySeriesAxis>("elapsed");
+  const [axisPreference, setAxisPreference] = useSelectionPreference(AXIS_PREFERENCE);
+  // The axis chosen, where this session has it: one with no clock is read along its distance.
+  const axis: ActivitySeriesAxis =
+    axisPreference === "distance" ? (hasDistance ? "distance" : "elapsed") : hasElapsed ? "elapsed" : "distance";
+  const [hiddenChannels, setHiddenChannels] = useSelectionPreference(HIDDEN_CHANNELS_PREFERENCE);
   const [selected, setSelected] = useState<ActivityChannelKey[]>([]);
   const [showAltitude, setShowAltitude] = useState(true);
   const [range, setRange] = useState<{ start: number; end: number } | null>(null);
   const [splitPreference, setSplitPreference] = useSelectionPreference(SPLIT_PREFERENCE);
+  const [mapPreference, setMapPreference] = useSelectionPreference(MAP_PREFERENCE);
+  const hasRoute = useMemo(() => hasActivityRoute(track), [track]);
+  const mapShown = hasRoute && mapPreference;
+  const [plotRect, setPlotRect] = useState<PlotRect | null>(null);
+  const selection = useLinkValue(link, (state) => state.selection);
   const splittable = canSplitActivityChannels(available);
   const split = splitPreference && splittable;
   // One id per mounted chart: it names the elevation gradients and, split, ties
@@ -351,22 +408,21 @@ export function ActivitySeriesChart({
   availableRef.current = available;
   const splitRef = useRef(split);
   splitRef.current = split;
+  const hiddenRef = useRef(hiddenChannels);
+  hiddenRef.current = hiddenChannels;
   useEffect(() => {
     setSelected(
       fitActivityChannels(
         defaultSelectedChannels(availableRef.current, motion),
         availableRef.current,
         splitRef.current
-      )
+      ).filter((key) => !hiddenRef.current.includes(key))
     );
+    if (hiddenRef.current.includes("altitude")) {
+      setShowAltitude(false);
+    }
     setRange(null);
   }, [availableKey, motion]);
-
-  useEffect(() => {
-    if (!hasElapsed && hasDistance) {
-      setAxis("distance");
-    }
-  }, [hasDistance, hasElapsed]);
 
   const rows = useMemo<ChartRow[]>(() => {
     const key = axis === "elapsed" ? "elapsed" : "distance";
@@ -378,25 +434,49 @@ export function ActivitySeriesChart({
   const boundaries = useMemo(() => lapBoundaries(laps, axis), [axis, laps]);
   const zoneBands = useMemo(() => hrZoneBands(hrZones), [hrZones]);
 
-  // A lap picked in the table below: translate its span on the current axis
-  // into the row indices the brush speaks in.
-  useEffect(() => {
-    if (focusLapIndex === null) {
-      return;
-    }
-    const lap = boundaries.find((entry) => entry.index === focusLapIndex);
-    if (lap && rows.length > 0) {
-      const start = rows.findIndex((row) => row.x >= lap.from);
-      let end = rows.findIndex((row) => row.x >= lap.to);
+  // The link is in seconds whatever the chart is drawn over, so every x the
+  // link draws or reads goes through the clock.
+  const clock = useMemo(() => linkClock(series), [series]);
+  const toAxis = useCallback(
+    (elapsed: number) => (axis === "elapsed" ? elapsed : distanceAtElapsed(clock, elapsed)),
+    [axis, clock]
+  );
+  const toElapsed = useCallback(
+    (value: number) => (axis === "elapsed" ? value : elapsedAtDistance(clock, value)),
+    [axis, clock]
+  );
+  /** A stretch of the clock as the rows the brush speaks in. */
+  const rowsOf = useCallback(
+    (from: number, to: number) => {
+      const low = toAxis(from);
+      const high = toAxis(to);
+      if (low === undefined || high === undefined || rows.length === 0) {
+        return null;
+      }
+      const start = Math.max(0, rows.findIndex((row) => row.x >= low));
+      let end = rows.findIndex((row) => row.x >= high);
       if (end === -1) {
         end = rows.length - 1;
       }
-      if (start !== -1 && end > start) {
-        setRange({ start, end });
-      }
+      return start < end ? { start, end } : null;
+    },
+    [rows, toAxis]
+  );
+
+  // A selection made where the zoom does not reach — a lap pressed in the
+  // table — is shown: the zoom lets go rather than hiding what was just chosen.
+  useEffect(() => {
+    if (!selection || range === null) {
+      return;
     }
-    onFocusLapHandled();
-  }, [boundaries, focusLapIndex, onFocusLapHandled, rows]);
+    const first = rows[range.start];
+    const last = rows[range.end];
+    const low = toAxis(selection.from);
+    const high = toAxis(selection.to);
+    if (first && last && low !== undefined && high !== undefined && (high <= first.x || low >= last.x)) {
+      setRange(null);
+    }
+  }, [range, rows, selection, toAxis]);
 
   const altitudeDomain = useMemo<[number, number] | null>(() => {
     if (!hasAltitude) {
@@ -433,79 +513,79 @@ export function ActivitySeriesChart({
     [axis, unitSystem, visible]
   );
 
+  const zoneRows = useMemo(() => heartRateZoneTime(hrZones, zoneFamily), [hrZones, zoneFamily]);
+  const lapStretches = link.laps();
+
+  /**
+   * The figures under the chart: the whole of it, and — when a stretch is
+   * selected, or the brush has cut one — that stretch. Off the recorded
+   * samples, never the chart's rows (`stretchFigures`).
+   */
   const segment = useMemo(() => {
-    if (visible.length < 2) {
+    const reading = {
+      // Only a ride states it: a run's power is the watch's own estimate.
+      power: motion === "speed",
+      // A ride's cadence is averaged over the pedalling, as the watch states
+      // it, and a hike's over the walking: its watch records through every rest.
+      cadenceSkipsZeros: !readsPace(motion),
+      gain: true
+    };
+    // Each zone's floor in bpm, easiest first; the easiest has none.
+    const bands =
+      zoneRows.length > 1 && zoneRows.slice(1).every((row) => row.easyEdge !== undefined)
+        ? zoneRows.map((row) => row.easyEdge ?? 0)
+        : undefined;
+    const key = hasElapsed ? "elapsed" : "distance";
+    const measured = stretchFigures(series, key, -Infinity, Infinity, reading, bands);
+    if (!measured) {
       return null;
     }
-    const first = visible[0]!;
-    const last = visible[visible.length - 1]!;
-    // Averages come off the recorded samples inside the stretch, not the
-    // chart's downsampled rows: a row is a bucket's mean, so one that holds
-    // ten seconds of pedalling and twenty of freewheeling reads 30 rpm, and
-    // no zero to skip — the segment then sat 10 rpm under the ride's figure.
-    const axisKey = axis === "elapsed" ? "elapsed" : "distance";
-    const recorded = series.filter((point) => {
-      const at = point[axisKey];
-      return typeof at === "number" && at >= first.x && at <= last.x;
-    });
-    const source: readonly ActivityChannelPoint[] = recorded.length >= 2 ? recorded : visible;
-    const mean = (key: ActivityChannelKey, skipZeros = false) => {
-      const values = source
-        .map((row) => row[key])
-        .filter(
-          (value): value is number =>
-            typeof value === "number" && (!skipZeros || value > 0)
-        );
-      return values.length === 0
-        ? undefined
-        : values.reduce((sum, value) => sum + value, 0) / values.length;
-    };
+    // COROS's own activity time, stated for the whole of it.
+    const whole: StretchFigures = activityTime !== undefined ? { ...measured, duration: activityTime } : measured;
 
-    // From the first and last rows that carry a distance, not the stretch's
-    // ends: a watch records the clock before GPS has a fix and after it has
-    // stopped counting, and a stretch ending on such a row stated no distance.
-    const firstDistance = visible.find((row) => typeof row.distance === "number")?.distance;
-    const lastDistance = [...visible].reverse().find((row) => typeof row.distance === "number")?.distance;
-    const distance =
-      firstDistance !== undefined && lastDistance !== undefined
-        ? lastDistance - firstDistance
-        : undefined;
-    const duration =
-      range === null && activityTime !== undefined
-        ? activityTime
-        : typeof first.elapsed === "number" && typeof last.elapsed === "number"
-          ? last.elapsed - first.elapsed
+    let stretch: StretchFigures | null = null;
+    let title: string | null = null;
+    if (selection && hasElapsed) {
+      stretch = stretchFigures(series, "elapsed", selection.from, selection.to, reading, bands);
+      title = stretchTitle(lapStretches, selection);
+      // Exactly one lap: COROS's own figures for it, so this block and the lap
+      // table below never read a second apart.
+      const whole_ = wholeLaps(lapStretches, selection);
+      const lap =
+        whole_ && whole_.first.index === whole_.last.index
+          ? laps.find((entry) => entry.index === whole_.first.index)
           : undefined;
+      if (stretch && lap) {
+        const pace =
+          lap.distance && lap.duration ? lap.duration / (lap.distance / 1000) : (lap.pace ?? stretch.pace);
+        stretch = {
+          ...stretch,
+          distance: lap.distance ?? stretch.distance,
+          duration: lap.duration ?? stretch.duration,
+          pace,
+          speed: pace !== undefined && pace > 0 ? 3600 / pace : stretch.speed,
+          hr: lap.avgHr ?? stretch.hr,
+          hrMax: lap.maxHr ?? stretch.hrMax,
+          cadence: lap.avgCadence ?? stretch.cadence
+        };
+      }
+    } else if (range !== null && visible.length >= 2) {
+      const axisKey = axis === "elapsed" ? "elapsed" : "distance";
+      stretch = stretchFigures(series, axisKey, visible[0]!.x, visible[visible.length - 1]!.x, reading, bands);
+    }
+    return { whole, stretch, title };
+  }, [activityTime, axis, hasElapsed, laps, lapStretches, motion, range, selection, series, visible, zoneRows]);
 
-    // The segment's own pace, from its own distance and clock, rather than
-    // the mean of per-sample paces — a run that stopped would otherwise read
-    // faster than it was, since a stopped sample carries no pace at all.
-    const pace =
-      distance !== undefined && duration !== undefined && distance > 0
-        ? duration / (distance / 1000)
-        : mean("pace");
-
-    return {
-      distance,
-      duration,
-      pace,
-      // A ride's speed is that same figure the other way up, not the mean of
-      // the samples' speeds, for the same reason.
-      speed: pace !== undefined && pace > 0 ? 3600 / pace : undefined,
-      hr: mean("hr"),
-      // A ride's cadence is averaged over the pedalling, as the watch states it:
-      // every coasting second reads 0, and counting them put the segment 15 rpm
-      // under the ride's own figure on the same page. A hike's over the walking,
-      // for the same reason: its watch keeps recording through every rest.
-      cadence: mean("cadence", !readsPace(motion)),
-      // Only a ride states it: a run's power is the watch's own estimate, and
-      // the Running screen has never put it beside the segment's figures.
-      power: motion === "speed" ? mean("power") : undefined,
-      // What a walker asks of a stretch first: how much height it gained. A
-      // trail runner asks it second, after the pace.
-      gain: motion === "hike" || motion === "trail" ? stretchGain(source) : undefined
-    };
-  }, [activityTime, axis, motion, range, series, visible]);
+  /** The x at the plot's two edges: the whole of it, or what the brush has cut. */
+  const domain = useMemo<readonly [number, number]>(
+    () => (visible.length > 1 ? [visible[0]!.x, visible[visible.length - 1]!.x] : [0, 1]),
+    [visible]
+  );
+  const lapSectionList = useMemo(() => lapSections(laps), [laps]);
+  const lapRecoveries = useMemo(
+    () => laps.map((lap, position) => isRecoveryLap(lap, lapSectionList[position])),
+    [laps, lapSectionList]
+  );
 
   const surfaceClass = embedded
     ? "activity-chart-panel is-embedded"
@@ -531,7 +611,6 @@ export function ActivitySeriesChart({
     name,
     channels,
     height,
-    withBrush,
     tooltipAltitude,
     showXAxis = true
   }: {
@@ -539,7 +618,6 @@ export function ActivitySeriesChart({
     name: "combined" | ActivityChannelGroup;
     channels: readonly ActivityChannelDefinition[];
     height: number;
-    withBrush: boolean;
     tooltipAltitude: boolean;
     showXAxis?: boolean;
   }) => {
@@ -548,9 +626,18 @@ export function ActivitySeriesChart({
     return (
       <>
         <PlotAxisCaptions channels={channels} palette={palette} motion={motion} unitSystem={unitSystem} />
+        <LinkedPlotStage
+          link={link}
+          domain={domain}
+          toAxis={toAxis}
+          toElapsed={toElapsed}
+          // The ruler stands over the first plot; split, the body plot's area
+          // has the same edges.
+          onPlotRect={name === "body" ? undefined : setPlotRect}
+        >
         <ResponsiveContainer width="100%" height={height}>
           <ComposedChart
-            data={rows}
+            data={visible}
             margin={{ top: 8, right: 8, bottom: 4, left: 0 }}
             {...(split ? { syncId } : {})}
           >
@@ -576,7 +663,7 @@ export function ActivitySeriesChart({
               axisLine={{ stroke: colors.grid }}
               tickMargin={6}
               tickFormatter={(value: number) => formatXTick(axis, value, unitSystem)}
-              minTickGap={48}
+              minTickGap={24}
             />
 
             {/* `hide` does not take the axis out of the layout: recharts still
@@ -703,32 +790,9 @@ export function ActivitySeriesChart({
               )}
             />
 
-            {withBrush ? (
-              <Brush
-                dataKey="x"
-                height={20}
-                travellerWidth={10}
-                stroke={colors.grid}
-                fill="transparent"
-                traveller={(props: { x: number; y: number; width: number; height: number }) => (
-                  <BrushHandle {...props} color={colors.text} fill={colors.tooltipBg} />
-                )}
-                startIndex={range?.start}
-                endIndex={range?.end}
-                tickFormatter={(value: number) => formatXTick(axis, value, unitSystem)}
-                onChange={(next) => {
-                  const start = (next as { startIndex?: number }).startIndex;
-                  const end = (next as { endIndex?: number }).endIndex;
-                  if (typeof start === "number" && typeof end === "number") {
-                    setRange(
-                      start === 0 && end === rows.length - 1 ? null : { start, end }
-                    );
-                  }
-                }}
-              />
-            ) : null}
           </ComposedChart>
         </ResponsiveContainer>
+        </LinkedPlotStage>
       </>
     );
   };
@@ -762,143 +826,502 @@ export function ActivitySeriesChart({
     />
   );
 
+  const shownChannels = available.filter((channel) => !hiddenChannels.includes(channel.key));
+  /** Puts a channel's chip away or brings it back; one put away is no longer drawn. */
+  const toggleHidden = (key: string) => {
+    const hide = !hiddenChannels.includes(key);
+    setHiddenChannels(hide ? [...hiddenChannels, key] : hiddenChannels.filter((entry) => entry !== key));
+    if (hide) {
+      if (activityChannel(key as ActivityChannelKey).background) {
+        setShowAltitude(false);
+      }
+      setSelected((previous) => previous.filter((entry) => entry !== key));
+    }
+  };
+
   const selectedIn = (group: ActivityChannelGroup) =>
     selected.filter((key) => activityChannelGroup(key) === group).map((key) => activityChannel(key, motion, sportType));
   const offeredIn = (group: ActivityChannelGroup) =>
-    available.filter((channel) =>
+    shownChannels.filter((channel) =>
       group === "motion"
         ? channel.background || activityChannelGroup(channel.key) === "motion"
         : activityChannelGroup(channel.key) === "body"
     );
 
+  const ruler =
+    plotRect && hasElapsed && lapStretches.length > 1 && lapStretches.length <= LAP_RULER_MOST ? (
+      <LapRuler
+        link={link}
+        rect={plotRect}
+        domain={domain}
+        toAxis={toAxis}
+        sections={lapSectionList}
+        recoveries={lapRecoveries}
+      />
+    ) : null;
+
+  const distanceText = (meters: number) =>
+    motion === "swim"
+      ? // A swim is said in metres (or yards), never in kilometres.
+        formatDistanceValue(meters, unitSystem, { swim: true })
+      : `${formatDecimal(metersToDisplayDistance(meters, unitSystem), 2)} ${distanceUnit(unitSystem)}`;
+  const signed = (value: number, unit: string) => {
+    const rounded = Math.round(value);
+    return rounded === 0 ? undefined : `${rounded > 0 ? "+" : "−"}${Math.abs(rounded)} ${unit}`;
+  };
+  const share = (part: number | undefined, all: number | undefined) =>
+    part !== undefined && all !== undefined && all > 0
+      ? t("activity.chart.selection.ofTotal", { percent: Math.round((part / all) * 100) })
+      : undefined;
+
+  /** A stretch's figures as they are written; `against` adds how each stands to the whole. */
+  const figuresOf = (shown: StretchFigures, against: StretchFigures | null) => {
+    const list: { key: string; label: string; value: string; delta?: string }[] = [];
+    if (shown.distance !== undefined) {
+      list.push({
+        key: "distance",
+        label: t("activity.m.distance"),
+        value: distanceText(shown.distance),
+        delta: against ? share(shown.distance, against.distance) : undefined
+      });
+    }
+    if (shown.duration !== undefined) {
+      list.push({
+        key: "time",
+        label: t("activity.m.time"),
+        value: formatDurationSeconds(shown.duration),
+        delta: against ? share(shown.duration, against.duration) : undefined
+      });
+    }
+    if (readsPace(motion) && shown.pace !== undefined) {
+      let delta: string | undefined;
+      if (against?.pace !== undefined) {
+        const gap = shown.pace - against.pace;
+        const amount = formatPaceTick(Math.abs(gap), unitSystem, motion);
+        if (amount !== "0:00") {
+          delta = t(gap < 0 ? "activity.chart.selection.faster" : "activity.chart.selection.slower", {
+            amount: `${amount} ${paceUnit(unitSystem, motion)}`
+          });
+        }
+      }
+      list.push({
+        key: "pace",
+        label: activityChannel("pace", motion, sportType).label,
+        value: formatChannelValue("pace", shown.pace, unitSystem, motion),
+        delta
+      });
+    }
+    if (!readsPace(motion) && shown.speed !== undefined) {
+      let delta: string | undefined;
+      if (against?.speed !== undefined) {
+        const gap = kmhToDisplaySpeed(shown.speed, unitSystem) - kmhToDisplaySpeed(against.speed, unitSystem);
+        if (Math.abs(gap) >= 0.05) {
+          delta = t(gap > 0 ? "activity.chart.selection.faster" : "activity.chart.selection.slower", {
+            amount: `${formatDecimal(Math.abs(gap), 1)} ${speedUnit(unitSystem)}`
+          });
+        }
+      }
+      list.push({
+        key: "speed",
+        label: activityChannel("speed", motion, sportType).label,
+        value: formatChannelValue("speed", shown.speed, unitSystem, motion),
+        delta
+      });
+    }
+    if (shown.power !== undefined) {
+      list.push({
+        key: "power",
+        label: t("activity.m.power"),
+        value: `${Math.round(shown.power)} W`,
+        delta: against?.power !== undefined ? signed(shown.power - against.power, "W") : undefined
+      });
+    }
+    if (shown.hr !== undefined) {
+      list.push({
+        key: "hr",
+        label: t("activity.m.avgHr"),
+        value: `${Math.round(shown.hr)} bpm`,
+        delta: against?.hr !== undefined ? signed(shown.hr - against.hr, "bpm") : undefined
+      });
+    }
+    if (shown.hrMax !== undefined) {
+      list.push({ key: "hrMax", label: t("activity.m.maxHr"), value: `${Math.round(shown.hrMax)} bpm` });
+    }
+    if (shown.cadence !== undefined) {
+      list.push({
+        key: "cadence",
+        label: activityChannel("cadence", motion, sportType).label,
+        value: `${Math.round(shown.cadence)} ${cadenceUnit(motion)}`,
+        delta:
+          against?.cadence !== undefined
+            ? signed(shown.cadence - against.cadence, cadenceUnit(motion))
+            : undefined
+      });
+    }
+    if (shown.gain !== undefined && shown.gain > 0) {
+      list.push({
+        key: "gain",
+        label: t("activity.m.climb"),
+        value: `+${Math.round(metersToElevation(shown.gain, unitSystem))} ${elevationUnit(unitSystem)}`
+      });
+    }
+    return list;
+  };
+
+  const shownFigures = segment ? (segment.stretch ?? segment.whole) : null;
+  // A stretch's time in each zone is counted off its samples; the whole
+  // session's is COROS's own, the seconds it scored.
+  const shownZones = segment?.stretch
+    ? (segment.stretch.zoneSeconds ?? [])
+    : zoneRows.map((row) => row.seconds);
+
   return (
-    <section className={surfaceClass}>
+    <section
+      className={surfaceClass}
+      onKeyDown={(event) => {
+        // Escape lets the selection go, and nothing else: the page is not left with it.
+        if (event.key === "Escape" && link.getState().selection) {
+          event.stopPropagation();
+          link.setSelection(null);
+        }
+      }}
+    >
       <div className="activity-chart-head">
         {heading}
         <div className="activity-chart-controls">
-          {splittable ? (
-            <OptionGroup
-              label={t("activity.chart.layout")}
-              value={split ? "split" : "combined"}
-              options={[
-                { value: "combined", label: t("activity.chart.layoutCombined") },
-                { value: "split", label: t("activity.chart.layoutSplit") }
-              ]}
-              onChange={(next) => {
-                const nextSplit = next === "split";
-                setSplitPreference(nextSplit);
-                setSelected((previous) => fitActivityChannels(previous, available, nextSplit));
+          {range !== null ? (
+            <button type="button" className="activity-chart-action" onClick={() => setRange(null)}>
+              <ZoomOut size={14} aria-hidden="true" />
+              {t("activity.chart.selection.resetZoom")}
+            </button>
+          ) : selection ? (
+            <button
+              type="button"
+              className="activity-chart-action"
+              onClick={() => {
+                // A little of what came before and after, so the stretch's
+                // edges, and the laps either side on the ruler, stay in view.
+                const margin = (selection.to - selection.from) * 0.12;
+                const next = rowsOf(selection.from - margin, selection.to + margin);
+                if (next) {
+                  setRange(next);
+                }
               }}
-            />
+            >
+              <ZoomIn size={14} aria-hidden="true" />
+              {t("activity.chart.selection.zoom")}
+            </button>
           ) : null}
-          <OptionGroup
-            label={t("activity.chart.xAxis")}
-            className="activity-chart-axis"
-            value={axis}
-            options={[
-              { value: "elapsed", label: t("activity.m.time"), disabled: !hasElapsed },
-              { value: "distance", label: t("activity.m.distance"), disabled: !hasDistance }
-            ]}
-            onChange={(next) =>
-              setAxis(next === "distance" ? "distance" : "elapsed")
-            }
-          />
+          {selection ? (
+            <button type="button" className="activity-chart-action" onClick={() => link.setSelection(null)}>
+              <X size={14} aria-hidden="true" />
+              {t("activity.chart.selection.clear")}
+            </button>
+          ) : null}
+          <ChartSettings
+            channels={available}
+            hidden={hiddenChannels}
+            colorOf={(key) => palette[key as ActivityChannelKey]?.stroke}
+            onToggle={toggleHidden}
+          >
+            <div className="activity-chart-settings-row">
+              <span>{t("activity.chart.xAxis")}</span>
+              <OptionGroup
+                label={t("activity.chart.xAxis")}
+                className="activity-chart-axis"
+                value={axis}
+                options={[
+                  { value: "elapsed", label: t("activity.m.time"), disabled: !hasElapsed },
+                  { value: "distance", label: t("activity.m.distance"), disabled: !hasDistance }
+                ]}
+                onChange={(next) => {
+                  // The zoom is in rows of the axis it was made on.
+                  setRange(null);
+                  setAxisPreference(next === "distance" ? "distance" : "elapsed");
+                }}
+              />
+            </div>
+            {splittable ? (
+              <div className="activity-chart-settings-row">
+                <span>{t("activity.chart.layout")}</span>
+                <OptionGroup
+                  label={t("activity.chart.layout")}
+                  value={split ? "split" : "combined"}
+                  options={[
+                    { value: "combined", label: t("activity.chart.layoutCombined") },
+                    { value: "split", label: t("activity.chart.layoutSplit") }
+                  ]}
+                  onChange={(next) => {
+                    const nextSplit = next === "split";
+                    setSplitPreference(nextSplit);
+                    setSelected((previous) => fitActivityChannels(previous, available, nextSplit));
+                  }}
+                />
+              </div>
+            ) : null}
+          </ChartSettings>
+          {hasRoute ? (
+            <button
+              type="button"
+              className="activity-chart-toggle"
+              aria-pressed={mapShown}
+              title={t(mapShown ? "activity.chart.map.hide" : "activity.chart.map.show")}
+              aria-label={t(mapShown ? "activity.chart.map.hide" : "activity.chart.map.show")}
+              onClick={() => setMapPreference(!mapPreference)}
+            >
+              <MapIcon size={15} aria-hidden="true" />
+            </button>
+          ) : null}
         </div>
       </div>
 
-      {split ? (
-        <>
-          <div className="activity-chart-group">
-            <span className="activity-chart-group-label">{t("activity.chart.groupMotion")}</span>
-            {chips(offeredIn("motion"), t("activity.chart.groupMotion"))}
+      <div className={mapShown ? "activity-chart-body has-map" : "activity-chart-body"}>
+        {mapShown ? (
+          <div className="activity-chart-map">
+            <ActivityRouteMap track={track} detail={routeDetail} link={link} pauses={pauses} />
           </div>
-          <div className="activity-chart-plot is-split-top">
-            {plot({
-              name: "motion",
-              channels: selectedIn("motion"),
-              height: SPLIT_TOP_HEIGHT,
-              withBrush: false,
-              tooltipAltitude: true,
-              showXAxis: false
-            })}
-          </div>
-          <div className="activity-chart-group">
-            <span className="activity-chart-group-label">{t("activity.chart.groupBody")}</span>
-            {chips(offeredIn("body"), t("activity.chart.groupBody"))}
-          </div>
-          <div className="activity-chart-plot is-split-bottom">
-            {plot({
-              name: "body",
-              channels: selectedIn("body"),
-              height: SPLIT_BOTTOM_HEIGHT,
-              withBrush: true,
-              tooltipAltitude: false
-            })}
-          </div>
-        </>
-      ) : (
-        <>
-          {chips(available, t("activity.chart.series"))}
-          <div className="activity-chart-plot">
-            {plot({
-              name: "combined",
-              channels: selected.map((key) => activityChannel(key, motion, sportType)),
-              height: COMBINED_HEIGHT,
-              withBrush: true,
-              tooltipAltitude: true
-            })}
-          </div>
-        </>
-      )}
+        ) : null}
+        <div className="activity-chart-main">
+          {split ? (
+            <>
+              <div className="activity-chart-group">
+                <span className="activity-chart-group-label">{t("activity.chart.groupMotion")}</span>
+                {chips(offeredIn("motion"), t("activity.chart.groupMotion"))}
+              </div>
+              {ruler}
+              <div className="activity-chart-plot is-split-top">
+                {plot({
+                  name: "motion",
+                  channels: selectedIn("motion"),
+                  height: SPLIT_TOP_HEIGHT,
+                  tooltipAltitude: true,
+                  showXAxis: false
+                })}
+              </div>
+              <div className="activity-chart-group">
+                <span className="activity-chart-group-label">{t("activity.chart.groupBody")}</span>
+                {chips(offeredIn("body"), t("activity.chart.groupBody"))}
+              </div>
+              <div className="activity-chart-plot is-split-bottom">
+                {plot({
+                  name: "body",
+                  channels: selectedIn("body"),
+                  height: SPLIT_BOTTOM_HEIGHT,
+                  tooltipAltitude: false
+                })}
+              </div>
+            </>
+          ) : (
+            <>
+              {chips(shownChannels, t("activity.chart.series"))}
+              {ruler}
+              <div className="activity-chart-plot">
+                {plot({
+                  name: "combined",
+                  channels: selected.map((key) => activityChannel(key, motion, sportType)),
+                  height: COMBINED_HEIGHT,
+                  tooltipAltitude: true
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
 
-      {segment ? (
+      {segment && shownFigures ? (
         <div className="activity-chart-segment">
-          <span className="activity-chart-segment-label">
-            {range === null
-              ? t(`activity.chart.whole.${ACTIVITY_NOUN[motion]}` as const)
-              : t("activity.chart.selection")}
-          </span>
-          {segment.distance !== undefined ? (
-            <span>
-              {motion === "swim" ? (
-                // A swim is said in metres (or yards), never in kilometres.
-                formatDistanceValue(segment.distance, unitSystem, { swim: true })
-              ) : (
-                <>
-                  {formatDecimal(metersToDisplayDistance(segment.distance, unitSystem), 2)}{" "}
-                  {distanceUnit(unitSystem)}
-                </>
-              )}
+          <div className="activity-chart-segment-head">
+            <span className="activity-chart-segment-label">
+              {segment.stretch
+                ? t("activity.chart.selection")
+                : t(`activity.chart.whole.${ACTIVITY_NOUN[motion]}` as const)}
             </span>
-          ) : null}
-          {segment.duration !== undefined ? (
-            <span>{formatDurationSeconds(segment.duration)}</span>
-          ) : null}
-          {readsPace(motion) && segment.pace !== undefined ? (
-            <span>{formatChannelValue("pace", segment.pace, unitSystem, motion)}</span>
-          ) : null}
-          {!readsPace(motion) && segment.speed !== undefined ? (
-            <span>{formatChannelValue("speed", segment.speed, unitSystem, motion)}</span>
-          ) : null}
-          {segment.gain !== undefined && segment.gain > 0 ? (
-            <span>
-              +{Math.round(metersToElevation(segment.gain, unitSystem))} {elevationUnit(unitSystem)}
-            </span>
-          ) : null}
-          {segment.power !== undefined ? (
-            <span>{Math.round(segment.power)} W</span>
-          ) : null}
-          {segment.hr !== undefined ? (
-            <span>{Math.round(segment.hr)} bpm</span>
-          ) : null}
-          {segment.cadence !== undefined ? (
-            <span>
-              {Math.round(segment.cadence)} {cadenceUnit(motion)}
-            </span>
-          ) : null}
+            {segment.stretch && segment.title ? (
+              <strong className="activity-chart-segment-title">{segment.title}</strong>
+            ) : null}
+            {!segment.stretch && hasElapsed ? (
+              <span className="activity-chart-segment-hint">{t("activity.chart.selection.hint")}</span>
+            ) : null}
+          </div>
+          <dl className="activity-chart-figures">
+            {figuresOf(shownFigures, segment.stretch ? segment.whole : null).map((figure) => (
+              <div key={figure.key} className="activity-chart-figure">
+                <dt>{figure.label}</dt>
+                <dd>
+                  <span>{figure.value}</span>
+                  {figure.delta ? <small>{figure.delta}</small> : null}
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <ZoneBar rows={zoneRows} seconds={shownZones} />
         </div>
       ) : null}
     </section>
+  );
+}
+
+/** A zone's bounds in bpm, as a reader writes them. */
+function zoneBounds(row: ZoneTimeRow): string | undefined {
+  const { easyEdge, hardEdge } = row;
+  if (easyEdge !== undefined && hardEdge !== undefined) {
+    return `${Math.round(easyEdge)}–${Math.round(hardEdge)} bpm`;
+  }
+  if (hardEdge !== undefined) return `< ${Math.round(hardEdge)} bpm`;
+  if (easyEdge !== undefined) return `> ${Math.round(easyEdge)} bpm`;
+  return undefined;
+}
+
+/**
+ * Time in each heart-rate zone as one bar: the whole session's, or the selected
+ * stretch's. A zone under the pointer, or its name below, stands out from the
+ * rest and says its bounds, its time and its share.
+ */
+function ZoneBar({ rows, seconds }: { rows: readonly ZoneTimeRow[]; seconds: readonly number[] }) {
+  const [active, setActive] = useState<number | null>(null);
+  const total = seconds.reduce((sum, value) => sum + value, 0);
+  if (rows.length === 0 || total <= 0) {
+    return null;
+  }
+  const parts = rows
+    .map((row, at) => ({ row, at, seconds: seconds[at] ?? 0 }))
+    .filter((part) => part.seconds > 0);
+  const name = (row: ZoneTimeRow) => (row.label ? zoneName(row.label) : zoneLabel(row.position));
+  const told = parts.find((part) => part.at === active);
+  // Where the told zone's middle is along the bar, for the note above it.
+  let before = 0;
+  for (const part of parts) {
+    if (part.at === active) break;
+    before += part.seconds;
+  }
+  const middle = told ? ((before + told.seconds / 2) / total) * 100 : 0;
+
+  return (
+    <div
+      className={active === null ? "activity-chart-zones" : "activity-chart-zones is-telling"}
+      onPointerLeave={() => setActive(null)}
+    >
+      <div className="activity-chart-zone-bar" role="img" aria-label={t("activity.zones.timeIn")}>
+        {parts.map((part) => (
+          <i
+            key={part.row.position}
+            className={part.at === active ? "is-active" : undefined}
+            style={{ width: `${(part.seconds / total) * 100}%`, background: zoneColor(part.row.position) }}
+            onPointerEnter={() => setActive(part.at)}
+          />
+        ))}
+      </div>
+      {told ? (
+        <div className="activity-chart-zone-note" style={{ left: `${Math.min(92, Math.max(8, middle))}%` }}>
+          <strong>{name(told.row)}</strong>
+          {zoneBounds(told.row) ? <span>{zoneBounds(told.row)}</span> : null}
+          <span>
+            {formatDurationSpan(told.seconds)} · {Math.round((told.seconds / total) * 100)}%
+          </span>
+        </div>
+      ) : null}
+      <div className="activity-chart-zone-key">
+        {parts.map((part) => (
+          <span
+            key={part.row.position}
+            className={part.at === active ? "is-active" : undefined}
+            onPointerEnter={() => setActive(part.at)}
+          >
+            <i aria-hidden="true" style={{ background: zoneColor(part.row.position) }} />
+            {name(part.row)} {formatDurationSeconds(part.seconds)}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * How the chart is set up, behind one button at its head: what it is read
+ * along, one plot or two, and which channels have a chip. A channel here is a
+ * switch in a list, not a chip: the chips beside the plot draw a line or take
+ * it away, and a control that looks the same would be read as doing the same.
+ */
+function ChartSettings({
+  channels,
+  hidden,
+  colorOf,
+  onToggle,
+  children
+}: {
+  channels: readonly ActivityChannelDefinition[];
+  hidden: readonly string[];
+  colorOf: (key: string) => string | undefined;
+  onToggle: (key: string) => void;
+  /** The chart's either/or choices, each a labelled row above the channels. */
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const id = useId();
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    // Escape closes the popup and nothing else; a press outside closes it too.
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        setOpen(false);
+      }
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown, true);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="activity-chart-settings">
+      <button
+        type="button"
+        className="activity-chart-toggle"
+        aria-expanded={open}
+        title={t("activity.chart.settings")}
+        aria-label={t("activity.chart.settings")}
+        onClick={() => setOpen((previous) => !previous)}
+      >
+        <Settings2 size={15} aria-hidden="true" />
+      </button>
+      {open ? (
+        <div className="activity-chart-settings-menu" role="dialog" aria-label={t("activity.chart.settings")}>
+          <strong className="activity-chart-settings-title">{t("activity.chart.settings")}</strong>
+          {children}
+          <div className="activity-chart-settings-channels">
+            <span className="activity-chart-settings-label">{t("activity.chart.channelsShown")}</span>
+            <ul>
+              {channels.map((channel) => (
+                <li key={channel.key}>
+                  <label className="activity-chart-switch" htmlFor={`${id}-${channel.key}`}>
+                    <i aria-hidden="true" style={{ background: colorOf(channel.key) }} />
+                    <span>{channel.label}</span>
+                    <input
+                      id={`${id}-${channel.key}`}
+                      type="checkbox"
+                      role="switch"
+                      checked={!hidden.includes(channel.key)}
+                      onChange={() => onToggle(channel.key)}
+                    />
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -939,48 +1362,6 @@ function axisUnit(key: ActivityChannelKey, unitSystem: UnitSystem, motion: Activ
   if (key === "verticalSpeed") return `${elevationUnit(unitSystem)}/h`;
   if (key === "cadence") return cadenceUnit(motion);
   return activityChannel(key).unit;
-}
-
-/** A brush handle: a rounded pill with a grip line, in place of recharts' square. */
-function BrushHandle({
-  x,
-  y,
-  width,
-  height,
-  color,
-  fill
-}: {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color: string;
-  fill: string;
-}) {
-  const centre = x + width / 2;
-  return (
-    <g>
-      <rect
-        x={x}
-        y={y + 1}
-        width={width}
-        height={height - 2}
-        rx={3}
-        fill={fill}
-        stroke={color}
-        strokeOpacity={0.45}
-      />
-      <line
-        x1={centre}
-        x2={centre}
-        y1={y + height * 0.3}
-        y2={y + height * 0.7}
-        stroke={color}
-        strokeOpacity={0.7}
-        strokeLinecap="round"
-      />
-    </g>
-  );
 }
 
 interface RunChartTooltipProps extends TooltipContentProps {

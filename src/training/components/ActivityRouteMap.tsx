@@ -4,10 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MapPin, Maximize2, RotateCcw, X } from "lucide-react";
 import type {
+  TrainingHubActivityPause,
   TrainingHubActivityTrack,
   TrainingHubTrackPoint
 } from "../../../electron/types";
-import { OptionGroup } from "../../components/OptionGroup";
+import type { ActivityLink } from "../activityLink";
+import { bindRouteLink, type RouteLinkBinding } from "./routeLink";
 import { useI18n } from "../../i18n/useI18n";
 import {
   defineSelectionPreference,
@@ -20,6 +22,7 @@ import { formatElevationMeters, formatPaceSecondsPerKm } from "../formatters";
 import { isSpeedSport } from "../sportTypes";
 import {
   BASE_LAYERS,
+  BASE_LAYER_ORDER,
   isLightBaseLayer,
   type BaseLayerConfig,
   type BaseLayerId
@@ -84,6 +87,13 @@ interface ActivityRouteMapProps {
   track?: TrainingHubActivityTrack;
   /** The activity's detail, for colouring the full map by pace, heart rate or elevation. */
   detail?: RouteDetail;
+  /**
+   * The cursor and the selection the page's chart and lap table share
+   * (`activityLink.ts`): given, the route shows both and sets both.
+   */
+  link?: ActivityLink;
+  /** The pauses the link's clock leaves out and the route's still counts. */
+  pauses?: readonly TrainingHubActivityPause[];
 }
 
 const ROUTE_COLOR = "#74c08f";
@@ -155,6 +165,21 @@ function routeEndMarker(map: L.Map, at: [number, number], kind: "start" | "end")
 
 const ROUTE_COLOR_MODES = ["route", "performance", "heatmap"] as const;
 const ROUTE_METRICS = ["pace", "hr", "elevation"] as const;
+
+/**
+ * What the layer menu offers for the route: the plain line, each thing recorded
+ * along it, or the heat. One list, so nothing about how the route is coloured
+ * is picked anywhere but the menu.
+ */
+type RouteLayerChoice = "route" | RouteMetric | "heatmap";
+
+/**
+ * The base maps a route map offers. Street and Topo are left out: the route is
+ * read on a quiet ground or on the land itself, and those two were neither.
+ */
+const ROUTE_BASE_LAYERS: readonly BaseLayerId[] = BASE_LAYER_ORDER.filter(
+  (layer) => layer !== "street" && layer !== "topo"
+);
 
 /** How the full map colours the route, remembered like the base map. */
 const ROUTE_COLOR_MODE_PREFERENCE = defineSelectionPreference<RouteColorMode>({
@@ -351,6 +376,8 @@ function headPosition(route: RouteReplay, progress: number): number {
 
 /** Below the route's lines, above the heatmap's pane (which never shows with them). */
 const LINE_HALO_PANE = "heraclesRouteHalo";
+/** The selected stretch drawn again: above the link's veil, below the start and finish. */
+const ROUTE_STRETCH_PANE = "heraclesRouteStretch";
 
 /**
  * Draws the route as runs of one colour each, up to the replay's head, along
@@ -374,7 +401,13 @@ class LinePainter implements Painter {
     private readonly route: RouteReplay,
     private readonly curve: SmoothPath,
     style: RouteStyle,
-    stretchColors: readonly (string | null)[] | undefined
+    stretchColors: readonly (string | null)[] | undefined,
+    /**
+     * Draw only this stretch of the route (positions along its points), in this
+     * pane: the selected stretch, drawn again over the veil laid on the rest —
+     * by this same painter, so it is the route's own line, halo and core.
+     */
+    private readonly only?: { from: number; to: number; pane: string }
   ) {
     if (!map.getPane(LINE_HALO_PANE)) {
       map.createPane(LINE_HALO_PANE).style.zIndex = "395";
@@ -390,7 +423,8 @@ class LinePainter implements Painter {
         lineCap: "round",
         lineJoin: "round",
         interactive: false,
-        ...options
+        ...options,
+        ...(only ? { pane: only.pane } : {})
       }).addTo(this.group);
     const runs = routeRuns(route.latLngs.length, stretchColors).filter(
       (run) => run.color !== null
@@ -431,6 +465,15 @@ class LinePainter implements Painter {
 
   paint(progress: number): PaintedEnds {
     const position = headPosition(this.route, progress);
+    if (this.only) {
+      // One stretch, whole: each run cut to it.
+      for (const entry of this.lines) {
+        const from = Math.max(entry.run.from, this.only.from);
+        const to = Math.min(entry.run.to, this.only.to);
+        this.draw(entry, from < to ? curveBetween(this.curve, from, to) : []);
+      }
+      return { start: curveHead(this.curve, this.only.from), head: curveHead(this.curve, this.only.to) };
+    }
     for (const entry of this.lines) {
       const { from, to } = entry.run;
       if (to <= position) {
@@ -740,9 +783,14 @@ function RouteMapCanvas({
   replaySpeed = 1,
   replayToken = 0,
   drawing,
+  link,
+  pauses,
   ariaLabel
 }: {
   route: RouteReplay;
+  /** The page's link: the route shows its cursor and selection, and sets them. */
+  link?: ActivityLink;
+  pauses?: readonly TrainingHubActivityPause[];
   /**
    * How the route is drawn when it is coloured by what happened along it.
    * Absent, it is one line in the route's own colour.
@@ -855,6 +903,7 @@ function RouteMapCanvas({
 
     const startMarker = ends ? routeEndMarker(map, start, "start").addTo(map) : undefined;
 
+    let placeEnds: (() => void) | undefined;
     const fitRoute = () => {
       const band =
         visibleBand === undefined
@@ -867,6 +916,41 @@ function RouteMapCanvas({
       });
     };
     fitRoute();
+    // Once the map has a view: the link reads the route in the map's own pixels.
+    // A selected stretch takes the two markers to its own ends: where it began
+    // and where it finished. Let go, they return to the route's.
+    let stretchEnds: { start: [number, number]; end: [number, number] } | null = null;
+    let stretchAt: { from: number; to: number } | null = null;
+    let stretchPainter: LinePainter | null = null;
+    /**
+     * The selected stretch over the veil, drawn as the route is: the same
+     * painter, the same colours, cut to the stretch. The heatmap is a canvas
+     * and has no stretch to draw again; there the veil alone sets it apart.
+     */
+    const drawStretch = () => {
+      stretchPainter?.remove();
+      stretchPainter = null;
+      const shown = drawnRef.current;
+      if (!stretchAt || shown?.kind === "glow") {
+        return;
+      }
+      if (!map.getPane(ROUTE_STRETCH_PANE)) {
+        map.createPane(ROUTE_STRETCH_PANE).style.zIndex = "445";
+      }
+      stretchPainter = new LinePainter(map, route, curve, style, shown?.stretchColors, {
+        ...stretchAt,
+        pane: ROUTE_STRETCH_PANE
+      });
+      stretchPainter.paint(1);
+    };
+    const routeLink: RouteLinkBinding | null = link
+      ? bindRouteLink(map, route, link, pauses, style, (next) => {
+          stretchEnds = next ? { start: next.start, end: next.end } : null;
+          stretchAt = next ? { from: next.from, to: next.to } : null;
+          drawStretch();
+          placeEnds?.();
+        })
+      : null;
     const routeEnds = ends ? bindRouteEnds(map) : undefined;
     // The heatmap's canvas is hidden through a zoom; the lines are not.
     const endsHideWithRoute = (next: RouteDrawing | undefined) =>
@@ -886,10 +970,19 @@ function RouteMapCanvas({
 
     // The markers sit on the line as drawn, which the heatmap moves off the
     // recorded points.
+    let drawnEnds: PaintedEnds | null = null;
     const paintAt = (progress: number) => {
       const drawn = painter.paint(progress);
-      startMarker?.setLatLng(drawn.start);
-      return drawn.head;
+      drawnEnds = drawn;
+      startMarker?.setLatLng(stretchEnds?.start ?? drawn.start);
+      return stretchEnds?.end ?? drawn.head;
+    };
+    placeEnds = () => {
+      if (!drawnEnds) {
+        return;
+      }
+      startMarker?.setLatLng(stretchEnds?.start ?? drawnEnds.start);
+      endMarker?.setLatLng(stretchEnds?.end ?? drawnEnds.head);
     };
 
     const showWhole = () => {
@@ -958,10 +1051,14 @@ function RouteMapCanvas({
         endsHideWithRoute(next);
         ghostLine.setStyle({ opacity: ghostShown(next) ? style.ghostOpacity : 0 });
         showWhole();
+        // After `drawnRef` is the new drawing: the redraw effect sets it first.
+        drawStretch();
       },
       restyle: (next) => {
         style = next;
         painter.restyle(next);
+        routeLink?.restyle(next);
+        drawStretch();
         ghostLine.setStyle({
           color: next.routeColor,
           opacity: ghostShown(drawingRef.current) ? next.ghostOpacity : 0
@@ -980,13 +1077,15 @@ function RouteMapCanvas({
     return () => {
       window.cancelAnimationFrame(animationFrame);
       controlRef.current = null;
+      routeLink?.remove();
+      stretchPainter?.remove();
       painter.remove();
       resizeObserver.disconnect();
       map.remove();
       mapRef.current = null;
       tileLayerRef.current = null;
     };
-  }, [route, theme, scrollWheelZoom, interactive, visibleBand, animate, ends]);
+  }, [route, theme, scrollWheelZoom, interactive, visibleBand, animate, ends, link, pauses]);
 
   useEffect(() => {
     if (replayToken > 0) {
@@ -1234,9 +1333,12 @@ interface RouteMapLayers {
  * is read once per hook, so two holders would not hear each other.
  */
 function useRouteMapLayers(): RouteMapLayers {
-  const [baseLayer, setBaseLayer] = useBaseLayerPreference(
+  const [storedLayer, setBaseLayer] = useBaseLayerPreference(
     ACTIVITY_ROUTE_BASE_LAYER_PREFERENCE
   );
+  const { theme } = useTheme();
+  // A choice remembered from when Street and Topo were offered follows the theme.
+  const baseLayer = ROUTE_BASE_LAYERS.includes(storedLayer) ? storedLayer : themeBaseLayer(theme);
   const [colorMode, setColorMode] = useSelectionPreference(ROUTE_COLOR_MODE_PREFERENCE);
   const [metric, setMetric] = useSelectionPreference(ROUTE_METRIC_PREFERENCE);
   return { baseLayer, setBaseLayer, colorMode, setColorMode, metric, setMetric };
@@ -1258,7 +1360,7 @@ interface RouteAnalysis {
   heat: RouteHeat | null;
   /** A ride: its pace is read out as speed. */
   speed: boolean;
-  layerSection: MapLayerSection<RouteColorMode>;
+  layerSection: MapLayerSection<RouteLayerChoice>;
 }
 
 function useRouteAnalysis(
@@ -1289,31 +1391,33 @@ function useRouteAnalysis(
   const heatmapShown = mode === "heatmap";
   const heat = useMemo(() => (heatmapShown ? routeHeat(route) : null), [route, heatmapShown]);
 
-  const nothingShown = !ROUTE_METRICS.some(shows);
-  const somethingRecorded = ROUTE_METRICS.some((candidate) => {
-    const entry = performance[candidate];
-    return entry.kind === "none" && entry.recorded;
-  });
-  const layerSection: MapLayerSection<RouteColorMode> = {
+  const layerSection: MapLayerSection<RouteLayerChoice> = {
     title: t("activity.m.route"),
-    value: mode,
-    onChange: layers.setColorMode,
+    value: mode === "performance" ? metric : mode,
+    onChange: (choice) => {
+      if (choice === "route" || choice === "heatmap") {
+        layers.setColorMode(choice);
+        return;
+      }
+      layers.setMetric(choice);
+      layers.setColorMode("performance");
+    },
     options: [
       {
         value: "route",
         label: t("activity.m.route"),
         description: t("activity.route.layer.route.description")
       },
-      {
-        value: "performance",
-        label: t("activity.route.layer.performance"),
-        description: !nothingShown
-          ? t("activity.route.layer.performance.description", { metric: metricLabel("pace", speed) })
-          : somethingRecorded
-            ? t("activity.route.layer.nothingPlaced")
-            : t("activity.route.layer.nothingRecorded"),
-        disabled: nothingShown
-      },
+      // One entry for each thing recorded along the route; one it cannot place says why.
+      ...ROUTE_METRICS.map((candidate) => {
+        const entry = performance[candidate];
+        return {
+          value: candidate,
+          label: metricLabel(candidate, speed),
+          disabled: entry.kind === "none",
+          ...(entry.kind === "none" ? { description: entry.reason } : {})
+        };
+      }),
       {
         value: "heatmap",
         label: t("activity.route.layer.heatmap"),
@@ -1360,6 +1464,8 @@ function RouteMapFrame({
   replayToken,
   replaySpeed,
   drawing,
+  link,
+  pauses,
   ariaLabel,
   onExpand,
   onReplay,
@@ -1367,9 +1473,11 @@ function RouteMapFrame({
   layerSection
 }: {
   route: RouteReplay;
+  link?: ActivityLink;
+  pauses?: readonly TrainingHubActivityPause[];
   layers: RouteMapLayers;
   /** How the route is coloured, offered in the layer menu below the base maps. */
-  layerSection?: MapLayerSection<RouteColorMode>;
+  layerSection?: MapLayerSection<RouteLayerChoice>;
   className: string;
   scrollWheelZoom?: boolean;
   animate?: boolean;
@@ -1394,6 +1502,8 @@ function RouteMapFrame({
         replayToken={replayToken}
         {...(replaySpeed ? { replaySpeed: Number(replaySpeed) } : {})}
         drawing={drawing}
+        link={link}
+        pauses={pauses}
         baseLayer={layers.baseLayer}
         ariaLabel={ariaLabel}
       />
@@ -1413,6 +1523,7 @@ function RouteMapFrame({
       <MapLayerControl
         value={layers.baseLayer}
         onChange={layers.setBaseLayer}
+        layers={ROUTE_BASE_LAYERS}
         section={layerSection}
       />
       {onReplay ? (
@@ -1472,7 +1583,7 @@ function RouteMapModal({
   const dialogRef = useRef<HTMLDivElement>(null);
   const lightGround = isLightBaseLayer(layers.baseLayer);
   const drawing = useRouteDrawing(analysis, lightGround);
-  const { performance, metric, mode, speed, layerSection } = analysis;
+  const { layerSection } = analysis;
 
   useEffect(() => {
     // Captured on the window and stopped there: the screen underneath may
@@ -1537,22 +1648,6 @@ function RouteMapModal({
           />
           <div className="activity-route-footer">
             <div className="activity-route-coloring">
-              {mode === "performance" ? (
-                <OptionGroup
-                  label={t("activity.route.metric")}
-                  value={metric}
-                  options={ROUTE_METRICS.map((candidate) => {
-                    const entry = performance[candidate];
-                    return {
-                      value: candidate,
-                      label: metricLabel(candidate, speed),
-                      disabled: entry.kind === "none",
-                      ...(entry.kind === "none" ? { title: entry.reason } : {})
-                    };
-                  })}
-                  onChange={layers.setMetric}
-                />
-              ) : null}
               <RouteColoringKey analysis={analysis} lightGround={lightGround} />
             </div>
             <RouteLegend />
@@ -1591,7 +1686,7 @@ function useRouteReplay(track?: TrainingHubActivityTrack): RouteReplay | null {
   return useMemo(() => buildRouteReplay(routePoints(track)), [track]);
 }
 
-export function ActivityRouteMap({ track, detail }: ActivityRouteMapProps) {
+export function ActivityRouteMap({ track, detail, link, pauses }: ActivityRouteMapProps) {
   const route = useRouteReplay(track);
 
   if (!route) {
@@ -1603,11 +1698,21 @@ export function ActivityRouteMap({ track, detail }: ActivityRouteMapProps) {
     );
   }
 
-  return <RoutePreviewMap route={route} detail={detail} />;
+  return <RoutePreviewMap route={route} detail={detail} link={link} pauses={pauses} />;
 }
 
 /** The side-panel map once there is a route, drawn the way the layer menu says. */
-function RoutePreviewMap({ route, detail }: { route: RouteReplay; detail?: RouteDetail }) {
+function RoutePreviewMap({
+  route,
+  detail,
+  link,
+  pauses
+}: {
+  route: RouteReplay;
+  detail?: RouteDetail;
+  link?: ActivityLink;
+  pauses?: readonly TrainingHubActivityPause[];
+}) {
   const layers = useRouteMapLayers();
   const [expanded, setExpanded] = useState(false);
   const closeExpanded = useCallback(() => setExpanded(false), []);
@@ -1624,6 +1729,8 @@ function RoutePreviewMap({ route, detail }: { route: RouteReplay; detail?: Route
         // A quick look: the whole route at once. The full map replays it.
         animate={false}
         drawing={drawing}
+        link={link}
+        pauses={pauses}
         layerSection={analysis.layerSection}
         ariaLabel={t("activity.route.mapLabel")}
         onExpand={() => setExpanded(true)}

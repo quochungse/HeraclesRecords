@@ -75,7 +75,6 @@ const run: RunMessages = {
   "run.detail.form": "ランニングフォーム",
   "run.detail.effect": "効果とコンディション",
   "run.detail.lap": "ラップ",
-  "run.detail.focusLap": "グラフをこのラップに絞り込む",
   "run.perf.title": "ランニング効率",
   "run.perf.unit": "ml/kg/分",
   "run.perf.reading": "表示",

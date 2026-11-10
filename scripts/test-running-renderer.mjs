@@ -599,11 +599,23 @@ async function main() {
       "laps count from one"
     );
 
+    // The axis is a row of Chart settings, behind the button at the chart's head.
+    assert.equal(await harness("count", ".activity-chart-head .activity-chart-axis"), 0, "the head holds no axis choice");
+    await harness("click", ".activity-chart-settings > button");
+    await settle();
     const pressedAxis = await win.webContents.executeJavaScript(
-      `[...document.querySelectorAll(".activity-chart-axis button[aria-checked=true]")].map((chip) => chip.textContent.trim())`,
+      `[...document.querySelectorAll(".activity-chart-settings-menu .activity-chart-axis button[aria-checked=true]")].map((chip) => chip.textContent.trim())`,
       true
     );
     assert.deepEqual(pressedAxis, ["Time"]);
+    assert.equal(
+      await harness("count", ".activity-chart-settings-menu input[role=switch]:checked"),
+      await harness("count", ".activity-chart-settings-menu input[role=switch]"),
+      "every channel has its chip until one is put away, and each is a switch, not a chip"
+    );
+    await harness("click", ".activity-chart-settings > button");
+    await settle();
+    assert.equal(await harness("exists", ".activity-chart-settings-menu"), false, "the button closes it again");
     assert.equal(await harness("count", ".activity-chart-chips button[aria-pressed=true]"), 2, "pace and heart rate open");
 
     // "Try again" re-fetches the same run and hands back a new detail object
@@ -762,7 +774,11 @@ async function main() {
       true
     );
     assert.deepEqual(coverMenu.heads, ["Route"], "one section, and no base map");
-    assert.deepEqual(coverMenu.options, ["Route", "Performance", "Heatmap"]);
+    assert.deepEqual(
+      coverMenu.options,
+      ["Route", "Pace", "Heart rate", "Elevation", "Heatmap"],
+      "each thing recorded along the route is an entry of the menu itself, not a second picker"
+    );
     assert.equal(coverMenu.lastOnTop, true, "the menu stands over the heading, not under it or clipped");
     assert.equal(await harness("exists", ".activity-route-modal"), false, "opening the picker opens no map");
     await win.webContents.executeJavaScript(

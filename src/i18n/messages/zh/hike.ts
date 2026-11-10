@@ -73,7 +73,6 @@ const hike: HikeMessages = {
   "hike.detail.failedBody": "上面的摘要来自活动列表。图表、休息和路线需要再向 COROS 请求一次，而那次请求失败了。",
   "hike.detail.splits": "分段",
   "hike.detail.split": "分段",
-  "hike.detail.focusSplit": "让图表聚焦到这个分段",
   "hike.detail.splitNote": "分段时间按手表的时钟计，段内的休息也算在里面 — 所以最慢的分段通常就是登顶的那一段。",
   "hike.rests.title": "休息",
   "hike.rests.total": "{time} <s>停留合计</s>",

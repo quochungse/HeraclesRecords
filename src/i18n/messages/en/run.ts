@@ -76,7 +76,6 @@ const run = {
   "run.detail.form": "Running form",
   "run.detail.effect": "Effect and conditions",
   "run.detail.lap": "Lap",
-  "run.detail.focusLap": "Focus the chart on this lap",
   "run.perf.title": "Running efficiency",
   "run.perf.unit": "ml/kg/min",
   "run.perf.reading": "Read as",

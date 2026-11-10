@@ -813,12 +813,16 @@ assert.equal(
     [0, 600, 1200, 1800, 2400, 3000, 3600],
     "a 70-minute run is marked every ten minutes, never at 16:40"
   );
-  assert.deepEqual(activityAxisTicks(0, 12_400, "distance", "metric"), [0, 2000, 4000, 6000, 8000, 10000, 12000]);
+  assert.deepEqual(
+    activityAxisTicks(0, 12_400, "distance", "metric"),
+    [0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 11000, 12000],
+    "a distance axis is marked a kilometre apart where that fits: a kilometre repeat has its own mark"
+  );
   assert.ok(Object.is(activityAxisTicks(0, 5000, "distance", "metric")[0], 0), "the first mark is 0, not -0");
   assert.deepEqual(
     activityAxisTicks(0, 16_093.44, "distance", "imperial"),
-    [0, 3218.688, 6437.376, 9656.064, 12874.752, 16093.44],
-    "in miles, every two"
+    [0, 1609.344, 3218.688, 4828.032, 6437.376, 8046.72, 9656.064, 11265.408, 12874.752, 14484.096, 16093.44],
+    "in miles, every mile of ten"
   );
   assert.deepEqual(activityAxisTicks(130, 1310, "elapsed", "metric"), [300, 600, 900, 1200], "a zoomed stretch keeps round marks");
   const samples = [

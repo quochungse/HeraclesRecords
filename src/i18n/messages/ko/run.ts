@@ -75,7 +75,6 @@ const run: RunMessages = {
   "run.detail.form": "러닝 폼",
   "run.detail.effect": "효과와 환경",
   "run.detail.lap": "랩",
-  "run.detail.focusLap": "그래프를 이 랩에 맞추기",
   "run.perf.title": "러닝 효율",
   "run.perf.unit": "ml/kg/분",
   "run.perf.reading": "보기",

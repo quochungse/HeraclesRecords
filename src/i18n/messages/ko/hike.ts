@@ -73,7 +73,6 @@ const hike: HikeMessages = {
   "hike.detail.failedBody": "위의 요약은 활동 목록에서 가져왔습니다. 그래프, 휴식, 경로는 COROS에 한 번 더 요청해야 하는데 그 요청이 실패했습니다.",
   "hike.detail.splits": "스플릿",
   "hike.detail.split": "스플릿",
-  "hike.detail.focusSplit": "그래프를 이 스플릿에 맞추기",
   "hike.detail.splitNote": "스플릿 시간은 워치 시계 기준이라 그 안에서 쉰 시간도 포함됩니다. 그래서 가장 느린 스플릿은 대개 정상이 있는 구간입니다.",
   "hike.rests.title": "휴식",
   "hike.rests.total": "{time} <s>총 정지</s>",

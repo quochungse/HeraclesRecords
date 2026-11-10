@@ -75,7 +75,6 @@ const run: RunMessages = {
   "run.detail.form": "Laufstil",
   "run.detail.effect": "Wirkung und Bedingungen",
   "run.detail.lap": "Runde",
-  "run.detail.focusLap": "Diagramm auf diese Runde fokussieren",
   "run.perf.title": "Laufeffizienz",
   "run.perf.unit": "ml/kg/min",
   "run.perf.reading": "Anzeigen als",

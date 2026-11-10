@@ -17,6 +17,8 @@ import { withPausesRemoved } from "../../electron/activityMetrics";
 import type { TrainingHubLoadStatus } from "../training/types";
 import { activityCoachRequest } from "../training/askCoachAbout";
 import { ActivityRouteCover, hasActivityRoute } from "../training/components/ActivityRouteMap";
+import { useActivityLink } from "../training/useActivityLink";
+import { heartRateZoneFamily } from "../training/zoneTime";
 import {
   formatDistanceMeters,
   formatDurationSeconds,
@@ -26,7 +28,6 @@ import {
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { formatTemperatureValue } from "../units/units";
 import { ActivitySeriesChart } from "../training/components/ActivitySeriesChart";
-import { ActivityZoneTimePanel } from "../training/components/ActivityZoneTimePanel";
 import { RunDetailSkeleton } from "../running/RunningSkeleton";
 import { useBackGesture } from "../running/sportPage";
 import { SwimLengthsChart } from "./SwimLengthsChart";
@@ -74,8 +75,6 @@ interface Stat {
   title?: string;
 }
 
-/** No lap table focuses the chart here: the intervals are read beside it, not through it. */
-function ignoreFocusLap(): void {}
 
 /**
  * One swim, on the whole page — Running's detail page with a swimmer's figures.
@@ -111,6 +110,9 @@ export function SwimDetailView({
     () => withPausesRemoved(detail?.series ?? [], detail?.pauses),
     [detail]
   );
+  const laps = useMemo(() => detail?.laps ?? [], [detail]);
+  // The chart and the map beside it point at one stretch.
+  const link = useActivityLink(laps, detail?.activityId);
   const styleTotals = useMemo(() => (swim ? swimStyleTotals(swim.lengths) : []), [swim]);
   const best = useMemo(() => (swim ? bestSwimEfforts(swim.lengths) : []), [swim]);
 
@@ -364,21 +366,16 @@ export function SwimDetailView({
       {series.length > 0 ? (
         <ActivitySeriesChart
           series={series}
-          laps={detail?.laps ?? []}
+          laps={laps}
           hrZones={detail?.hrZones ?? []}
-          focusLapIndex={null}
-          onFocusLapHandled={ignoreFocusLap}
+          link={link}
+          track={detail?.track}
+          routeDetail={detail ?? undefined}
+          pauses={detail?.pauses}
+          zoneFamily={heartRateZoneFamily(detail?.hrZoneType, zoneFamily)}
           activityTime={detail?.duration ?? activity.duration}
           sportType={activity.sportType}
           motion="swim"
-        />
-      ) : null}
-
-      {detail ? (
-        <ActivityZoneTimePanel
-          hrZones={detail.hrZones}
-          hrZoneType={detail.hrZoneType}
-          accountFamily={zoneFamily}
         />
       ) : null}
 

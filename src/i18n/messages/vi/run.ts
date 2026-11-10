@@ -75,7 +75,6 @@ const run: RunMessages = {
   "run.detail.form": "Kỹ thuật chạy",
   "run.detail.effect": "Hiệu quả và điều kiện",
   "run.detail.lap": "Vòng",
-  "run.detail.focusLap": "Tập trung biểu đồ vào vòng này",
   "run.perf.title": "Hiệu suất chạy",
   "run.perf.unit": "ml/kg/phút",
   "run.perf.reading": "Đọc theo",

@@ -75,7 +75,6 @@ const run: RunMessages = {
   "run.detail.form": "跑姿",
   "run.detail.effect": "训练效果与环境",
   "run.detail.lap": "分段",
-  "run.detail.focusLap": "让图表聚焦到这个分段",
   "run.perf.title": "跑步效率",
   "run.perf.unit": "ml/kg/分钟",
   "run.perf.reading": "显示为",

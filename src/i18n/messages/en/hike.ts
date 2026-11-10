@@ -74,7 +74,6 @@ const hike = {
   "hike.detail.failedBody": "The summary above comes from the activity list. The chart, the rests and the route need a second request to COROS, and that one failed.",
   "hike.detail.splits": "Splits",
   "hike.detail.split": "Split",
-  "hike.detail.focusSplit": "Focus the chart on this split",
   "hike.detail.splitNote": "A split’s time is on the watch’s clock, so a rest taken inside it is in it — which is why the slowest split is usually the one with the summit in it.",
   "hike.rests.title": "Rests",
   "hike.rests.total": "{time} <s>stopped in all</s>",

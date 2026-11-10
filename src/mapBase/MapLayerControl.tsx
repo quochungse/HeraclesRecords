@@ -39,9 +39,12 @@ export function MapLayerControl<T extends string = never>({
   onChange,
   section,
   toggle,
+  layers = BASE_LAYER_ORDER,
   className
 }: {
   section?: MapLayerSection<T>;
+  /** The base maps offered, in order; every one unless the map says otherwise. */
+  layers?: readonly BaseLayerId[];
   /** The button's face and name, in place of the layers icon. */
   toggle?: { content: ReactNode; label: string };
   className?: string;
@@ -104,7 +107,7 @@ export function MapLayerControl<T extends string = never>({
               <X size={15} aria-hidden="true" />
             </button>
           </div>
-          {onChange ? BASE_LAYER_ORDER.map((id) => {
+          {onChange ? layers.map((id) => {
             const config = BASE_LAYERS[id];
             return (
               <button

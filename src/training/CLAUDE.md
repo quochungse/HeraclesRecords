@@ -39,6 +39,48 @@ that is not a screen's own names its own, as Running's scale year does.
 - `motion` picks the sport's reading: `"speed"` (rides: speed, rpm), `"hike"` (km/h, climbing
   rate), `"trail"` (pace, GAP, climbing rate), `"swim"` (pace per 100 m/yd, cadence named Stroke rate).
 
+## One stretch on the chart, the map and the laps (`activityLink.ts`)
+
+A session's page makes one link (`useActivityLink`) and hands it to the chart, the route map
+and each lap row (`LinkedLapRow`): a cursor (a moment) and a selection (a stretch), in seconds
+**on the clock the chart's `series` is on** — pauses out on a sport's page, the wall clock in
+the Activities pane. Each of the three sets them and draws them (`ActivityLinkParts.tsx`,
+`routeLink.ts`). `npm run test:activity-link`.
+- **A drag on the plot selects; it does not zoom.** There is no brush: the head's Zoom to
+  selection cuts the plot to the stretch (a little either side) and becomes Reset zoom. Pressing
+  a lap (its row, or its block on the ruler above the plot)
+  selects it, again lets go, with Shift reaches from the lap pressed before.
+- **The link's layer stands over the chart library, not in it** (`LinkedPlotStage`): it reads
+  the plot's area off Recharts' own clip rectangle and draws the band, its two edges and the
+  cursor as elements of its own, so a moving cursor redraws a line, not a thousand-row chart.
+  Whatever reads the cursor reads a primitive through `useLinkValue`.
+- **The route is stamped by the wall clock**: a page that took the pauses out of its series
+  hands them to the map (`pauses`), or every stretch after a pause lights the wrong road. A
+  route with no clock (a track merged from two sources) is drawn untied.
+- **The plot's area is read again whenever the chart redraws** (a `MutationObserver` on the
+  stage, read at once, never on a frame): Recharts moves its edges some time after its box
+  changes — the map shown or hidden — and the lap ruler stands on those edges.
+- A selected stretch takes the map's start and finish markers to its own ends, and **keeps the
+  colours the route is drawn in**: the rest of the route goes under a veil in the ground's colour
+  (`routeLink.ts`), never a dimmed pane or a one-colour line over the stretch. Over the veil the
+  stretch is drawn again **by the route's own `LinePainter`** cut to it (`only`), so it has the
+  route's halo, body and core in the route's colours; a hand-made line there lost the neon. The
+  heatmap is a canvas and gets the veil alone.
+- **Chart settings** (the head's one button) holds the axis (`activity.chart.axis`), one plot or
+  two, and which channels have a chip (`activity.chart.hiddenChannels`) — as switches in a list,
+  since a chip there read as the chip beside the plot. A route map offers no Street or Topo base map, and its
+  layer menu lists Route, each recorded metric and Heatmap — no second picker under the map.
+- Where a route passes one spot twice, the pointer takes the pass nearest the moment already
+  under the cursor (`momentAt`). A press on the route selects the lap there; a press that
+  lands on the route never starts a pan.
+- **The figures block** (`stretchFigures`) reads the recorded samples; a selection that is
+  exactly one lap states COROS's own figures for it, so the block and the lap table agree. What
+  stands under a figure is how the stretch compares with the whole, in plain ink: faster is not
+  better on a recovery.
+- The docked map shows on a sport's page only (`track` given), behind the head's map button
+  (`activity.chart.map`); the Activities pane ties the map it already has. The lap ruler is
+  drawn for 2 to `LAP_RULER_MOST` laps.
+
 ## Training label (`electron/sessionIntensity.ts` reads, `trainingBenefit.ts` names)
 
 A coloured chip (Recovery, Aerobic, Tempo, Threshold, VO2 Max, Anaerobic) and a shape chip
@@ -54,12 +96,14 @@ A coloured chip (Recovery, Aerobic, Tempo, Threshold, VO2 Max, Anaerobic) and a 
   (`requireIntensity`). The screenshot demo profile is HR reserve (`hrZoneType: 2`) because its
   sessions are scored that way. `npm run test:training-benefit`.
 
-## Time in zones (`ActivityZoneTimePanel`, `zoneTime.ts`)
+## Time in zones (`zoneTime.ts`)
 
-On the run, ride and hike pages (not Activities, not Strength): COROS's own seconds per zone
-from `zoneList`, every zone listed. A run switches HR / pace (a trail run's pace is the GAP
-list, type 173). Pace's seven buckets draw buckets 3 and 4 as one Threshold row.
-`npm run test:zone-time`.
+One bar at the foot of the Performance chart's figures (`ZoneBar` in `ActivitySeriesChart`), not
+a panel of its own: the whole session's is **COROS's own seconds per zone** from `zoneList`; a
+selected stretch's is counted off its samples against the same bounds. A zone under the pointer
+stands out and says its bounds, time and share. Heart rate only: the pace scale and the training
+label's reason went with the panel. `zoneTime.ts` still reads both scales (`paceZoneTime` draws
+buckets 3 and 4 as one Threshold row) for whoever needs them. `npm run test:zone-time`.
 
 ## Signed out (`TrainingSignIn.tsx`, `signIn.css`)
 

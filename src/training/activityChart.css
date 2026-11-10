@@ -104,18 +104,615 @@
   text-transform: uppercase;
 }
 
-.activity-chart-segment {
+/*
+ * The route beside the plots, tied to them (`activityLink.ts`). The panel is
+ * the container, so the map goes above the chart by the panel's own width, not
+ * the window's: the same panel is a page's full measure and a narrow pane.
+ */
+.activity-chart-panel {
+  container-type: inline-size;
+}
+
+.activity-chart-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  min-width: 0;
+}
+
+.activity-chart-body.has-map {
+  grid-template-columns: minmax(220px, 30%) minmax(0, 1fr);
+}
+
+.activity-chart-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 14px;
+  min-width: 0;
+}
+
+.activity-chart-map {
+  min-width: 0;
+}
+
+/* As tall as the plots beside it: the frame and the canvas take the cell's height. */
+.activity-chart-map .activity-route-map,
+.activity-chart-map .activity-route-map-frame,
+.activity-chart-map .activity-route-map-canvas {
+  height: 100%;
+}
+
+.activity-chart-map .activity-route-map-frame {
+  align-self: stretch;
+}
+
+.activity-chart-map .activity-route-map-canvas {
+  min-height: 240px;
+}
+
+@container (max-width: 760px) {
+  .activity-chart-body.has-map {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .activity-chart-map .activity-route-map-canvas {
+    height: 240px;
+  }
+}
+
+/* Shows or hides the map; beside the layout and axis choices, in their height. */
+.activity-chart-toggle {
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--chart-well);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
+}
+
+.activity-chart-toggle:hover {
+  color: var(--text-primary);
+}
+
+.activity-chart-toggle[aria-pressed="true"] {
+  color: var(--accent);
+}
+
+.activity-chart-toggle:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Which channels have a chip: the button, and the list it opens under itself. */
+.activity-chart-settings {
+  position: relative;
+}
+
+.activity-chart-settings-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 5;
+  display: grid;
+  gap: 12px;
+  width: min(300px, 80vw);
+  padding: 14px;
+  border-radius: var(--radius-md);
+  background: var(--menu-surface);
+  box-shadow: var(--shadow-elevated);
+}
+
+.activity-chart-settings-title {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* An either/or choice: its name, then the choice at the row's end. */
+.activity-chart-settings-row {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px 16px;
-  padding: 10px 14px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.activity-chart-settings-channels {
+  display: grid;
+  gap: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--chart-hairline);
+}
+
+.activity-chart-settings-label {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.activity-chart-settings-channels ul {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A channel: its colour, its name, and a switch at the row's end. */
+.activity-chart-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.activity-chart-switch i {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+}
+
+.activity-chart-switch span {
+  flex: 1;
+  min-width: 0;
+}
+
+.activity-chart-switch input {
+  position: relative;
+  flex: none;
+  width: 30px;
+  height: 18px;
+  margin: 0;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-primary) 16%, transparent);
+  cursor: pointer;
+  appearance: none;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.activity-chart-switch input::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-pill);
+  background: var(--text-primary);
+  content: "";
+  transition: transform var(--dur-base) var(--ease);
+}
+
+.activity-chart-switch input:checked {
+  background: var(--accent);
+}
+
+.activity-chart-switch input:checked::after {
+  background: var(--bg-base);
+  transform: translateX(12px);
+}
+
+.activity-chart-switch input:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/*
+ * A plot and the link drawn over it. The layer lets every pointer event
+ * through to the chart; only the selection's two edges take the pointer.
+ */
+.activity-chart-stage {
+  position: relative;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.activity-chart-link {
+  position: absolute;
+  pointer-events: none;
+}
+
+.activity-chart-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  box-sizing: border-box;
+}
+
+.activity-chart-band.is-preview {
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+}
+
+.activity-chart-band.is-selected {
+  border-inline: 1px solid color-mix(in srgb, var(--text-primary) 70%, transparent);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.activity-chart-band-edge {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 28px;
+  margin-top: -14px;
+  border: 1px solid color-mix(in srgb, var(--text-primary) 70%, transparent);
+  border-radius: var(--radius-pill);
+  background: var(--bg-base);
+  cursor: ew-resize;
+  pointer-events: auto;
+}
+
+/* A wider reach than the pill is drawn: an edge is pulled without aiming. */
+.activity-chart-band-edge::before {
+  position: absolute;
+  inset: -10px -7px;
+  content: "";
+}
+
+.activity-chart-band-edge.is-from {
+  left: -5px;
+}
+
+.activity-chart-band-edge.is-to {
+  right: -5px;
+}
+
+.activity-chart-cursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: color-mix(in srgb, var(--text-primary) 45%, transparent);
+}
+
+/* The laps as a strip over the first plot, on its x. */
+.activity-lap-ruler {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.activity-lap-ruler-parts,
+.activity-lap-ruler-track {
+  position: relative;
+  overflow: hidden;
+}
+
+.activity-lap-ruler-parts {
+  height: 16px;
+}
+
+.activity-lap-ruler-parts span {
+  position: absolute;
+  top: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.45;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.activity-lap-ruler-track {
+  height: 22px;
+}
+
+.activity-lap-ruler-block {
+  position: absolute;
+  top: 0;
+  height: 22px;
+  padding: 0;
+  overflow: hidden;
+  /* The gap between two laps, cut out of the block rather than laid between them. */
+  border: 0;
+  border-right: 2px solid transparent;
+  border-radius: var(--radius-xs);
+  background-color: color-mix(in srgb, var(--text-primary) 16%, transparent);
+  background-clip: padding-box;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.activity-lap-ruler-block.is-recovery {
+  background-color: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  color: var(--text-muted);
+}
+
+.activity-lap-ruler-block:hover,
+.activity-lap-ruler-block.is-lap-preview,
+.activity-lap-ruler-block.is-lap-partial {
+  background-color: color-mix(in srgb, var(--text-primary) 28%, transparent);
+}
+
+.activity-lap-ruler-block.is-lap-selected {
+  background-color: color-mix(in srgb, var(--text-primary) 82%, transparent);
+  color: var(--bg-base);
+}
+
+/* One of many laps: no gap to spend, and the hairline between two is the ground showing through. */
+.activity-lap-ruler-block.is-sliver {
+  border-right-width: 1px;
+  border-radius: 0;
+}
+
+/* The lap the cursor is in. */
+.activity-lap-ruler-block.is-lap-cursor::after {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+  content: "";
+}
+
+.activity-lap-ruler-block:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/*
+ * A lap table's row, tied to the chart and the map: its stretch previewed under
+ * the pointer, tinted once selected, and marked while the cursor is inside it.
+ */
+table tbody tr.lap-link-row {
+  cursor: pointer;
+}
+
+table tbody tr.lap-link-row td:first-child {
+  position: relative;
+}
+
+table tbody tr.lap-link-row.is-lap-preview td {
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+}
+
+table tbody tr.lap-link-row.is-lap-selected td {
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  color: var(--text-primary);
+}
+
+table tbody tr.lap-link-row.is-lap-selected td:first-child::before,
+table tbody tr.lap-link-row.is-lap-partial td:first-child::before {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 0;
+  width: 2px;
+  border-radius: var(--radius-xs);
+  background: var(--text-primary);
+  content: "";
+}
+
+table tbody tr.lap-link-row.is-lap-partial td:first-child::before {
+  background: var(--text-muted);
+}
+
+table tbody tr.lap-link-row.is-lap-cursor td:first-child::after {
+  position: absolute;
+  top: 50%;
+  left: 6px;
+  width: 4px;
+  height: 4px;
+  margin-top: -2px;
+  border-radius: var(--radius-pill);
+  background: var(--text-primary);
+  content: "";
+}
+
+table tbody tr.lap-link-row:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* The route's side of the link (`routeLink.ts` draws the stretch and the veil over the rest). */
+.activity-route-map-canvas.is-on-route.leaflet-container {
+  cursor: pointer;
+}
+
+.activity-route-cursor span {
+  display: block;
+  box-sizing: border-box;
+  width: 14px;
+  height: 14px;
+  border: 3px solid rgba(10, 12, 14, 0.85);
+  border-radius: var(--radius-pill);
+  background: #ffffff;
+}
+
+/* The figures of the whole of it, or of the stretch selected. */
+.activity-chart-segment {
+  display: grid;
+  gap: 12px;
+  padding: 12px 14px;
   border: 1px solid var(--chart-hairline);
   border-radius: var(--radius-sm);
   background: var(--chart-well);
   color: var(--text-primary);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
+}
+
+.activity-chart-segment-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  min-height: 26px;
+}
+
+.activity-chart-segment-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.activity-chart-segment-hint {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.activity-chart-segment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.activity-chart-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.activity-chart-action:hover {
+  background: color-mix(in srgb, var(--text-primary) 14%, transparent);
+}
+
+.activity-chart-action:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.activity-chart-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 12px 18px;
+  margin: 0;
+}
+
+.activity-chart-figure {
+  min-width: 0;
+}
+
+.activity-chart-figure dt {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.activity-chart-figure dd {
+  display: grid;
+  margin: 0;
+}
+
+.activity-chart-figure dd > span {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+
+/* How the stretch stands to the whole, in plain ink: faster is not better on a recovery. */
+.activity-chart-figure small {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.activity-chart-zones {
+  position: relative;
+  display: grid;
+  gap: 6px;
+}
+
+.activity-chart-zone-bar {
+  display: flex;
+  height: 10px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--chart-hairline);
+}
+
+.activity-chart-zone-bar i {
+  display: block;
+  height: 100%;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+/* One zone told: the rest step back, in the bar and in its key. */
+.activity-chart-zones.is-telling .activity-chart-zone-bar i:not(.is-active),
+.activity-chart-zones.is-telling .activity-chart-zone-key span:not(.is-active) {
+  opacity: 0.35;
+}
+
+.activity-chart-zone-note {
+  position: absolute;
+  bottom: 100%;
+  z-index: 2;
+  display: grid;
+  gap: 2px;
+  margin-bottom: 6px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--menu-surface);
+  box-shadow: var(--shadow-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.activity-chart-zone-note strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.activity-chart-zone-key span {
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.activity-chart-zone-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.activity-chart-zone-key i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: var(--radius-pill);
 }
 
 .activity-chart-segment-label {

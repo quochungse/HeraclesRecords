@@ -75,7 +75,6 @@ const run: RunMessages = {
   "run.detail.form": "ท่าวิ่ง",
   "run.detail.effect": "ผลการฝึกและสภาพแวดล้อม",
   "run.detail.lap": "รอบ",
-  "run.detail.focusLap": "โฟกัสกราฟที่รอบนี้",
   "run.perf.title": "ประสิทธิภาพการวิ่ง",
   "run.perf.unit": "มล./กก./นาที",
   "run.perf.reading": "แสดงเป็น",

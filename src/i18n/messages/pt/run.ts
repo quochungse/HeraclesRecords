@@ -75,7 +75,6 @@ const run: RunMessages = {
   "run.detail.form": "Técnica de corrida",
   "run.detail.effect": "Efeito e condições",
   "run.detail.lap": "Volta",
-  "run.detail.focusLap": "Focar o gráfico nesta volta",
   "run.perf.title": "Eficiência de corrida",
   "run.perf.unit": "ml/kg/min",
   "run.perf.reading": "Ver como",

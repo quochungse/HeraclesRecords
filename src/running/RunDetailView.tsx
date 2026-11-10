@@ -1,5 +1,5 @@
 import { useI18n } from "../i18n/useI18n";
-import { Fragment, useCallback, useMemo, useState } from "react";
+import { Fragment, useMemo } from "react";
 import { ArrowLeft, CloudOff, MessageCircle, RefreshCw } from "lucide-react";
 import type {
   ActivityDetailSummary,
@@ -32,7 +32,6 @@ import {
   hikeTerrain
 } from "../hiking/hikeAnalysis";
 import { ClimbsPanel, TerrainPanel } from "../hiking/TerrainPanels";
-import { ActivityZoneTimePanel } from "../training/components/ActivityZoneTimePanel";
 import { RunDetailSkeleton } from "./RunningSkeleton";
 import { useBackGesture } from "./sportPage";
 import {
@@ -53,6 +52,9 @@ import { sportHasRunPerformance, type PerformanceProfile } from "../../electron/
 import { RunPerformanceChart } from "./RunPerformanceChart";
 import { isRecoveryLap, lapSections } from "../../electron/lapSections";
 import { LapRecoveryMark, LapSectionRow } from "../training/components/LapSections";
+import { LinkedLapRow } from "../training/components/ActivityLinkParts";
+import { useActivityLink } from "../training/useActivityLink";
+import { heartRateZoneFamily } from "../training/zoneTime";
 import { ShareButton } from "../share/ShareButton";
 import { buildActivityShareSession, shareTrainingLabel } from "../share/buildShareSession";
 
@@ -168,8 +170,8 @@ export function RunDetailView({
 
   // Set from a lap row below, consumed by the chart, then cleared — a lap stays
   // selectable a second time, and the chart is not re-focused on every render.
-  const [focusLapIndex, setFocusLapIndex] = useState<number | null>(null);
-  const clearFocusLap = useCallback(() => setFocusLapIndex(null), []);
+  // The chart, the map beside it and the lap table point at one stretch.
+  const link = useActivityLink(laps, detail?.activityId);
 
   /**
    * How far pace and heart rate drifted apart over the run. Above roughly 5%
@@ -478,18 +480,6 @@ export function RunDetailView({
         </section>
       ) : null}
 
-      {detail ? (
-        <ActivityZoneTimePanel
-          hrZones={detail.hrZones}
-          hrZoneType={detail.hrZoneType}
-          accountFamily={zoneFamily}
-          // A trail's pace is the gradient's, so its zones are read on GAP.
-          paceZones={trail ? detail.adjustedPaceZones : detail.paceZones}
-          paceIsGradeAdjusted={trail}
-          benefit={benefit}
-        />
-      ) : null}
-
       {ground && ground.terrain.length > 0 ? (
         <TerrainPanel terrain={ground.terrain} reading="trail" />
       ) : null}
@@ -513,8 +503,11 @@ export function RunDetailView({
           series={series}
           laps={laps}
           hrZones={detail?.hrZones ?? []}
-          focusLapIndex={focusLapIndex}
-          onFocusLapHandled={clearFocusLap}
+          link={link}
+          track={detail?.track}
+          routeDetail={detail ?? undefined}
+          pauses={detail?.pauses}
+          zoneFamily={heartRateZoneFamily(detail?.hrZoneType, zoneFamily)}
           activityTime={detail?.duration ?? activity.duration}
           motion={trail ? "trail" : "pace"}
         />
@@ -547,17 +540,10 @@ export function RunDetailView({
                 return (
                   <Fragment key={lap.index}>
                     <LapSectionRow sections={lapSectionList} index={position} colSpan={7} />
-                    <tr
-                      tabIndex={0}
+                    <LinkedLapRow
+                      link={link}
+                      lapIndex={lap.index}
                       className={recovery ? "run-lap-row is-lap-recovery" : "run-lap-row"}
-                      title={t("run.detail.focusLap")}
-                      onClick={() => setFocusLapIndex(lap.index)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          setFocusLapIndex(lap.index);
-                        }
-                      }}
                     >
                       {/* Already counted from one by the parser. */}
                       <td>
@@ -580,7 +566,7 @@ export function RunDetailView({
                       <td className="is-numeric">
                         {lap.avgCadence === undefined ? "—" : Math.round(lap.avgCadence)}
                       </td>
-                    </tr>
+                    </LinkedLapRow>
                   </Fragment>
                 );
               })}
