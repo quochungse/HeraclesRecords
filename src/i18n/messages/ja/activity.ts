@@ -103,6 +103,7 @@ const activity: ActivityMessages = {
   "activity.chart.selection.clear": "選択を解除",
   "activity.chart.selection.resetZoom": "拡大を元に戻す",
   "activity.chart.channelsShown": "表示するチャンネル",
+  "activity.chart.settings": "グラフの設定",
   "activity.chart.selection.hint": "グラフ上をドラッグするか、ラップを押すと、その区間だけを読めます。",
   "activity.chart.selection.ofTotal": "全体の {percent}%",
   "activity.chart.selection.faster": "{amount} 速い",

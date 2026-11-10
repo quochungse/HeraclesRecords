@@ -103,6 +103,7 @@ const activity: ActivityMessages = {
   "activity.chart.selection.clear": "선택 해제",
   "activity.chart.selection.resetZoom": "확대 초기화",
   "activity.chart.channelsShown": "표시할 채널",
+  "activity.chart.settings": "그래프 설정",
   "activity.chart.selection.hint": "그래프에서 끌거나 랩을 눌러 한 구간만 읽어 보세요.",
   "activity.chart.selection.ofTotal": "전체의 {percent}%",
   "activity.chart.selection.faster": "{amount} 빠름",

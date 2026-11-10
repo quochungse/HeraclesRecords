@@ -103,6 +103,7 @@ const activity: ActivityMessages = {
   "activity.chart.selection.clear": "Bỏ chọn",
   "activity.chart.selection.resetZoom": "Bỏ phóng",
   "activity.chart.channelsShown": "Các kênh hiển thị",
+  "activity.chart.settings": "Cài đặt biểu đồ",
   "activity.chart.selection.hint": "Kéo trên biểu đồ hoặc bấm một vòng để đọc riêng một đoạn.",
   "activity.chart.selection.ofTotal": "{percent}% tổng",
   "activity.chart.selection.faster": "nhanh hơn {amount}",

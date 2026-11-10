@@ -903,10 +903,29 @@ function RouteMapCanvas({
     // and where it finished. Let go, they return to the route's.
     let stretchEnds: { start: [number, number]; end: [number, number] } | null = null;
     const routeLink: RouteLinkBinding | null = link
-      ? bindRouteLink(map, route, link, pauses, style, (next) => {
-          stretchEnds = next;
-          placeEnds?.();
-        })
+      ? bindRouteLink(
+          map,
+          route,
+          link,
+          pauses,
+          style,
+          (next) => {
+            stretchEnds = next;
+            placeEnds?.();
+          },
+          () => {
+            const shown = drawnRef.current;
+            if (shown?.kind === "glow") {
+              return "glow";
+            }
+            if (!shown?.stretchColors) {
+              return null;
+            }
+            return routeRuns(route.latLngs.length, shown.stretchColors).flatMap((run) =>
+              run.color ? [{ from: run.from, to: run.to, color: run.color }] : []
+            );
+          }
+        )
       : null;
     const routeEnds = ends ? bindRouteEnds(map) : undefined;
     // The heatmap's canvas is hidden through a zoom; the lines are not.
@@ -1008,6 +1027,8 @@ function RouteMapCanvas({
         endsHideWithRoute(next);
         ghostLine.setStyle({ opacity: ghostShown(next) ? style.ghostOpacity : 0 });
         showWhole();
+        // After `drawnRef` is the new drawing: the redraw effect sets it first.
+        routeLink?.recolour();
       },
       restyle: (next) => {
         style = next;

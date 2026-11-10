@@ -104,6 +104,7 @@ const activity = {
   "activity.chart.selection.clear": "Clear selection",
   "activity.chart.selection.resetZoom": "Reset zoom",
   "activity.chart.channelsShown": "Channels shown",
+  "activity.chart.settings": "Chart settings",
   "activity.chart.selection.hint": "Drag on the chart or press a lap to read a stretch.",
   "activity.chart.selection.ofTotal": "{percent}% of total",
   "activity.chart.selection.faster": "{amount} faster",

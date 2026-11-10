@@ -60,9 +60,13 @@ the Activities pane. Each of the three sets them and draws them (`ActivityLinkPa
 - **The plot's area is read again whenever the chart redraws** (a `MutationObserver` on the
   stage, read at once, never on a frame): Recharts moves its edges some time after its box
   changes — the map shown or hidden — and the lap ruler stands on those edges.
-- A selected stretch takes the map's start and finish markers to its own ends.
-- The head's settings button puts channel chips away (`activity.chart.hiddenChannels`); the axis
-  is remembered (`activity.chart.axis`). A route map offers no Street or Topo base map, and its
+- A selected stretch takes the map's start and finish markers to its own ends, and **keeps the
+  colours the route is drawn in**: the rest of the route goes under a veil in the ground's colour
+  (`routeLink.ts`), never a dimmed pane or a one-colour line over the stretch. On a route
+  coloured by a metric the stretch is drawn again over the veil, run by run (`recolour`).
+- **Chart settings** (the head's one button) holds the axis (`activity.chart.axis`), one plot or
+  two, and which channels have a chip (`activity.chart.hiddenChannels`) — as switches in a list,
+  since a chip there read as the chip beside the plot. A route map offers no Street or Topo base map, and its
   layer menu lists Route, each recorded metric and Heatmap — no second picker under the map.
 - Where a route passes one spot twice, the pointer takes the pass nearest the moment already
   under the cursor (`momentAt`). A press on the route selects the lap there; a press that

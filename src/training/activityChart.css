@@ -202,21 +202,112 @@
   right: 0;
   z-index: 5;
   display: grid;
-  gap: 10px;
-  width: min(360px, 80vw);
-  padding: 12px;
+  gap: 12px;
+  width: min(300px, 80vw);
+  padding: 14px;
   border-radius: var(--radius-md);
   background: var(--menu-surface);
   box-shadow: var(--shadow-elevated);
 }
 
-.activity-chart-settings-menu p {
-  margin: 0;
+.activity-chart-settings-title {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* An either/or choice: its name, then the choice at the row's end. */
+.activity-chart-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.activity-chart-settings-channels {
+  display: grid;
+  gap: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--chart-hairline);
+}
+
+.activity-chart-settings-label {
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.activity-chart-settings-channels ul {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A channel: its colour, its name, and a switch at the row's end. */
+.activity-chart-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.activity-chart-switch i {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+}
+
+.activity-chart-switch span {
+  flex: 1;
+  min-width: 0;
+}
+
+.activity-chart-switch input {
+  position: relative;
+  flex: none;
+  width: 30px;
+  height: 18px;
+  margin: 0;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-primary) 16%, transparent);
+  cursor: pointer;
+  appearance: none;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.activity-chart-switch input::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-pill);
+  background: var(--text-primary);
+  content: "";
+  transition: transform var(--dur-base) var(--ease);
+}
+
+.activity-chart-switch input:checked {
+  background: var(--accent);
+}
+
+.activity-chart-switch input:checked::after {
+  background: var(--bg-base);
+  transform: translateX(12px);
+}
+
+.activity-chart-switch input:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 /*
@@ -436,16 +527,7 @@ table tbody tr.lap-link-row:focus-visible {
   outline-offset: -2px;
 }
 
-/*
- * The route's side of the link. A selected stretch is the subject: the rest of
- * the route steps back, in whichever pane it is drawn.
- */
-.activity-route-map-canvas.has-stretch .leaflet-overlay-pane,
-.activity-route-map-canvas.has-stretch .leaflet-heraclesRouteHalo-pane,
-.activity-route-map-canvas.has-stretch .leaflet-heraclesRouteGlow-pane {
-  opacity: 0.35;
-}
-
+/* The route's side of the link (`routeLink.ts` draws the stretch and the veil over the rest). */
 .activity-route-map-canvas.is-on-route.leaflet-container {
   cursor: pointer;
 }

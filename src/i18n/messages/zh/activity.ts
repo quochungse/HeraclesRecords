@@ -103,6 +103,7 @@ const activity: ActivityMessages = {
   "activity.chart.selection.clear": "取消选择",
   "activity.chart.selection.resetZoom": "重置缩放",
   "activity.chart.channelsShown": "显示的通道",
+  "activity.chart.settings": "图表设置",
   "activity.chart.selection.hint": "在图表上拖动，或点按一圈，即可单独查看一个区段。",
   "activity.chart.selection.ofTotal": "占全程 {percent}%",
   "activity.chart.selection.faster": "快 {amount}",

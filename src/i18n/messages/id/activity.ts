@@ -103,6 +103,7 @@ const activity: ActivityMessages = {
   "activity.chart.selection.clear": "Hapus pilihan",
   "activity.chart.selection.resetZoom": "Atur ulang zoom",
   "activity.chart.channelsShown": "Kanal yang ditampilkan",
+  "activity.chart.settings": "Pengaturan grafik",
   "activity.chart.selection.hint": "Seret di grafik atau tekan satu putaran untuk membaca satu ruas.",
   "activity.chart.selection.ofTotal": "{percent}% dari total",
   "activity.chart.selection.faster": "{amount} lebih cepat",

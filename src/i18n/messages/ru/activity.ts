@@ -103,6 +103,7 @@ const activity: ActivityMessages = {
   "activity.chart.selection.clear": "Снять выделение",
   "activity.chart.selection.resetZoom": "Сбросить масштаб",
   "activity.chart.channelsShown": "Показываемые каналы",
+  "activity.chart.settings": "Настройки графика",
   "activity.chart.selection.hint": "Протяните по графику или нажмите на круг, чтобы прочитать отрезок.",
   "activity.chart.selection.ofTotal": "{percent}% от всего",
   "activity.chart.selection.faster": "на {amount} быстрее",

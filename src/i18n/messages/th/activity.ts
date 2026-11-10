@@ -103,6 +103,7 @@ const activity: ActivityMessages = {
   "activity.chart.selection.clear": "ล้างการเลือก",
   "activity.chart.selection.resetZoom": "รีเซ็ตการซูม",
   "activity.chart.channelsShown": "ช่องข้อมูลที่แสดง",
+  "activity.chart.settings": "การตั้งค่ากราฟ",
   "activity.chart.selection.hint": "ลากบนกราฟหรือกดที่รอบเพื่ออ่านเฉพาะช่วงนั้น",
   "activity.chart.selection.ofTotal": "{percent}% ของทั้งหมด",
   "activity.chart.selection.faster": "เร็วกว่า {amount}",

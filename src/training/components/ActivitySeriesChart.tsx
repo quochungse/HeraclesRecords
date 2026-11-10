@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Map as MapIcon, Settings2, X, ZoomIn, ZoomOut } from "lucide-react";
 import {
   Area,
@@ -1018,12 +1018,48 @@ export function ActivitySeriesChart({
               {t("activity.chart.selection.clear")}
             </button>
           ) : null}
-          <ChannelSettings
+          <ChartSettings
             channels={available}
             hidden={hiddenChannels}
             colorOf={(key) => palette[key as ActivityChannelKey]?.stroke}
             onToggle={toggleHidden}
-          />
+          >
+            <div className="activity-chart-settings-row">
+              <span>{t("activity.chart.xAxis")}</span>
+              <OptionGroup
+                label={t("activity.chart.xAxis")}
+                className="activity-chart-axis"
+                value={axis}
+                options={[
+                  { value: "elapsed", label: t("activity.m.time"), disabled: !hasElapsed },
+                  { value: "distance", label: t("activity.m.distance"), disabled: !hasDistance }
+                ]}
+                onChange={(next) => {
+                  // The zoom is in rows of the axis it was made on.
+                  setRange(null);
+                  setAxisPreference(next === "distance" ? "distance" : "elapsed");
+                }}
+              />
+            </div>
+            {splittable ? (
+              <div className="activity-chart-settings-row">
+                <span>{t("activity.chart.layout")}</span>
+                <OptionGroup
+                  label={t("activity.chart.layout")}
+                  value={split ? "split" : "combined"}
+                  options={[
+                    { value: "combined", label: t("activity.chart.layoutCombined") },
+                    { value: "split", label: t("activity.chart.layoutSplit") }
+                  ]}
+                  onChange={(next) => {
+                    const nextSplit = next === "split";
+                    setSplitPreference(nextSplit);
+                    setSelected((previous) => fitActivityChannels(previous, available, nextSplit));
+                  }}
+                />
+              </div>
+            ) : null}
+          </ChartSettings>
           {hasRoute ? (
             <button
               type="button"
@@ -1036,35 +1072,6 @@ export function ActivitySeriesChart({
               <MapIcon size={15} aria-hidden="true" />
             </button>
           ) : null}
-          {splittable ? (
-            <OptionGroup
-              label={t("activity.chart.layout")}
-              value={split ? "split" : "combined"}
-              options={[
-                { value: "combined", label: t("activity.chart.layoutCombined") },
-                { value: "split", label: t("activity.chart.layoutSplit") }
-              ]}
-              onChange={(next) => {
-                const nextSplit = next === "split";
-                setSplitPreference(nextSplit);
-                setSelected((previous) => fitActivityChannels(previous, available, nextSplit));
-              }}
-            />
-          ) : null}
-          <OptionGroup
-            label={t("activity.chart.xAxis")}
-            className="activity-chart-axis"
-            value={axis}
-            options={[
-              { value: "elapsed", label: t("activity.m.time"), disabled: !hasElapsed },
-              { value: "distance", label: t("activity.m.distance"), disabled: !hasDistance }
-            ]}
-            onChange={(next) => {
-              // The zoom is in rows of the axis it was made on.
-              setRange(null);
-              setAxisPreference(next === "distance" ? "distance" : "elapsed");
-            }}
-          />
         </div>
       </div>
 
@@ -1230,27 +1237,33 @@ function ZoneBar({ rows, seconds }: { rows: readonly ZoneTimeRow[]; seconds: rea
 }
 
 /**
- * Which channels have a chip: a button at the chart's head opening the list of
- * every channel this session recorded, each one put away or brought back.
+ * How the chart is set up, behind one button at its head: what it is read
+ * along, one plot or two, and which channels have a chip. A channel here is a
+ * switch in a list, not a chip: the chips beside the plot draw a line or take
+ * it away, and a control that looks the same would be read as doing the same.
  */
-function ChannelSettings({
+function ChartSettings({
   channels,
   hidden,
   colorOf,
-  onToggle
+  onToggle,
+  children
 }: {
   channels: readonly ActivityChannelDefinition[];
   hidden: readonly string[];
   colorOf: (key: string) => string | undefined;
   onToggle: (key: string) => void;
+  /** The chart's either/or choices, each a labelled row above the channels. */
+  children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const id = useId();
   useEffect(() => {
     if (!open) {
       return;
     }
-    // Escape closes the list and nothing else; a press outside closes it too.
+    // Escape closes the popup and nothing else; a press outside closes it too.
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.stopPropagation();
@@ -1276,23 +1289,36 @@ function ChannelSettings({
         type="button"
         className="activity-chart-toggle"
         aria-expanded={open}
-        title={t("activity.chart.channelsShown")}
-        aria-label={t("activity.chart.channelsShown")}
+        title={t("activity.chart.settings")}
+        aria-label={t("activity.chart.settings")}
         onClick={() => setOpen((previous) => !previous)}
       >
         <Settings2 size={15} aria-hidden="true" />
       </button>
       {open ? (
-        <div className="activity-chart-settings-menu" role="dialog" aria-label={t("activity.chart.channelsShown")}>
-          <p>{t("activity.chart.channelsShown")}</p>
-          <OptionChips
-            label={t("activity.chart.channelsShown")}
-            className="activity-chart-chips"
-            options={channels.map((channel) => ({ value: channel.key, label: channel.label }))}
-            values={channels.filter((channel) => !hidden.includes(channel.key)).map((channel) => channel.key)}
-            colorOf={colorOf}
-            onToggle={onToggle}
-          />
+        <div className="activity-chart-settings-menu" role="dialog" aria-label={t("activity.chart.settings")}>
+          <strong className="activity-chart-settings-title">{t("activity.chart.settings")}</strong>
+          {children}
+          <div className="activity-chart-settings-channels">
+            <span className="activity-chart-settings-label">{t("activity.chart.channelsShown")}</span>
+            <ul>
+              {channels.map((channel) => (
+                <li key={channel.key}>
+                  <label className="activity-chart-switch" htmlFor={`${id}-${channel.key}`}>
+                    <i aria-hidden="true" style={{ background: colorOf(channel.key) }} />
+                    <span>{channel.label}</span>
+                    <input
+                      id={`${id}-${channel.key}`}
+                      type="checkbox"
+                      role="switch"
+                      checked={!hidden.includes(channel.key)}
+                      onChange={() => onToggle(channel.key)}
+                    />
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       ) : null}
     </div>

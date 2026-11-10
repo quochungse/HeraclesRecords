@@ -103,6 +103,7 @@ const activity: ActivityMessages = {
   "activity.chart.selection.clear": "Limpar a seleção",
   "activity.chart.selection.resetZoom": "Repor o zoom",
   "activity.chart.channelsShown": "Canais mostrados",
+  "activity.chart.settings": "Definições do gráfico",
   "activity.chart.selection.hint": "Arraste no gráfico ou pressione uma volta para ler um trecho.",
   "activity.chart.selection.ofTotal": "{percent}% do total",
   "activity.chart.selection.faster": "{amount} mais rápido",
