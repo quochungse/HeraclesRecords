@@ -57,6 +57,7 @@ import {
   performanceHistory,
   performanceScaleRuns,
   STEADY_BAND_PERCENT,
+  usualCrossings,
   zeroOffsetIn
 } from "./runPerformanceModel";
 
@@ -284,6 +285,26 @@ export function RunPerformanceChart({
   const highest = Math.max(...readings);
   const lineZeroAt = zeroOffsetIn(lowest, highest);
   const fillZeroAt = zeroOffsetIn(Math.min(0, lowest), Math.max(0, highest));
+  // In ml/kg/min the usual is a curve, so the line changes colour where it
+  // crosses it, along the axis: stops across the line's own box, left to right.
+  const usualStops = (() => {
+    if (effective !== "absolute" || !baseline) return undefined;
+    const crossings = usualCrossings(
+      rows.flatMap((row) =>
+        row.value !== undefined
+          ? [{ x: row.x, diff: row.value - baseline.value * shapeAt(shape, row.t) * scale }]
+          : []
+      )
+    );
+    let below = crossings.startsBelow;
+    const stops = [{ offset: 0, below }];
+    for (const offset of crossings.offsets) {
+      stops.push({ offset, below });
+      below = !below;
+      stops.push({ offset, below });
+    }
+    return stops;
+  })();
   const xTicks = activityAxisTicks(xExtent[0], xExtent[1], axis, unitSystem);
 
   if (own.points.length === 0) {
@@ -361,6 +382,13 @@ export function RunPerformanceChart({
                 <stop offset={fillZeroAt} stopColor={colors.better} stopOpacity={0.18} />
                 <stop offset={fillZeroAt} stopColor={colors.worse} stopOpacity={0.18} />
               </linearGradient>
+              {usualStops ? (
+                <linearGradient id="run-performance-usual-split" x1="0" y1="0" x2="1" y2="0">
+                  {usualStops.map((stop, index) => (
+                    <stop key={index} offset={stop.offset} stopColor={stop.below ? colors.worse : colors.better} />
+                  ))}
+                </linearGradient>
+              ) : null}
             </defs>
             <CartesianGrid stroke={colors.grid} strokeDasharray="3 3" vertical={false} />
             {/* The Performance chart's axis, prop for prop. */}
@@ -460,7 +488,7 @@ export function RunPerformanceChart({
             ) : (
               <Line
                 dataKey="value"
-                stroke={colors.accentBright}
+                stroke={usualStops ? "url(#run-performance-usual-split)" : colors.accentBright}
                 strokeWidth={2}
                 dot={false}
                 connectNulls={false}

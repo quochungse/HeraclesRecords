@@ -334,4 +334,35 @@ export function zeroOffsetIn(min: number, max: number): number {
   return Math.min(1, Math.max(0, max / (max - min)));
 }
 
+/**
+ * Where a line crosses the usual, as offsets (0 left to 1 right) across the box
+ * of the line: the usual is a curve of its own in ml/kg/min, so no height splits
+ * better from worse there and the colour changes along the axis instead. `diff`
+ * is the reading less the usual at `x`; the points are in the axis's order.
+ * `startsBelow` says which side the first reading is on, and each offset after
+ * it changes sides.
+ */
+export function usualCrossings(points: readonly { x: number; diff: number }[]): {
+  startsBelow: boolean;
+  offsets: number[];
+} {
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (!first || !last) return { startsBelow: false, offsets: [] };
+  const width = last.x - first.x;
+  const offsets: number[] = [];
+  let below = first.diff < 0;
+  for (let index = 1; index < points.length; index += 1) {
+    const from = points[index - 1]!;
+    const to = points[index]!;
+    if (to.diff < 0 === below) continue;
+    below = !below;
+    if (!(width > 0)) continue;
+    const share = from.diff === to.diff ? 0 : from.diff / (from.diff - to.diff);
+    const x = from.x + (to.x - from.x) * share;
+    offsets.push(Math.min(1, Math.max(0, (x - first.x) / width)));
+  }
+  return { startsBelow: first.diff < 0, offsets };
+}
+
 export { MIN_BASELINE_RUNS };

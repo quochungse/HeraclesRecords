@@ -417,4 +417,22 @@ assert.equal(model.zeroOffsetIn(-5, -1), 0, "wholly below zero is all worse");
 assert.equal(model.zeroOffsetIn(3, 3), 1, "a flat line above zero is better");
 assert.equal(model.zeroOffsetIn(-3, -3), 0, "a flat line below zero is worse");
 
+// The ml/kg/min line changes colour where it crosses the usual, along the axis.
+assert.deepEqual(
+  model.usualCrossings([
+    { x: 0, diff: 2 },
+    { x: 10, diff: -2 },
+    { x: 20, diff: -1 },
+    { x: 40, diff: 3 }
+  ]),
+  { startsBelow: false, offsets: [0.125, 0.625] },
+  "a crossing sits where the line meets the usual"
+);
+assert.deepEqual(
+  model.usualCrossings([{ x: 5, diff: -1 }, { x: 9, diff: -4 }]),
+  { startsBelow: true, offsets: [] },
+  "wholly under the usual is all worse"
+);
+assert.deepEqual(model.usualCrossings([]), { startsBelow: false, offsets: [] }, "no readings, no crossings");
+
 console.log("run performance: ok");
