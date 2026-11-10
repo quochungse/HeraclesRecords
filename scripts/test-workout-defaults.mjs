@@ -290,6 +290,21 @@ check("the movement decides reps, sets and recovery", () => {
   assert.deepEqual(strength("Farmers Carry").target, { type: "time", seconds: 45 });
 });
 
+check("a movement inside a repeat is one set a round, its own reps and recovery kept", () => {
+  const inRound = (exerciseName) => resolveStepDefaults({
+    sport: "strength",
+    stepKind: "training",
+    insideRepeat: true,
+    exerciseName,
+    context: FULL_CONTEXT
+  });
+  assert.equal(inRound("Barbell Deadlift").sets, 1, "the repeat counts the rounds");
+  assert.deepEqual(inRound("Barbell Deadlift").target, strength("Barbell Deadlift").target);
+  assert.equal(inRound("Barbell Deadlift").restSeconds, strength("Barbell Deadlift").restSeconds);
+  assert.equal(inRound(undefined).sets, 1, "a step with no movement yet too");
+  assert.equal(strength(undefined).sets, 3, "outside a repeat the movement keeps its sets");
+});
+
 check("a held movement is counted in seconds, whatever it files under", () => {
   assert.deepEqual(strength("Plank").target, { type: "time", seconds: 45 });
   // A wall sit files as a squat; the hold decides the target, the squat still

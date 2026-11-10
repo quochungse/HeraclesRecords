@@ -379,15 +379,20 @@ export function emptyRow(
     exerciseId: "",
     ...defaultsToRowFields(defaults, sport, unitSystem)
   };
-  return kind === "intervals"
-    ? {
-        ...row,
-        children: [
-          emptyRow("training", sport, { ...seed, insideRepeat: true }),
-          emptyRow("rest", sport, { ...seed, insideRepeat: true })
-        ]
-      }
-    : row;
+  return kind === "intervals" ? { ...row, children: repeatStartingChildren(sport, seed) } : row;
+}
+
+/**
+ * What a new repeat holds. A strength repeat is a superset — two movements
+ * done in turn, each resting before the next — so it starts with two; every
+ * other sport's is a rep and its recovery.
+ */
+function repeatStartingChildren(sport: WorkoutSport, seed: RowSeed): BuilderRow[] {
+  const inside = { ...seed, insideRepeat: true };
+  return [
+    emptyRow("training", sport, inside),
+    emptyRow(sport === "strength" ? "training" : "rest", sport, inside)
+  ];
 }
 
 /**
@@ -470,10 +475,7 @@ export function changeBuilderRowKind(
     children: kind === "intervals"
       ? row.children?.length
         ? row.children
-        : [
-            emptyRow("training", sport, { ...seed, insideRepeat: true }),
-            emptyRow("rest", sport, { ...seed, insideRepeat: true })
-          ]
+        : repeatStartingChildren(sport, seed)
       : row.children
   };
 }

@@ -239,6 +239,8 @@ const workout: WorkoutMessages = {
   "workout.b.s.weightIn": "Beban dalam {unit}",
   "workout.b.s.restBetween": "Istirahat antar set",
   "workout.b.s.restSeconds": "Istirahat antar set dalam detik",
+  "workout.b.s.restAfter": "Istirahat setelah setiap set",
+  "workout.b.s.restAfterSeconds": "Istirahat setelah setiap set dalam detik",
   "workout.b.s.sec": "detik",
   "workout.b.s.measureByShort": "Ukur dengan",
   "workout.b.s.target": "Target",

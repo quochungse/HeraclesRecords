@@ -508,6 +508,74 @@ const invalidRepeat = validatePlanDraft({
 assert.equal(invalidRepeat.ok, false);
 assert.match(invalidRepeat.errors.join(" "), /repeat between 1 and 99/);
 
+// An interval is a training step wherever training is written, a movement
+// included: Coach may write either, and the builder writes a step inside a
+// repeat as an interval. Read off the raw kind, a strength step or a HYROX
+// station written as an interval went to COROS as the generic training row.
+{
+  const bench = (kind) => ({
+    kind,
+    exercise_id: "469656087885430784",
+    exercise_name: "Dumbbell Bench Press",
+    target_type: "reps",
+    target_reps: 10,
+    sets: 1,
+    rest_type: 1,
+    rest_value: 30,
+    intensity: { type: "weight", mode: "weight", value: 40, unit: "kg" }
+  });
+  for (const kind of ["training", "interval"]) {
+    for (const [label, steps, at] of [
+      ["alone", [{ ...bench(kind), sets: 3 }], 0],
+      ["in a repeat", [{ repeat: 3, steps: [bench(kind)] }], 1]
+    ]) {
+      const step = buildWorkoutPayload("Superset", steps, "strength").exercises[at];
+      assert.equal(step.originId, "469656087885430784", `a strength ${kind} ${label} keeps its movement`);
+      assert.equal(step.exerciseType, 2);
+      assert.equal(step.restType, 1);
+      assert.equal(step.restValue, 30);
+    }
+    const station = buildWorkoutPayload("Stations", [{
+      repeat: 2,
+      steps: [{ kind, exercise_id: "476760420131192832", exercise_name: "SkiErg", exercise_kind: 1, target_type: "distance", target_distance_meters: 1000 }]
+    }], "hyrox").exercises[1];
+    assert.equal(station.originId, "476760420131192832", `a HYROX station written as ${kind} keeps its station`);
+    assert.equal(station.exerciseKind, 1);
+    assert.equal(station.hyroxTrainingMode, "strength");
+  }
+  assert.throws(
+    () => buildWorkoutPayload("Nameless", [{ kind: "interval", target_type: "reps", target_reps: 10 }], "strength"),
+    /Strength training steps require exercise_id or exercise_name/,
+    "an interval with no movement is refused as a training step is"
+  );
+  const preview = buildPlanPreview("draft-superset", {
+    name: "Superset",
+    workouts: [{
+      key: "superset",
+      name: "Superset",
+      sport: "strength",
+      steps: [{ repeat: 3, steps: [bench("interval"), { ...bench("interval"), exercise_id: "425827615547506689", exercise_name: "Pull Ups" }] }]
+    }]
+  });
+  assert.equal(preview.entries[0]?.volume, "6 sets", "an interval's sets count, round by round");
+  // A one-set step's rest is the move to the next step, and in a superset the
+  // only place that move is written, so the summary Coach reads back states it.
+  assert.equal(
+    preview.entries[0]?.stepsSummary,
+    "3x (Dumbbell Bench Press 10 reps @ 40 kg (30 sec rest), Pull Ups 10 reps @ 40 kg (30 sec rest))"
+  );
+  assert.equal(
+    formatEntryStepsSummary({
+      key: "no-rest",
+      name: "No rest",
+      sport: "strength",
+      steps: [{ ...bench("training"), rest_value: 0 }]
+    }),
+    "Dumbbell Bench Press 10 reps @ 40 kg",
+    "a one-set step with no rest says none"
+  );
+}
+
 assert.throws(() => parsePace("4:70/km"), /Could not parse pace/);
 
 const preview = buildPlanPreview("draft-1", {

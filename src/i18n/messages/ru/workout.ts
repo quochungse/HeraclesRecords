@@ -253,6 +253,8 @@ const workout: WorkoutMessages = {
   "workout.b.s.weightIn": "Вес в {unit}",
   "workout.b.s.restBetween": "Отдых между подходами",
   "workout.b.s.restSeconds": "Отдых между подходами в секундах",
+  "workout.b.s.restAfter": "Отдых после каждого подхода",
+  "workout.b.s.restAfterSeconds": "Отдых после каждого подхода в секундах",
   "workout.b.s.sec": "с",
   "workout.b.s.measureByShort": "Измерять в",
   "workout.b.s.target": "Цель",

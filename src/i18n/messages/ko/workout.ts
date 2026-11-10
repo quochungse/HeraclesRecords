@@ -239,6 +239,8 @@ const workout: WorkoutMessages = {
   "workout.b.s.weightIn": "무게({unit})",
   "workout.b.s.restBetween": "세트 간 휴식",
   "workout.b.s.restSeconds": "세트 간 휴식(초)",
+  "workout.b.s.restAfter": "각 세트 후 휴식",
+  "workout.b.s.restAfterSeconds": "각 세트 후 휴식(초)",
   "workout.b.s.sec": "초",
   "workout.b.s.measureByShort": "측정 기준",
   "workout.b.s.target": "목표",

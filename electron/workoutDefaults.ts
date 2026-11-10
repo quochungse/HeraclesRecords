@@ -398,6 +398,16 @@ function loadIntensity(name: string, movement: ExerciseSearchMovement | undefine
   return equipment.length > 0 ? { type: "weight", mode: "bodyweight" } : NONE;
 }
 
+/**
+ * A movement inside a repeat is one set a round — a superset or a circuit:
+ * the repeat counts the rounds, and the movement's own three or four sets
+ * would multiply into twelve. Its rest stays the movement's, the pause before
+ * the next step.
+ */
+function withRoundSets(defaults: StepDefaults, insideRepeat: boolean): StepDefaults {
+  return insideRepeat ? { ...defaults, sets: 1 } : defaults;
+}
+
 function strengthTrainingDefaults(
   name: string | undefined,
   fallback: StepDefaults
@@ -696,7 +706,7 @@ export function resolveStepDefaults(input: StepDefaultsInput): StepDefaults {
   const base = stepKind !== "training"
     ? table
     : sport === "strength"
-      ? strengthTrainingDefaults(exerciseName, table)
+      ? withRoundSets(strengthTrainingDefaults(exerciseName, table), insideRepeat)
       : sport === "hyrox"
         ? hyroxTrainingDefaults(exerciseName, insideRepeat, table)
         : table;

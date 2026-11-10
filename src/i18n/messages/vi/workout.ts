@@ -239,6 +239,8 @@ const workout: WorkoutMessages = {
   "workout.b.s.weightIn": "Mức tạ ({unit})",
   "workout.b.s.restBetween": "Nghỉ giữa các hiệp",
   "workout.b.s.restSeconds": "Nghỉ giữa các hiệp (giây)",
+  "workout.b.s.restAfter": "Nghỉ sau mỗi hiệp",
+  "workout.b.s.restAfterSeconds": "Nghỉ sau mỗi hiệp (giây)",
   "workout.b.s.sec": "giây",
   "workout.b.s.measureByShort": "Đo theo",
   "workout.b.s.target": "Mục tiêu",

@@ -240,6 +240,8 @@ const workout = {
   "workout.b.s.weightIn": "Weight in {unit}",
   "workout.b.s.restBetween": "Rest between sets",
   "workout.b.s.restSeconds": "Rest between sets in seconds",
+  "workout.b.s.restAfter": "Rest after each set",
+  "workout.b.s.restAfterSeconds": "Rest after each set in seconds",
   "workout.b.s.sec": "sec",
   "workout.b.s.measureByShort": "Measure by",
   "workout.b.s.target": "Target",

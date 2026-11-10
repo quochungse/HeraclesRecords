@@ -114,7 +114,8 @@ valid step; intensity is a zone, never a figure; never a `load` target; never a 
 bodyweight movements start at `{weight, bodyweight}`). An absent context means "COROS has not
 answered yet", not "no FTP" — only a present context lacking a threshold degrades. Strength
 files a movement through `classifyWorkoutExerciseName`; Hybrid Fitness by name, never by
-`exerciseKind`. A step of a repeat group takes the in-repeat default. `BuilderRow` holds one
+`exerciseKind`. A step of a repeat group takes the in-repeat default; a Strength movement in
+one is one set a round (a superset: COROS's web editor groups strength steps too). `BuilderRow` holds one
 `targetValue`. `npm run test:workout-defaults`.
 
 **Training zones** (`workoutCapabilities.ts` tables, `corosWorkoutEditor.ts` parser): the

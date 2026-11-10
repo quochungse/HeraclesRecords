@@ -239,6 +239,8 @@ const workout: WorkoutMessages = {
   "workout.b.s.weightIn": "Charge en {unit}",
   "workout.b.s.restBetween": "Récupération entre les séries",
   "workout.b.s.restSeconds": "Récupération entre les séries en secondes",
+  "workout.b.s.restAfter": "Récupération après chaque série",
+  "workout.b.s.restAfterSeconds": "Récupération après chaque série en secondes",
   "workout.b.s.sec": "s",
   "workout.b.s.measureByShort": "Mesurer en",
   "workout.b.s.target": "Objectif",

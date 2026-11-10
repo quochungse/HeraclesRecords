@@ -239,6 +239,8 @@ const workout: WorkoutMessages = {
   "workout.b.s.weightIn": "Gewicht in {unit}",
   "workout.b.s.restBetween": "Pause zwischen den Sätzen",
   "workout.b.s.restSeconds": "Pause zwischen den Sätzen in Sekunden",
+  "workout.b.s.restAfter": "Pause nach jedem Satz",
+  "workout.b.s.restAfterSeconds": "Pause nach jedem Satz in Sekunden",
   "workout.b.s.sec": "Sek.",
   "workout.b.s.measureByShort": "Messen nach",
   "workout.b.s.target": "Ziel",

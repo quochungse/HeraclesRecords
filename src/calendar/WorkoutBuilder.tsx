@@ -210,7 +210,7 @@ export const BUILDER_KIND_META: Record<BuilderKind, { readonly label: string; Ic
   sendOff: kindMeta("sendOff", Flag)
 };
 
-function BuilderIntensityFields({ row, sport, context, exerciseOptions, exercisesLoading, onChange }: { row: BuilderRow; sport: WorkoutSport; context?: WorkoutEditorContext; exerciseOptions: WorkoutExerciseOption[]; exercisesLoading: boolean; onChange: (update: Partial<BuilderRow>) => void }) {
+function BuilderIntensityFields({ row, sport, context, exerciseOptions, exercisesLoading, insideRepeat = false, onChange }: { row: BuilderRow; sport: WorkoutSport; context?: WorkoutEditorContext; exerciseOptions: WorkoutExerciseOption[]; exercisesLoading: boolean; insideRepeat?: boolean; onChange: (update: Partial<BuilderRow>) => void }) {
   const { unitSystem } = useUnitSystem();
   const stepKind = row.kind === "intervals" ? "training" : row.kind;
   const intensityTypes = workoutIntensitiesForStep(sport, stepKind, row.exerciseKind);
@@ -247,7 +247,7 @@ function BuilderIntensityFields({ row, sport, context, exerciseOptions, exercise
       : row.intensityType === "cadence" ? (row.intensityUnit === "spm" ? "spm" : "rpm")
         : row.intensityType === "power" ? "W" : "%";
   const selectExercise = (selection: ExerciseComboboxSelection) => {
-    onChange(exerciseSelectionFields(selection, sport, stepKind, { context, unitSystem }));
+    onChange(exerciseSelectionFields(selection, sport, stepKind, { context, unitSystem, insideRepeat }));
   };
   const intensityControls = <>
     <label className="calendar-builder-control">
@@ -426,6 +426,7 @@ function BuilderStrengthStepFields({
   kindLabel,
   validationMessage,
   context,
+  insideRepeat = false,
   onChange,
   onKindChange
 }: {
@@ -436,11 +437,14 @@ function BuilderStrengthStepFields({
   allowedKinds: readonly BuilderKind[];
   kindLabel: string;
   validationMessage?: string;
+  /** A movement in a repeat rests after its set before the next sub-step, not only between sets. */
+  insideRepeat?: boolean;
   onChange: (update: Partial<BuilderRow>) => void;
   onKindChange: (kind: BuilderKind) => void;
 }) {
   const { unitSystem } = useUnitSystem();
   const targetTypes = workoutTargetsForStep("strength", "training", row.exerciseKind);
+  const restLabel = insideRepeat ? t("workout.b.s.restAfter") : t("workout.b.s.restBetween");
   const selectedExercise = row.exerciseId
     ? exerciseOptions.find((option) => option.id === row.exerciseId)
     : undefined;
@@ -528,7 +532,7 @@ function BuilderStrengthStepFields({
             loading={exercisesLoading}
             hidePreview
             onChange={(selection) => onChange(
-              exerciseSelectionFields(selection, "strength", "training", { context, unitSystem })
+              exerciseSelectionFields(selection, "strength", "training", { context, unitSystem, insideRepeat })
             )}
           />
           {exercisesLoading ? (
@@ -629,10 +633,10 @@ function BuilderStrengthStepFields({
         </section>
 
         <section className="strength-block">
-          <h4>{t("workout.b.s.restBetween")}</h4>
+          <h4>{restLabel}</h4>
           <div className="rest-picker">
             <OptionGroup
-              label={t("workout.b.s.restBetween")}
+              label={restLabel}
               tone="quiet"
               value={Number.isFinite(restSeconds) ? String(restSeconds) : ""}
               options={STRENGTH_REST_PRESETS.map((preset) => ({
@@ -647,7 +651,7 @@ function BuilderStrengthStepFields({
                 min="0"
                 max="3600"
                 step="5"
-                aria-label={t("workout.b.s.restSeconds")}
+                aria-label={insideRepeat ? t("workout.b.s.restAfterSeconds") : t("workout.b.s.restSeconds")}
                 value={row.restSeconds}
                 onChange={(event) => onChange({ restSeconds: event.target.value })}
               />
@@ -685,6 +689,7 @@ function BuilderStepFields({
   exercisesLoading,
   allowedKinds,
   kindLabel = t("workout.b.s.stepType"),
+  insideRepeat = false,
   onChange,
   onKindChange
 }: {
@@ -695,6 +700,8 @@ function BuilderStepFields({
   exercisesLoading: boolean;
   allowedKinds: readonly BuilderKind[];
   kindLabel?: string;
+  /** A sub-step of a repeat: a movement picked here is seeded as one set a round. */
+  insideRepeat?: boolean;
   onChange: (update: Partial<BuilderRow>) => void;
   onKindChange: (kind: BuilderKind) => void;
 }) {
@@ -722,6 +729,7 @@ function BuilderStepFields({
         allowedKinds={allowedKinds}
         kindLabel={kindLabel}
         validationMessage={validationMessage}
+        insideRepeat={insideRepeat}
         onChange={onChange}
         onKindChange={onKindChange}
       />
@@ -809,6 +817,7 @@ function BuilderStepFields({
         context={context}
         exerciseOptions={exerciseOptions}
         exercisesLoading={exercisesLoading}
+        insideRepeat={insideRepeat}
         onChange={onChange}
       />
       {validationMessage ? (
@@ -1037,6 +1046,7 @@ function BuilderRepeatFields({
                       exercisesLoading={exercisesLoading}
                       allowedKinds={childKinds}
                       kindLabel={t("workout.b.r.subStepType")}
+                      insideRepeat
                       onChange={(update) => updateChild(child.id, update)}
                       onKindChange={(kind) => changeChildKind(child.id, kind)}
                     />
@@ -1294,10 +1304,10 @@ export function useWorkoutBuilder(api: HeraclesRecordsApi, options: UseWorkoutBu
   const builderStructure = useMemo(() => builderStructureCounts(rows), [rows]);
   const builderStepKinds = useMemo<BuilderKind[]>(() => {
     const supported = WORKOUT_SPORT_CAPABILITIES[builderSport].stepKinds;
+    // Every sport takes a repeat: COROS's web editor groups any steps, a
+    // strength superset included.
     return BUILDER_ADD_KIND_ORDER.filter((kind) =>
-      kind === "intervals"
-        ? builderSport !== "strength"
-        : (supported as readonly BuilderKind[]).includes(kind)
+      kind === "intervals" || (supported as readonly BuilderKind[]).includes(kind)
     );
   }, [builderSport]);
 

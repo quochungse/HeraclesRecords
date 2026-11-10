@@ -280,6 +280,51 @@ for (const sport of ["run", "bike", "swim", "strength", "hyrox"]) {
   );
 }
 
+// A strength repeat is a superset: it starts with two movements, each one set
+// a round, and a movement picked inside it stays one set a round — its own
+// three or four sets would multiply by the rounds. Written, each keeps its
+// movement and the rest before the next sub-step.
+{
+  const seed = { unitSystem: "metric" };
+  const superset = emptyRow("intervals", "strength", seed);
+  assert.deepEqual(superset.children.map((child) => [child.kind, child.sets]), [["training", "1"], ["training", "1"]]);
+  assert.deepEqual(
+    emptyRow("intervals", "run", seed).children.map((child) => child.kind),
+    ["training", "rest"],
+    "every other sport's repeat is still a rep and its recovery"
+  );
+  const pick = (name, id, insideRepeat) => rowsModule.exerciseSelectionFields(
+    { name, id }, "strength", "training", { ...seed, insideRepeat }
+  );
+  assert.equal(pick("Barbell Deadlift", "dl", true).sets, "1");
+  assert.equal(pick("Barbell Deadlift", "dl", false).sets, "4", "outside a repeat the movement keeps its sets");
+  const filled = {
+    ...superset,
+    repeats: "3",
+    children: [
+      { ...superset.children[0], ...pick("Dumbbell Bench Press", "469656087885430784", true), restSeconds: "30" },
+      { ...superset.children[1], ...pick("Pull Ups", "425827615547506689", true), restSeconds: "90" }
+    ]
+  };
+  const [written] = rowToSteps(filled, "strength", "metric");
+  assert.equal(written.repeat, 3);
+  assert.deepEqual(
+    written.steps.map(({ exercise_id, sets, rest_value }) => ({ exercise_id, sets, rest_value })),
+    [
+      { exercise_id: "469656087885430784", sets: 1, rest_value: 30 },
+      { exercise_id: "425827615547506689", sets: 1, rest_value: 90 }
+    ]
+  );
+  const edited = builderRowsToEditorDraft([filled], { sport: "strength", name: "Superset", description: "" }, "metric").nodes[0];
+  assert.deepEqual(
+    edited.steps.map(({ kind, exerciseId, sets, restValue }) => ({ kind, exerciseId, sets, restValue })),
+    [
+      { kind: "training", exerciseId: "469656087885430784", sets: 1, restValue: 30 },
+      { kind: "training", exerciseId: "425827615547506689", sets: 1, restValue: 90 }
+    ]
+  );
+}
+
 // ---------------------------------------------------------------------------
 // 4. A locked step is carried through
 // ---------------------------------------------------------------------------

@@ -595,6 +595,15 @@ const DEFAULT_STEP_LABELS = new Set([
   "send-off", "send off", "sendoff"
 ]);
 
+/**
+ * A step written as COROS's training row: `training`, an `interval` (a rep of a
+ * repeat), or no kind at all, which `normalizeRunStep` reads as training. On
+ * Strength and for a HYROX station this is the step that carries a movement.
+ */
+export function isTrainingKind(kind: string | undefined): boolean {
+  return kind === undefined || kind === "training" || kind === "interval";
+}
+
 function buildRunExercise(
   step: RunWorkoutStep,
   exId: number,
@@ -607,6 +616,9 @@ function buildRunExercise(
   const parsed = normalizeRunStep(step);
   const kind = parsed.kind ?? "training";
   const capability = WORKOUT_SPORT_CAPABILITIES[sport];
+  // An interval is a training step wherever training is written — a movement
+  // included. Read off `kind`, a strength step or a HYROX station written as
+  // an interval went to COROS as the generic training row, its movement gone.
   const editorKind = kind === "interval" ? "training" : kind;
   if (!capability.stepKinds.includes(editorKind)) {
     throw new Error(`${formatWorkoutSport(sport)} does not support ${kind} steps.`);
@@ -650,7 +662,7 @@ function buildRunExercise(
   }
   if (
     (sport === "strength" || (sport === "hyrox" && normalized.exercise_kind !== undefined)) &&
-    kind === "training" &&
+    editorKind === "training" &&
     !normalized.exercise_id &&
     !normalized.exercise_name
   ) {
@@ -672,7 +684,7 @@ function buildRunExercise(
       };
   // A movement: a strength training step, or a HYROX station. Warm-up,
   // cool-down and rest are COROS's own rows even on a strength day.
-  const functionalExercise = kind === "training" && (sport === "strength" ||
+  const functionalExercise = editorKind === "training" && (sport === "strength" ||
     (sport === "hyrox" && Boolean(normalized.exercise_kind)));
   const exerciseType = RUN_STEP_KIND_TO_EXERCISE_TYPE[kind];
   const catalogRow = functionalExercise && normalized.exercise_id
@@ -686,7 +698,7 @@ function buildRunExercise(
     catalogRow
   );
   const climbing = sport === "indoorClimb" || sport === "bouldering";
-  const hyroxRun = sport === "hyrox" && kind === "training" && !functionalExercise;
+  const hyroxRun = sport === "hyrox" && editorKind === "training" && !functionalExercise;
   const ownName = stepOwnName(normalized, catalogRow);
 
   const exercise: Record<string, unknown> = {
@@ -1190,11 +1202,11 @@ function formatEntryVolume(
     if ("repeat" in step) {
       repeatSets += step.repeat;
       for (const sub of step.steps) {
-        if (entry.sport === "strength" && sub.kind === "training") {
+        if (entry.sport === "strength" && isTrainingKind(sub.kind)) {
           strengthSets += (sub.sets ?? 1) * step.repeat;
         }
       }
-    } else if (entry.sport === "strength" && step.kind === "training") {
+    } else if (entry.sport === "strength" && isTrainingKind(step.kind)) {
       strengthSets += step.sets ?? 1;
     }
   }
@@ -1310,7 +1322,9 @@ function formatRunStepSummary(
   const prescribedTarget = target && step.sets && step.sets > 1
     ? `${step.sets} × ${target}`
     : target;
-  const rest = step.rest_value !== undefined && step.sets && step.sets > 1
+  // The watch rests after a step's last set too, so a one-set step's rest is
+  // the move to the next step — in a superset, the only place it is written.
+  const rest = step.rest_value !== undefined && ((step.sets ?? 1) > 1 || step.rest_value > 0)
     ? `(${step.rest_value} sec rest)`
     : undefined;
   return [exercise || kind, prescribedTarget, intensity, rest].filter(Boolean).join(" ");

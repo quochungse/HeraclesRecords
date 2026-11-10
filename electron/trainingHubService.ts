@@ -120,6 +120,7 @@ import type {
 import {
   applyWorkoutCalculation,
   buildWorkoutPayloadFromEntry,
+  isTrainingKind,
   resetProgramForCreate,
   validatePlanDraft,
   type CorosWorkoutCalculation,
@@ -3955,7 +3956,7 @@ export async function resolveTrainingPlanExercises(
       "repeat" in step ? step.steps : [step]
     );
     const exerciseSteps = plainSteps.filter(
-      (step) => step.kind === "training" && (step.exercise_id || step.exercise_name)
+      (step) => isTrainingKind(step.kind) && (step.exercise_id || step.exercise_name)
     );
     if (!exerciseSteps.length) continue;
     const catalog = await catalogFor(sport);
