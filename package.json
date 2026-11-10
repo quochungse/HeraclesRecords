@@ -30,6 +30,7 @@
     "build:renderer": "tsc -p tsconfig.json --noEmit && vite build && node scripts/collect-licenses.mjs",
     "check:coach": "node scripts/check-coach.mjs",
     "test:base-layers": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-base-layers.mjs",
+    "test:activity-link": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types scripts/test-activity-link.mjs",
     "test:zone-time": "npm run build:electron && cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-zone-time.mjs",
     "test:training-benefit": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types scripts/test-training-benefit.mjs",
     "test:route-coloring": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types scripts/test-route-coloring.mjs",

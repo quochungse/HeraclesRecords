@@ -1,5 +1,5 @@
 import { renderRich, useI18n } from "../i18n/useI18n";
-import { Fragment, useCallback, useMemo, useState } from "react";
+import { Fragment, useMemo } from "react";
 import { ArrowLeft, CloudOff, MessageCircle, RefreshCw } from "lucide-react";
 import type {
   CoachOpenRequest,
@@ -47,6 +47,9 @@ import { ActivityZoneTimePanel } from "../training/components/ActivityZoneTimePa
 import { formatDecimal, getIntlLocale, t } from "../i18n/core";
 import { isRecoveryLap, lapSections } from "../../electron/lapSections";
 import { LapRecoveryMark, LapSectionRow } from "../training/components/LapSections";
+import { LinkedLapRow } from "../training/components/ActivityLinkParts";
+import { useActivityLink } from "../training/useActivityLink";
+import { heartRateZoneFamily } from "../training/zoneTime";
 import { ShareButton } from "../share/ShareButton";
 import { buildActivityShareSession } from "../share/buildShareSession";
 
@@ -142,8 +145,8 @@ export function HikeDetailView({
   const legs = useMemo(() => hikeLegs(rawSeries, movement), [movement, rawSeries]);
   const range = useMemo(() => altitudeRange(rawSeries), [rawSeries]);
 
-  const [focusLapIndex, setFocusLapIndex] = useState<number | null>(null);
-  const clearFocusLap = useCallback(() => setFocusLapIndex(null), []);
+  // The chart, the map beside it and the lap table point at one stretch.
+  const link = useActivityLink(laps, detail?.activityId);
 
   const hasRoute = useMemo(() => hasActivityRoute(detail?.track), [detail]);
   const loading = detailStatus === "pending" && detail === null;
@@ -389,8 +392,11 @@ export function HikeDetailView({
           series={series}
           laps={laps}
           hrZones={detail?.hrZones ?? []}
-          focusLapIndex={focusLapIndex}
-          onFocusLapHandled={clearFocusLap}
+          link={link}
+          track={detail?.track}
+          routeDetail={detail ?? undefined}
+          pauses={detail?.pauses}
+          zoneFamily={heartRateZoneFamily(detail?.hrZoneType, zoneFamily)}
           activityTime={detail?.duration ?? activity.duration}
           motion="hike"
         />
@@ -447,17 +453,10 @@ export function HikeDetailView({
                   return (
                     <Fragment key={lap.index}>
                       <LapSectionRow sections={lapSectionList} index={position} colSpan={7} />
-                      <tr
-                        tabIndex={0}
+                      <LinkedLapRow
+                        link={link}
+                        lapIndex={lap.index}
                         className={recovery ? "run-lap-row is-lap-recovery" : "run-lap-row"}
-                        title={t("hike.detail.focusSplit")}
-                        onClick={() => setFocusLapIndex(lap.index)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            setFocusLapIndex(lap.index);
-                          }
-                        }}
                       >
                         <td>
                           {lap.index}
@@ -477,7 +476,7 @@ export function HikeDetailView({
                         <td className="is-numeric">
                           {lap.avgCadence === undefined ? "—" : Math.round(lap.avgCadence)}
                         </td>
-                      </tr>
+                      </LinkedLapRow>
                     </Fragment>
                   );
                 })}

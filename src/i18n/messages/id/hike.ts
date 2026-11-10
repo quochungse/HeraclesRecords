@@ -73,7 +73,6 @@ const hike: HikeMessages = {
   "hike.detail.failedBody": "Ringkasan di atas berasal dari daftar aktivitas. Grafik, istirahat, dan rute butuh permintaan kedua ke COROS, dan permintaan itu gagal.",
   "hike.detail.splits": "Split",
   "hike.detail.split": "Split",
-  "hike.detail.focusSplit": "Fokuskan grafik ke split ini",
   "hike.detail.splitNote": "Waktu sebuah split mengikuti jam, jadi istirahat di dalamnya ikut terhitung — itulah sebabnya split paling lambat biasanya yang memuat puncak.",
   "hike.rests.title": "Istirahat",
   "hike.rests.total": "{time} <s>berhenti total</s>",

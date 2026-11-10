@@ -58,6 +58,8 @@ import { TrainingBenefitChips, TrainingBenefitReason } from "./TrainingBenefitCh
 import { formatCount, formatDecimal, t } from "../../i18n/core";
 import { isRecoveryLap, lapSections } from "../../../electron/lapSections";
 import { LapRecoveryMark, LapSectionRow } from "./LapSections";
+import { LinkedLapRow } from "./ActivityLinkParts";
+import { useActivityLink } from "../useActivityLink";
 
 interface ActivityDetailPaneProps {
   detail: TrainingHubActivityDetail | null;
@@ -161,7 +163,6 @@ export function ActivityDetailPane({
   const [showRaw, setShowRaw] = useState(false);
   const [raw, setRaw] = useState<Record<string, unknown> | null>(null);
   const [rawError, setRawError] = useState<string | null>(null);
-  const [focusLapIndex, setFocusLapIndex] = useState<number | null>(null);
 
   const sportName = useMemo(() => {
     if (detail) {
@@ -204,10 +205,10 @@ export function ActivityDetailPane({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [showRaw]);
 
-  // A new activity's chart must not inherit the previous one's focused lap.
-  useEffect(() => {
-    setFocusLapIndex(null);
-  }, [activityId]);
+  // The chart, the route map and the lap table point at one stretch; a new
+  // activity starts with none.
+  const linkLaps = useMemo(() => detail?.laps ?? [], [detail]);
+  const link = useActivityLink(linkLaps, activityId);
 
   const request =
     detailRequest && detailRequest.activityId === listActivity?.activityId
@@ -683,8 +684,7 @@ export function ActivityDetailPane({
               series={series}
               laps={detail.laps}
               hrZones={detail.hrZones}
-              focusLapIndex={focusLapIndex}
-              onFocusLapHandled={() => setFocusLapIndex(null)}
+              link={link}
               activityTime={duration}
               embedded
               sportType={sportType}
@@ -709,7 +709,7 @@ export function ActivityDetailPane({
           {gpsPoints > 1 ? (
             <section className="activity-detail-block">
               <h3>{t("activity.m.route")}</h3>
-              <ActivityRouteMap track={detail.track} detail={detail} />
+              <ActivityRouteMap track={detail.track} detail={detail} link={hasSeries ? link : undefined} />
             </section>
           ) : null}
 
@@ -753,18 +753,10 @@ export function ActivityDetailPane({
                     return (
                       <Fragment key={lap.index}>
                         <LapSectionRow sections={lapSectionList} index={position} colSpan={7} />
-                        <tr
-                          className={
-                            [
-                              hasSeries ? "is-pickable" : "",
-                              recovery ? "is-lap-recovery" : ""
-                            ]
-                              .filter(Boolean)
-                              .join(" ") || undefined
-                          }
-                          onClick={
-                            hasSeries ? () => setFocusLapIndex(lap.index) : undefined
-                          }
+                        <LinkedLapRow
+                          link={hasSeries ? link : undefined}
+                          lapIndex={lap.index}
+                          className={recovery ? "is-lap-recovery" : undefined}
                         >
                           <td>
                             {lap.index}
@@ -788,7 +780,7 @@ export function ActivityDetailPane({
                               ? formatElevationMeters(lap.elevationGain, unitSystem)
                               : "—"}
                           </td>
-                        </tr>
+                        </LinkedLapRow>
                       </Fragment>
                     );
                   })}

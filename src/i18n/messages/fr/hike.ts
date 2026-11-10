@@ -73,7 +73,6 @@ const hike: HikeMessages = {
   "hike.detail.failedBody": "Le résumé ci-dessus vient de la liste des activités. Le graphique, les pauses et le parcours demandent une seconde requête à COROS, qui a échoué.",
   "hike.detail.splits": "Temps intermédiaires",
   "hike.detail.split": "Segment",
-  "hike.detail.focusSplit": "Centrer le graphique sur ce segment",
   "hike.detail.splitNote": "Le temps d’un segment suit l’horloge de la montre : une pause prise pendant ce segment y est comptée — c’est pourquoi le segment le plus lent est souvent celui du sommet.",
   "hike.rests.title": "Pauses",
   "hike.rests.total": "{time} <s>d’arrêt au total</s>",

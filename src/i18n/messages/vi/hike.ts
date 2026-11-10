@@ -73,7 +73,6 @@ const hike: HikeMessages = {
   "hike.detail.failedBody": "Phần tóm tắt ở trên lấy từ danh sách hoạt động. Biểu đồ, các lần nghỉ và lộ trình cần thêm một yêu cầu tới COROS, và yêu cầu đó đã thất bại.",
   "hike.detail.splits": "Từng chặng",
   "hike.detail.split": "Chặng",
-  "hike.detail.focusSplit": "Tập trung biểu đồ vào chặng này",
   "hike.detail.splitNote": "Thời gian mỗi chặng tính theo đồng hồ, nên lần nghỉ nào nằm trong chặng thì được tính vào chặng đó — vì vậy chặng chậm nhất thường là chặng có đỉnh núi.",
   "hike.rests.title": "Các lần nghỉ",
   "hike.rests.total": "{time} <s>dừng tổng cộng</s>",

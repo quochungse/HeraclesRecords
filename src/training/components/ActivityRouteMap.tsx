@@ -4,9 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MapPin, Maximize2, RotateCcw, X } from "lucide-react";
 import type {
+  TrainingHubActivityPause,
   TrainingHubActivityTrack,
   TrainingHubTrackPoint
 } from "../../../electron/types";
+import type { ActivityLink } from "../activityLink";
+import { bindRouteLink, type RouteLinkBinding } from "./routeLink";
 import { OptionGroup } from "../../components/OptionGroup";
 import { useI18n } from "../../i18n/useI18n";
 import {
@@ -84,6 +87,13 @@ interface ActivityRouteMapProps {
   track?: TrainingHubActivityTrack;
   /** The activity's detail, for colouring the full map by pace, heart rate or elevation. */
   detail?: RouteDetail;
+  /**
+   * The cursor and the selection the page's chart and lap table share
+   * (`activityLink.ts`): given, the route shows both and sets both.
+   */
+  link?: ActivityLink;
+  /** The pauses the link's clock leaves out and the route's still counts. */
+  pauses?: readonly TrainingHubActivityPause[];
 }
 
 const ROUTE_COLOR = "#74c08f";
@@ -740,9 +750,14 @@ function RouteMapCanvas({
   replaySpeed = 1,
   replayToken = 0,
   drawing,
+  link,
+  pauses,
   ariaLabel
 }: {
   route: RouteReplay;
+  /** The page's link: the route shows its cursor and selection, and sets them. */
+  link?: ActivityLink;
+  pauses?: readonly TrainingHubActivityPause[];
   /**
    * How the route is drawn when it is coloured by what happened along it.
    * Absent, it is one line in the route's own colour.
@@ -867,6 +882,10 @@ function RouteMapCanvas({
       });
     };
     fitRoute();
+    // Once the map has a view: the link reads the route in the map's own pixels.
+    const routeLink: RouteLinkBinding | null = link
+      ? bindRouteLink(map, route, link, pauses, style)
+      : null;
     const routeEnds = ends ? bindRouteEnds(map) : undefined;
     // The heatmap's canvas is hidden through a zoom; the lines are not.
     const endsHideWithRoute = (next: RouteDrawing | undefined) =>
@@ -962,6 +981,7 @@ function RouteMapCanvas({
       restyle: (next) => {
         style = next;
         painter.restyle(next);
+        routeLink?.restyle(next);
         ghostLine.setStyle({
           color: next.routeColor,
           opacity: ghostShown(drawingRef.current) ? next.ghostOpacity : 0
@@ -980,13 +1000,14 @@ function RouteMapCanvas({
     return () => {
       window.cancelAnimationFrame(animationFrame);
       controlRef.current = null;
+      routeLink?.remove();
       painter.remove();
       resizeObserver.disconnect();
       map.remove();
       mapRef.current = null;
       tileLayerRef.current = null;
     };
-  }, [route, theme, scrollWheelZoom, interactive, visibleBand, animate, ends]);
+  }, [route, theme, scrollWheelZoom, interactive, visibleBand, animate, ends, link, pauses]);
 
   useEffect(() => {
     if (replayToken > 0) {
@@ -1360,6 +1381,8 @@ function RouteMapFrame({
   replayToken,
   replaySpeed,
   drawing,
+  link,
+  pauses,
   ariaLabel,
   onExpand,
   onReplay,
@@ -1367,6 +1390,8 @@ function RouteMapFrame({
   layerSection
 }: {
   route: RouteReplay;
+  link?: ActivityLink;
+  pauses?: readonly TrainingHubActivityPause[];
   layers: RouteMapLayers;
   /** How the route is coloured, offered in the layer menu below the base maps. */
   layerSection?: MapLayerSection<RouteColorMode>;
@@ -1394,6 +1419,8 @@ function RouteMapFrame({
         replayToken={replayToken}
         {...(replaySpeed ? { replaySpeed: Number(replaySpeed) } : {})}
         drawing={drawing}
+        link={link}
+        pauses={pauses}
         baseLayer={layers.baseLayer}
         ariaLabel={ariaLabel}
       />
@@ -1591,7 +1618,7 @@ function useRouteReplay(track?: TrainingHubActivityTrack): RouteReplay | null {
   return useMemo(() => buildRouteReplay(routePoints(track)), [track]);
 }
 
-export function ActivityRouteMap({ track, detail }: ActivityRouteMapProps) {
+export function ActivityRouteMap({ track, detail, link, pauses }: ActivityRouteMapProps) {
   const route = useRouteReplay(track);
 
   if (!route) {
@@ -1603,11 +1630,21 @@ export function ActivityRouteMap({ track, detail }: ActivityRouteMapProps) {
     );
   }
 
-  return <RoutePreviewMap route={route} detail={detail} />;
+  return <RoutePreviewMap route={route} detail={detail} link={link} pauses={pauses} />;
 }
 
 /** The side-panel map once there is a route, drawn the way the layer menu says. */
-function RoutePreviewMap({ route, detail }: { route: RouteReplay; detail?: RouteDetail }) {
+function RoutePreviewMap({
+  route,
+  detail,
+  link,
+  pauses
+}: {
+  route: RouteReplay;
+  detail?: RouteDetail;
+  link?: ActivityLink;
+  pauses?: readonly TrainingHubActivityPause[];
+}) {
   const layers = useRouteMapLayers();
   const [expanded, setExpanded] = useState(false);
   const closeExpanded = useCallback(() => setExpanded(false), []);
@@ -1624,6 +1661,8 @@ function RoutePreviewMap({ route, detail }: { route: RouteReplay; detail?: Route
         // A quick look: the whole route at once. The full map replays it.
         animate={false}
         drawing={drawing}
+        link={link}
+        pauses={pauses}
         layerSection={analysis.layerSection}
         ariaLabel={t("activity.route.mapLabel")}
         onExpand={() => setExpanded(true)}

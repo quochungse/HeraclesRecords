@@ -73,7 +73,6 @@ const hike: HikeMessages = {
   "hike.detail.failedBody": "Die Übersicht oben stammt aus der Aktivitätsliste. Diagramm, Pausen und Strecke brauchen eine zweite Anfrage an COROS, und die ist fehlgeschlagen.",
   "hike.detail.splits": "Splits",
   "hike.detail.split": "Split",
-  "hike.detail.focusSplit": "Diagramm auf diesen Split fokussieren",
   "hike.detail.splitNote": "Die Zeit eines Splits folgt der Uhrzeit, eine Pause darin zählt also mit — deshalb ist der langsamste Split meist der mit dem Gipfel.",
   "hike.rests.title": "Pausen",
   "hike.rests.total": "{time} <s>Stillstand insgesamt</s>",

@@ -73,7 +73,6 @@ const hike: HikeMessages = {
   "hike.detail.failedBody": "สรุปด้านบนมาจากรายการกิจกรรม กราฟ ช่วงพัก และเส้นทางต้องขอข้อมูลจาก COROS อีกครั้ง และคำขอนั้นล้มเหลว",
   "hike.detail.splits": "สปลิต",
   "hike.detail.split": "สปลิต",
-  "hike.detail.focusSplit": "โฟกัสกราฟที่สปลิตนี้",
   "hike.detail.splitNote": "เวลาของแต่ละสปลิตนับตามนาฬิกา ช่วงพักภายในสปลิตจึงรวมอยู่ด้วย — นี่คือเหตุผลที่สปลิตที่ช้าที่สุดมักเป็นช่วงที่มียอดเขา",
   "hike.rests.title": "ช่วงพัก",
   "hike.rests.total": "{time} <s>หยุดรวมทั้งหมด</s>",

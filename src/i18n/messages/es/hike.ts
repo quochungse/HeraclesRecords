@@ -73,7 +73,6 @@ const hike: HikeMessages = {
   "hike.detail.failedBody": "El resumen de arriba sale de la lista de actividades. El gráfico, los descansos y la ruta necesitan otra petición a COROS, y esa ha fallado.",
   "hike.detail.splits": "Parciales",
   "hike.detail.split": "Parcial",
-  "hike.detail.focusSplit": "Centrar el gráfico en este parcial",
   "hike.detail.splitNote": "El tiempo de un parcial va por el reloj, así que un descanso dentro de él cuenta — por eso el parcial más lento suele ser el de la cumbre.",
   "hike.rests.title": "Descansos",
   "hike.rests.total": "{time} <s>parado en total</s>",

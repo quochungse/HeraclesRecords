@@ -77,7 +77,6 @@ const run: RunMessages = {
   "run.detail.form": "Техника бега",
   "run.detail.effect": "Эффект и условия",
   "run.detail.lap": "Круг",
-  "run.detail.focusLap": "Сфокусировать график на этом круге",
   "run.perf.title": "Беговая эффективность",
   "run.perf.unit": "мл/кг/мин",
   "run.perf.reading": "Показать как",

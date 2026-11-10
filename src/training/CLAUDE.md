@@ -39,6 +39,34 @@ that is not a screen's own names its own, as Running's scale year does.
 - `motion` picks the sport's reading: `"speed"` (rides: speed, rpm), `"hike"` (km/h, climbing
   rate), `"trail"` (pace, GAP, climbing rate), `"swim"` (pace per 100 m/yd, cadence named Stroke rate).
 
+## One stretch on the chart, the map and the laps (`activityLink.ts`)
+
+A session's page makes one link (`useActivityLink`) and hands it to the chart, the route map
+and each lap row (`LinkedLapRow`): a cursor (a moment) and a selection (a stretch), in seconds
+**on the clock the chart's `series` is on** — pauses out on a sport's page, the wall clock in
+the Activities pane. Each of the three sets them and draws them (`ActivityLinkParts.tsx`,
+`routeLink.ts`). `npm run test:activity-link`.
+- **A drag on the plot selects; it does not zoom.** Zoom is the brush under the plot and the
+  figures block's button. Pressing a lap (its row, or its block on the ruler above the plot)
+  selects it, again lets go, with Shift reaches from the lap pressed before.
+- **The link's layer stands over the chart library, not in it** (`LinkedPlotStage`): it reads
+  the plot's area off Recharts' own clip rectangle and draws the band, its two edges and the
+  cursor as elements of its own, so a moving cursor redraws a line, not a thousand-row chart.
+  Whatever reads the cursor reads a primitive through `useLinkValue`.
+- **The route is stamped by the wall clock**: a page that took the pauses out of its series
+  hands them to the map (`pauses`), or every stretch after a pause lights the wrong road. A
+  route with no clock (a track merged from two sources) is drawn untied.
+- Where a route passes one spot twice, the pointer takes the pass nearest the moment already
+  under the cursor (`momentAt`). A press on the route selects the lap there; a press that
+  lands on the route never starts a pan.
+- **The figures block** (`stretchFigures`) reads the recorded samples; a selection that is
+  exactly one lap states COROS's own figures for it, so the block and the lap table agree. What
+  stands under a figure is how the stretch compares with the whole, in plain ink: faster is not
+  better on a recovery.
+- The docked map shows on a sport's page only (`track` given), behind the head's map button
+  (`activity.chart.map`); the Activities pane ties the map it already has. The lap ruler is
+  drawn for 2 to `LAP_RULER_MOST` laps.
+
 ## Training label (`electron/sessionIntensity.ts` reads, `trainingBenefit.ts` names)
 
 A coloured chip (Recovery, Aerobic, Tempo, Threshold, VO2 Max, Anaerobic) and a shape chip

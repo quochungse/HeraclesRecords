@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### What's new
+- **The chart, the map and the laps point at one stretch** - on a run, ride, hike or swim the route now stands beside the Performance chart (the map button in its corner shows or hides it). Move over the chart and a dot follows the route; move over the route and the chart follows. Drag on the chart, press a lap, or drag along the route to select a stretch: it lights up on all three, and the figures under the chart read that stretch alone, each against the whole session, with its own time in heart rate zones. A strip of laps above the chart selects one lap, or several with Shift. Zoom to selection is a button, and Escape lets the selection go.
 - **Figures move when you change what they show** - choose another period or filter and the figures roll up or down to their new values while a weekly chart zooms along its weeks; choose another measure (time, distance, load, sets) and the figures slide across while the bars change height in place. On Overview, Running, Cycling, Hiking, Swimming, Strength and Activities, and a session's time in zones. A change you did not make here, such as new data or units changed in Personal, just appears.
 
 ## [1.4.7] - 2026-11-05

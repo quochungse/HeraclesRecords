@@ -73,7 +73,6 @@ const hike: HikeMessages = {
   "hike.detail.failedBody": "上の概要はアクティビティ一覧から取得しています。グラフ、休憩、ルートには COROS への追加リクエストが必要で、それが失敗しました。",
   "hike.detail.splits": "スプリット",
   "hike.detail.split": "スプリット",
-  "hike.detail.focusSplit": "グラフをこのスプリットに絞り込む",
   "hike.detail.splitNote": "スプリットの時間はウォッチの時計で計っているため、その中で取った休憩も含まれます。だから一番遅いスプリットは、たいてい山頂を含むものです。",
   "hike.rests.title": "休憩",
   "hike.rests.total": "{time} <s>停止（合計）</s>",

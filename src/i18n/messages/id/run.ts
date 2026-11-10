@@ -75,7 +75,6 @@ const run: RunMessages = {
   "run.detail.form": "Teknik lari",
   "run.detail.effect": "Efek dan kondisi",
   "run.detail.lap": "Putaran",
-  "run.detail.focusLap": "Fokuskan grafik ke putaran ini",
   "run.perf.title": "Efisiensi lari",
   "run.perf.unit": "ml/kg/menit",
   "run.perf.reading": "Tampilkan sebagai",

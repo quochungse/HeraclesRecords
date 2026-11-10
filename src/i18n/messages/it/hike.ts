@@ -73,7 +73,6 @@ const hike: HikeMessages = {
   "hike.detail.failedBody": "Il riepilogo sopra viene dall’elenco delle attività. Grafico, soste e percorso richiedono una seconda richiesta a COROS, che non è andata a buon fine.",
   "hike.detail.splits": "Parziali",
   "hike.detail.split": "Parziale",
-  "hike.detail.focusSplit": "Centra il grafico su questo parziale",
   "hike.detail.splitNote": "Il tempo di un parziale segue l’orologio, quindi una sosta fatta al suo interno è compresa — per questo il parziale più lento è di solito quello con la vetta.",
   "hike.rests.title": "Soste",
   "hike.rests.total": "{time} <s>di sosta in tutto</s>",

@@ -1,5 +1,5 @@
 import { useI18n } from "../i18n/useI18n";
-import { Fragment, useCallback, useMemo, useState } from "react";
+import { Fragment, useMemo } from "react";
 import { ArrowLeft, CloudOff, MessageCircle, RefreshCw } from "lucide-react";
 import type {
   CoachOpenRequest,
@@ -45,6 +45,9 @@ import { detailTrainingBenefit, type BenefitZoneFamily } from "../training/train
 import { TrainingBenefitChips } from "../training/components/TrainingBenefitChip";
 import { isRecoveryLap, lapSections } from "../../electron/lapSections";
 import { LapRecoveryMark, LapSectionRow } from "../training/components/LapSections";
+import { LinkedLapRow } from "../training/components/ActivityLinkParts";
+import { useActivityLink } from "../training/useActivityLink";
+import { heartRateZoneFamily } from "../training/zoneTime";
 import { ShareButton } from "../share/ShareButton";
 import { buildActivityShareSession, shareTrainingLabel } from "../share/buildShareSession";
 
@@ -127,8 +130,8 @@ export function RideDetailView({
     [detail]
   );
 
-  const [focusLapIndex, setFocusLapIndex] = useState<number | null>(null);
-  const clearFocusLap = useCallback(() => setFocusLapIndex(null), []);
+  // The chart, the map beside it and the lap table point at one stretch.
+  const link = useActivityLink(laps, detail?.activityId);
 
   const maxSpeed = useMemo(() => rideMaxSpeedKmh(series), [series]);
 
@@ -376,8 +379,11 @@ export function RideDetailView({
           series={series}
           laps={laps}
           hrZones={detail?.hrZones ?? []}
-          focusLapIndex={focusLapIndex}
-          onFocusLapHandled={clearFocusLap}
+          link={link}
+          track={detail?.track}
+          routeDetail={detail ?? undefined}
+          pauses={detail?.pauses}
+          zoneFamily={heartRateZoneFamily(detail?.hrZoneType, zoneFamily)}
           activityTime={detail?.duration ?? activity.duration}
           motion="speed"
         />
@@ -411,17 +417,10 @@ export function RideDetailView({
                   return (
                     <Fragment key={lap.index}>
                       <LapSectionRow sections={lapSectionList} index={position} colSpan={lapsHavePower ? 8 : 7} />
-                      <tr
-                        tabIndex={0}
+                      <LinkedLapRow
+                        link={link}
+                        lapIndex={lap.index}
                         className={recovery ? "run-lap-row is-lap-recovery" : "run-lap-row"}
-                        title={t("run.detail.focusLap")}
-                        onClick={() => setFocusLapIndex(lap.index)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            setFocusLapIndex(lap.index);
-                          }
-                        }}
                       >
                         <td>
                           {lap.index}
@@ -448,7 +447,7 @@ export function RideDetailView({
                             {lap.avgPower === undefined ? "—" : `${Math.round(lap.avgPower)} W`}
                           </td>
                         ) : null}
-                      </tr>
+                      </LinkedLapRow>
                     </Fragment>
                   );
                 })}

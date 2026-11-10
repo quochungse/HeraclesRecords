@@ -75,7 +75,6 @@ const run: RunMessages = {
   "run.detail.form": "Foulée",
   "run.detail.effect": "Effet et conditions",
   "run.detail.lap": "Tour",
-  "run.detail.focusLap": "Centrer le graphique sur ce tour",
   "run.perf.title": "Efficacité de course",
   "run.perf.unit": "ml/kg/min",
   "run.perf.reading": "Afficher en",
