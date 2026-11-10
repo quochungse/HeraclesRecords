@@ -43,6 +43,7 @@ import {
   STEADY_BAND_PERCENT,
   type PerformanceSession
 } from "./runPerformanceModel";
+import { MotionFigure } from "../motion/MotionFigure";
 
 interface RunPerformancePanelProps {
   /** The runs on screen: the period, on the chosen surface. */
@@ -210,7 +211,7 @@ export function RunPerformancePanel({
         <div>
           <p className="running-eyebrow">{t("run.perf.title")}</p>
           <h3>
-            {headline}
+            <MotionFigure text={headline} value={model?.form} />
             <span className="run-block-sub">
               {" "}
               {t("run.perf.form", { period: periodPhrase(periodDays) })}
@@ -224,7 +225,7 @@ export function RunPerformancePanel({
               <>
                 {" · "}
                 <strong className={model.trend.change >= 0 ? "tone-up" : "tone-down"}>
-                  {signed(model.trend.change)}%
+                  <MotionFigure text={`${signed(model.trend.change)}%`} value={model.trend.change} />
                 </strong>{" "}
                 {t("run.perf.since", { date: dayLabel(model.trend.sinceMs) })}
               </>

@@ -236,6 +236,7 @@ export function StrengthHero({
             metricSwitch={
               <OptionGroup
                 label={t("strength.heatMetric")}
+                motion="slide"
                 tone="quiet"
                 size="xs"
                 className="muscle-panel-metric"

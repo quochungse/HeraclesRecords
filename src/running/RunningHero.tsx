@@ -15,6 +15,7 @@ import { buildVo2Trend, formatPlateauDuration, type Vo2Reading } from "../traini
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { buildRunWeeks, runLoadBalance, type LoadBalance } from "./runMetrics";
 import { formatDecimal, plural, t } from "../i18n/core";
+import { MotionFigure } from "../motion/MotionFigure";
 
 interface RunningHeroProps {
   /**
@@ -129,7 +130,7 @@ export function RunningHero({ runs, allRuns, snapshot, filtered, nowMs }: Runnin
       <div className="run-hero-card">
         <span className="run-hero-label">{t("activity.hero.thisWeek")}</span>
         <strong className="run-hero-value">
-          {formatDistanceMeters(thisWeek?.current.distance ?? 0, unitSystem)}
+          <MotionFigure text={formatDistanceMeters(thisWeek?.current.distance ?? 0, unitSystem)} />
         </strong>
         <div className="run-hero-foot">
           <span>{plural("activity.run.count", thisWeek?.current.count ?? 0)}</span>
@@ -143,7 +144,9 @@ export function RunningHero({ runs, allRuns, snapshot, filtered, nowMs }: Runnin
 
       <div className="run-hero-card">
         <span className="run-hero-label">VO₂max</span>
-        <strong className="run-hero-value">{vo2 ? vo2.latest : "—"}</strong>
+        <strong className="run-hero-value">
+          <MotionFigure text={vo2 ? String(vo2.latest) : "—"} />
+        </strong>
         <div className="run-hero-foot">
           <span>
             {vo2
@@ -156,7 +159,7 @@ export function RunningHero({ runs, allRuns, snapshot, filtered, nowMs }: Runnin
       <div className="run-hero-card">
         <span className="run-hero-label">{t("activity.scores.threshold")}</span>
         <strong className="run-hero-value">
-          {ltsp === undefined ? "—" : formatPaceSecondsPerKm(ltsp, unitSystem)}
+          <MotionFigure text={ltsp === undefined ? "—" : formatPaceSecondsPerKm(ltsp, unitSystem)} />
         </strong>
         <div className="run-hero-foot">
           <span>{lthr === undefined ? t("activity.hero.noThresholdHr") : `${lthr} bpm`}</span>

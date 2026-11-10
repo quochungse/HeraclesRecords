@@ -16,6 +16,7 @@ import {
 } from "./runMetrics";
 import { classifyRunSurface } from "./runSurface";
 import { plural, t } from "../i18n/core";
+import { MotionFigure } from "../motion/MotionFigure";
 
 interface TrailRunningHeroProps {
   /** Trail runs over the whole history: the week, its baseline and the twelve-week rate look back past the period. */
@@ -84,7 +85,7 @@ export function TrailRunningHero({ trailRuns, allRuns, nowMs }: TrailRunningHero
       <div className="run-hero-card">
         <span className="run-hero-label">{t("activity.hero.thisWeek")}</span>
         <strong className="run-hero-value">
-          {count > 0 ? formatDurationSpan(thisWeek?.current.duration) : "—"}
+          <MotionFigure text={count > 0 ? formatDurationSpan(thisWeek?.current.duration) : "—"} />
         </strong>
         <div className="run-hero-foot">
           <span>
@@ -100,7 +101,7 @@ export function TrailRunningHero({ trailRuns, allRuns, nowMs }: TrailRunningHero
       <div className="run-hero-card">
         <span className="run-hero-label">{t("activity.trail.climbThisWeek")}</span>
         <strong className="run-hero-value">
-          {climb > 0 ? formatElevationMeters(climb, unitSystem) : "—"}
+          <MotionFigure text={climb > 0 ? formatElevationMeters(climb, unitSystem) : "—"} />
         </strong>
         <div className="run-hero-foot">
           <span>
@@ -119,7 +120,7 @@ export function TrailRunningHero({ trailRuns, allRuns, nowMs }: TrailRunningHero
       >
         <span className="run-hero-label">{t("activity.trail.rate")}</span>
         <strong className="run-hero-value">
-          {rate.rate === undefined ? "—" : formatVerticalRate(rate.rate, unitSystem)}
+          <MotionFigure text={rate.rate === undefined ? "—" : formatVerticalRate(rate.rate, unitSystem)} />
         </strong>
         <div className="run-hero-foot">
           <span>

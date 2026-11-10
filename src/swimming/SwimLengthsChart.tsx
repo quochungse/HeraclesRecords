@@ -14,6 +14,7 @@ import type { TooltipContentProps } from "recharts";
 import type { SwimStyle, TrainingHubSwimDetail, UnitSystem } from "../../electron/types";
 import { secondsPer100m } from "../../electron/swimDetail";
 import { OptionGroup } from "../components/OptionGroup";
+import { useChartMotion } from "../motion/useChartMotion";
 import { trainingChartTooltipStyle } from "../training/chartConfig";
 import { formatDurationSeconds } from "../training/formatters";
 import { useChartColors } from "../training/useChartColors";
@@ -105,6 +106,10 @@ export function SwimLengthsChart({ swim }: { swim: TrainingHubSwimDetail }) {
     return built;
   }, [swim]);
 
+  // Another measure: each length's bar changes height where it stands (src/motion/).
+  const drawn = useMemo(() => [rows, metric] as const, [rows, metric]);
+  const motion = useChartMotion(drawn, "key");
+
   const { average, floor, hasValues } = useMemo(() => {
     const values = rows.flatMap((row) => {
       const value = valueOf(row, metric);
@@ -166,6 +171,7 @@ export function SwimLengthsChart({ swim }: { swim: TrainingHubSwimDetail }) {
 
       <OptionGroup
         label={t("swim.lengths.metric")}
+        motion="slide"
         value={metric}
         options={metricOptions()}
         onChange={(next) => setMetric(next as LengthMetric)}
@@ -196,7 +202,7 @@ export function SwimLengthsChart({ swim }: { swim: TrainingHubSwimDetail }) {
                   metric === "pace" ? formatPer100(value, unitSystem).split(" ")[0]! : formatDecimal(value, 0)
                 }
               />
-              <Bar dataKey={metric} isAnimationActive={false} radius={[2, 2, 0, 0]}>
+              <Bar dataKey={metric} radius={[2, 2, 0, 0]} {...motion.bar}>
                 {rows.map((row) => (
                   <Cell key={row.key} fill={row.kind ? SWIM_STYLE_COLORS[row.kind] : "transparent"} fillOpacity={0.85} />
                 ))}

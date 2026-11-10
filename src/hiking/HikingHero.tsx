@@ -16,6 +16,7 @@ import {
   hikeSeconds
 } from "./hikeMetrics";
 import { plural, t } from "../i18n/core";
+import { MotionFigure } from "../motion/MotionFigure";
 
 interface HikingHeroProps {
   /**
@@ -80,7 +81,7 @@ export function HikingHero({ hikes, nowMs }: HikingHeroProps) {
       <div className="run-hero-card">
         <span className="run-hero-label">{t("activity.hero.thisWeek")}</span>
         <strong className="run-hero-value">
-          {count > 0 ? formatDurationSpan(thisWeek?.current.duration) : "—"}
+          <MotionFigure text={count > 0 ? formatDurationSpan(thisWeek?.current.duration) : "—"} />
         </strong>
         <div className="run-hero-foot">
           <span>
@@ -96,9 +97,7 @@ export function HikingHero({ hikes, nowMs }: HikingHeroProps) {
       <div className="run-hero-card">
         <span className="run-hero-label">{t("hike.hero.ascentThisWeek")}</span>
         <strong className="run-hero-value">
-          {(thisWeek?.current.elevationGain ?? 0) > 0
-            ? formatElevationMeters(thisWeek?.current.elevationGain, unitSystem)
-            : "—"}
+          <MotionFigure text={(thisWeek?.current.elevationGain ?? 0) > 0 ? formatElevationMeters(thisWeek?.current.elevationGain, unitSystem) : "—"} />
         </strong>
         <div className="run-hero-foot">
           <span>
@@ -112,7 +111,7 @@ export function HikingHero({ hikes, nowMs }: HikingHeroProps) {
       <div className="run-hero-card">
         <span className="run-hero-label">{t("hike.hero.biggest")}</span>
         <strong className="run-hero-value">
-          {biggest ? formatDurationSpan(hikeSeconds(biggest)) : "—"}
+          <MotionFigure text={biggest ? formatDurationSpan(hikeSeconds(biggest)) : "—"} />
         </strong>
         <div className="run-hero-foot">
           <span className="hike-hero-name" title={biggest?.name}>
@@ -133,7 +132,7 @@ export function HikingHero({ hikes, nowMs }: HikingHeroProps) {
       >
         <span className="run-hero-label">{t("hike.hero.rate")}</span>
         <strong className="run-hero-value">
-          {rate.rate === undefined ? "—" : formatVerticalRate(rate.rate, unitSystem)}
+          <MotionFigure text={rate.rate === undefined ? "—" : formatVerticalRate(rate.rate, unitSystem)} />
         </strong>
         <div className="run-hero-foot">
           <span>

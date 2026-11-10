@@ -13,6 +13,7 @@ import { useUnitSystem } from "../units/UnitSystemProvider";
 import { DeltaChip, LoadRatioCard } from "../running/RunningHero";
 import { buildRideWeeks, rideLoadBalance } from "./rideMetrics";
 import { formatDecimal, plural, t } from "../i18n/core";
+import { MotionFigure } from "../motion/MotionFigure";
 
 interface CyclingHeroProps {
   /**
@@ -119,7 +120,7 @@ export function CyclingHero({
       <div className="run-hero-card">
         <span className="run-hero-label">{t("activity.hero.thisWeek")}</span>
         <strong className="run-hero-value">
-          {count > 0 ? formatDurationSpan(thisWeek?.current.duration) : "—"}
+          <MotionFigure text={count > 0 ? formatDurationSpan(thisWeek?.current.duration) : "—"} />
         </strong>
         <div className="run-hero-foot">
           <span>
@@ -139,7 +140,7 @@ export function CyclingHero({
       <div className="run-hero-card">
         <span className="run-hero-label">FTP</span>
         <strong className="run-hero-value">
-          {ftp === undefined ? "—" : `${Math.round(ftp)} W`}
+          <MotionFigure text={ftp === undefined ? "—" : `${Math.round(ftp)} W`} />
         </strong>
         <div className="run-hero-foot">
           <span>
@@ -157,7 +158,9 @@ export function CyclingHero({
       {vo2 ? (
         <div className="run-hero-card">
           <span className="run-hero-label">VO₂max</span>
-          <strong className="run-hero-value">{vo2.latest}</strong>
+          <strong className="run-hero-value">
+            <MotionFigure text={String(vo2.latest)} />
+          </strong>
           <div className="run-hero-foot">
             <span>{t("activity.hero.held", { duration: formatPlateauDuration(vo2.daysAtCurrent) })}</span>
           </div>
@@ -167,9 +170,7 @@ export function CyclingHero({
       <div className="run-hero-card">
         <span className="run-hero-label">{t("activity.trail.climbThisWeek")}</span>
         <strong className="run-hero-value">
-          {(thisWeek?.current.elevationGain ?? 0) > 0
-            ? formatElevationMeters(thisWeek?.current.elevationGain, unitSystem)
-            : "—"}
+          <MotionFigure text={(thisWeek?.current.elevationGain ?? 0) > 0 ? formatElevationMeters(thisWeek?.current.elevationGain, unitSystem) : "—"} />
         </strong>
         <div className="run-hero-foot">
           <span>

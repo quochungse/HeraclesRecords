@@ -192,6 +192,21 @@ async function main() {
     const rows = await harness("count", ".running-list-panel tbody tr");
     assert.equal(rows, RUNS.length);
 
+    // A MotionFigure is a span: a stylesheet's `.stat span` rule meant for a
+    // label must not restyle the figure beside it (Strength's did).
+    assert.ok(await win.webContents.executeJavaScript(`document.querySelectorAll(".motion-figure").length`, true) > 0);
+    assert.deepEqual(
+      await win.webContents.executeJavaScript(
+        `[...document.querySelectorAll(".motion-figure")].flatMap((figure) => {
+          const own = getComputedStyle(figure), parent = getComputedStyle(figure.parentElement);
+          return ["fontSize", "fontWeight", "color"].filter((p) => own[p] !== parent[p]).map((p) => figure.textContent + " " + p + " " + own[p] + " ≠ " + parent[p]);
+        })`,
+        true
+      ),
+      [],
+      "every figure looks like what holds it"
+    );
+
     const panel = await harness("rect", ".running-list-panel");
     assert.ok(
       panel.height >= rows * 40,

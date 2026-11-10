@@ -15,6 +15,7 @@ import {
   type MuscleWeekPoint
 } from "./strengthAnalytics";
 import { formatCount, formatDecimal, plural, t } from "../i18n/core";
+import { MotionFigure } from "../motion/MotionFigure";
 
 interface MusclePanelProps {
   muscles: MuscleStat[];
@@ -542,7 +543,9 @@ function HeroStat({ cell, level }: { cell: StatCell; level: number }) {
         {cell.label}
       </p>
       <p className="muscle-hero-value">
-        <strong>{cell.value}</strong>
+        <strong>
+          <MotionFigure text={cell.value} />
+        </strong>
         {cell.unit ? <small>{cell.unit}</small> : null}
       </p>
       {cell.note ? <p className="muscle-hero-note">{cell.note}</p> : null}
@@ -579,7 +582,9 @@ export function MusclePanel({
             className="muscle-panel-summary"
             aria-label={t("strength.coverage.trainedLabel", { trained: trainedCount, total: MUSCLES.length })}
           >
-            <strong>{trainedCount}</strong>
+            <strong>
+              <MotionFigure text={String(trainedCount)} value={trainedCount} />
+            </strong>
             <span>{t("strength.coverage.trained", { total: MUSCLES.length })}</span>
           </p>
         </header>
@@ -639,7 +644,9 @@ export function MusclePanel({
             data-level={level}
             aria-label={t(`strength.rank.${metric}` as const, { rank, total: muscles.length })}
           >
-            <strong>{rank}</strong>
+            <strong>
+              <MotionFigure text={String(rank)} value={rank} />
+            </strong>
             <span>{t("strength.rank.of", { total: muscles.length })}</span>
           </div>
         ) : null}
@@ -653,7 +660,9 @@ export function MusclePanel({
           {secondary.map((cell) => (
             <div key={cell.id} className="muscle-readout-cell">
               <p className="muscle-readout-label">{cell.label}</p>
-              <strong>{cell.value}</strong>
+              <strong>
+                <MotionFigure text={cell.value} />
+              </strong>
               {cell.note ? <span>{cell.note}</span> : null}
             </div>
           ))}

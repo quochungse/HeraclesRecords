@@ -55,6 +55,31 @@ row equally. Rules that are easy to break:
 - Selection preferences persist under `heraclesrecords.selection.v1`; a test that needs a
   clean state clears every key there, not the bare preference name.
 
+## Figures that move (`src/motion/`)
+
+A figure or a chart moves only when a control beside it changed it: `OptionGroup` and
+`OptionChips` take `motion` — `roll` for a period or a filter (digits roll up or down, a time
+axis zooms), `slide` for another measure (no counting between two quantities; bars change
+height where they stand) — and mark the press. `MotionFigure`, `useChartMotion` and
+`useFigureMotionFor` move only within `INTENT_WINDOW_MS` of it. A unit or a load chosen on
+another screen, data arriving, a sync: no motion (a figure counting on its own reads as loading).
+- `MotionFigure`'s text is the new figure from the first frame; the old characters live only
+  in `data-was` generated content, so tests and screen readers read what it says. A change
+  landing while it moves joins a motion of the same kind (from where it started, as far
+  along as it got) rather than cutting it and starting over.
+- A screen whose answer to a press is read from main keeps the press (`freshFigureMotion()`
+  when the read starts) and calls `answerFigureMotion` before setting what came back; past
+  `ANSWER_WINDOW_MS` the answer just appears. Strength does, and holds its window until then.
+- **Recharts' animation stays on** (`useChartMotion`): drawn with it off, Recharts keeps no
+  last frame and the next motion starts from a stale drawing. A change nobody pressed for gets
+  `settledMarks` over 1 ms. A weekly chart matches bars by `weekStartMs` and its x-axis takes
+  `allowDataOverflow`, which clips the zoom to the plot.
+- **A `MotionFigure` is a span**: a stat's rule for its label is written `> span`, or it
+  restyles the figure beside it too — a smaller size, and a clip that lifts the wheels off the
+  line. The Strength and Running renderer suites assert every figure computes its parent's
+  size, weight and colour.
+- Under reduced motion figures fade (140 ms) and charts do not move. `npm run test:figure-motion`.
+
 ## CSS
 
 Plain CSS with custom properties — no Tailwind, no CSS modules. `src/styles.css` holds the

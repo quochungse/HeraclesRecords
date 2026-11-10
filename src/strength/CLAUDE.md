@@ -10,6 +10,11 @@ COROS strength sessions merged with Hevy imports (`electron/strengthHistoryServi
 the load formula; Hevy is connected and managed in its own dialog (`StrengthHevyDialog`), opened
 from there one sheet at a time.
 
+**The window shown waits for its sessions** (`shownDays` in `useStrengthData`): sessions are
+read per window, so the figures, the weekly chart and the words naming the window stay on the
+last window read until the chosen one's sessions land, then change together and once (they
+roll, `answerFigureMotion`). The chip is the chosen window at once.
+
 **One scope at a time**: the session list beside a header band and the body map, and under
 them only what the selection is about — a session's exercises, or the window's weekly chart,
 main lifts and records. **The band is one fixed height** (`--strength-band-height`) for a

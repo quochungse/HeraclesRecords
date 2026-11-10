@@ -2434,7 +2434,7 @@
   background: var(--pattern-color);
 }
 
-.strength-mix-legend span {
+.strength-mix-legend li > span {
   color: var(--text-secondary);
   letter-spacing: 0;
 }

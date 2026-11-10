@@ -21,6 +21,7 @@ import { kilogramsToDisplayWeight } from "../units/units";
 import { nextWeekStartMs, startOfWeekMs, type WeekBucket } from "./strengthAnalytics";
 import { formatTotalWeight } from "./strengthFormat";
 import { getIntlLocale, plural, t } from "../i18n/core";
+import { useChartMotion } from "../motion/useChartMotion";
 
 const MS_PER_DAY = 86_400_000;
 
@@ -154,6 +155,7 @@ export function StrengthWeeklyChart({
     () =>
       weekSeries.map((week) => ({
         label: week.label,
+        weekStart: week.weekStart,
         value: usesWeights
           ? Math.round(kilogramsToDisplayWeight(week.volumeKg, unitSystem))
           : Math.round(week.sets),
@@ -163,6 +165,8 @@ export function StrengthWeeklyChart({
       })),
     [weekSeries, unitSystem, usesWeights]
   );
+  // A period zooms the weeks along the axis (src/motion/).
+  const motion = useChartMotion(chartData, "weekStart");
 
   /**
    * Averaged over the weeks that were actually trained: counting rest weeks
@@ -272,6 +276,8 @@ export function StrengthWeeklyChart({
             <CartesianGrid stroke={colors.grid} vertical={false} />
             <XAxis
               dataKey="label"
+              // Clips the plot, so a period change zooms inside it.
+              allowDataOverflow
               stroke={colors.text}
               tickLine={false}
               axisLine={false}
@@ -346,6 +352,7 @@ export function StrengthWeeklyChart({
               fill="url(#strengthWeekFill)"
               radius={[5, 5, 2, 2]}
               maxBarSize={30}
+              {...motion.bar}
             />
             {usesWeights ? (
               <Line
@@ -362,7 +369,7 @@ export function StrengthWeeklyChart({
                   stroke: colors.dotStroke,
                   strokeWidth: 2
                 }}
-                isAnimationActive={false}
+                {...motion.line}
               />
             ) : null}
           </ComposedChart>

@@ -37,6 +37,7 @@ export function ActivitiesFilterBar({
           holds nothing else but the search. */}
       <OptionGroup
         label={t("activity.filter.period")}
+        motion="roll"
         mode="dropdown"
         className="activities-period"
         value={periodValue(filters.periodDays as PeriodDays)}

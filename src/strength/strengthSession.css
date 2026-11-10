@@ -479,7 +479,7 @@
   min-width: 0;
 }
 
-.strength-session-stat span {
+.strength-session-stat > span {
   overflow: hidden;
   color: var(--text-secondary);
   font-size: 12px;

@@ -85,6 +85,7 @@ export function StrengthView({
 
   const {
     days,
+    shownDays,
     setDays,
     source,
     setSource,
@@ -169,7 +170,8 @@ export function StrengthView({
   const openExercise = useCallback((name: string) => setSelectedExerciseName(name), []);
   const closeExercise = useCallback(() => setSelectedExerciseName(null), []);
 
-  const activeWindow = activeStrengthWindow(days);
+  // The window the figures are of, which follows the choice once its sessions are read.
+  const activeWindow = activeStrengthWindow(shownDays);
   const summary = analytics.summary;
   const hasSessions = summary.sessions > 0;
   // An empty history and a history that has not arrived look identical from
@@ -288,6 +290,7 @@ export function StrengthView({
         {withControls ? (
           <OptionGroup
             label={t("strength.timeCovered")}
+            motion="roll"
             mode="collapsible"
             value={periodValue(days as PeriodDays)}
             options={STRENGTH_PERIOD_OPTIONS}
@@ -490,7 +493,7 @@ export function StrengthView({
             <>
               <StrengthWeeklyChart
                 weeks={analytics.weeks}
-                days={days}
+                days={shownDays}
                 usesWeights={usesWeights}
               />
 

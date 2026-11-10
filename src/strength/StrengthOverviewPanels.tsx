@@ -9,6 +9,7 @@ import {
 } from "./strengthAnalytics";
 import { formatLiftWeight, liftWeightParts } from "./strengthFormat";
 import { plural, t } from "../i18n/core";
+import { MotionFigure } from "../motion/MotionFigure";
 
 /**
  * Lifts shown in the main-lift list. Five keeps that card roughly level with
@@ -193,7 +194,7 @@ export function StrengthOverviewPanels({
                     />
                     <div className="strength-lift-figures">
                       <strong>
-                        {best.value}
+                        <MotionFigure text={best.value} />
                         {best.unit ? <em>{best.unit}</em> : null}
                       </strong>
                       <span className="strength-lift-change" data-tone={tone}>
@@ -256,7 +257,9 @@ export function StrengthOverviewPanels({
                 <li key={segment.key}>
                   <i data-pattern={segment.key} aria-hidden="true" />
                   <span>{segment.label}</span>
-                  <strong>{Math.round(segment.share * 100)}%</strong>
+                  <strong>
+                    <MotionFigure text={`${Math.round(segment.share * 100)}%`} value={segment.share} />
+                  </strong>
                 </li>
               ))}
             </ul>

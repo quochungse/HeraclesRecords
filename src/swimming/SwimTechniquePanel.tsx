@@ -12,6 +12,8 @@ import type { TooltipContentProps } from "recharts";
 import type { ActivityDetailSummary, TrainingHubActivity, UnitSystem } from "../../electron/types";
 import { swimPacePer100 } from "../../electron/activityReading";
 import { OptionGroup } from "../components/OptionGroup";
+import { MotionFigure } from "../motion/MotionFigure";
+import { useChartMotion } from "../motion/useChartMotion";
 import { trainingChartTooltipStyle } from "../training/chartConfig";
 import { useChartColors } from "../training/useChartColors";
 import { formatTrainingTableWhen } from "../training/formatters";
@@ -105,6 +107,9 @@ export function SwimTechniquePanel({ swims, summaries, settled }: SwimTechniqueP
       ...(point.name ? { name: point.name } : {})
     }));
   }, [points]);
+  // Another measure or another pool: the swims' points move to their new
+  // places, matched by when each was swum (src/motion/).
+  const motion = useChartMotion(rows, "at");
 
   const median = medianTechnique(points);
   const first = rows[0]?.median;
@@ -121,7 +126,7 @@ export function SwimTechniquePanel({ swims, summaries, settled }: SwimTechniqueP
         <div>
           <p className="running-eyebrow">{t("swim.technique.title")}</p>
           <h3>
-            {formatTechnique(metric, median, unitSystem)}
+            <MotionFigure text={formatTechnique(metric, median, unitSystem)} value={median} />
             <span className="run-block-sub">
               {" "}
               {onePool && pool
@@ -137,12 +142,16 @@ export function SwimTechniquePanel({ swims, summaries, settled }: SwimTechniqueP
           <p className="run-block-aside">
             {t("swim.technique.change")}{" "}
             <strong className={better === undefined ? undefined : better ? "tone-up" : "tone-down"}>
-              {change > 0 ? "+" : change < 0 ? "−" : ""}
-              {metric === "pace"
-                ? `${formatDecimal(swimPacePer100(Math.abs(change) * 10, unitSystem), 1)} s`
-                : metric === "dps"
-                  ? formatDistancePerStroke(Math.abs(change), unitSystem)
-                  : formatDecimal(Math.abs(change), metric === "swolf" ? 1 : 0)}
+              <MotionFigure
+                text={`${change > 0 ? "+" : change < 0 ? "−" : ""}${
+                  metric === "pace"
+                    ? `${formatDecimal(swimPacePer100(Math.abs(change) * 10, unitSystem), 1)} s`
+                    : metric === "dps"
+                      ? formatDistancePerStroke(Math.abs(change), unitSystem)
+                      : formatDecimal(Math.abs(change), metric === "swolf" ? 1 : 0)
+                }`}
+                value={change}
+              />
             </strong>
           </p>
         ) : null}
@@ -150,6 +159,7 @@ export function SwimTechniquePanel({ swims, summaries, settled }: SwimTechniqueP
 
       <OptionGroup
         label={t("swim.technique.metric")}
+        motion="slide"
         value={metric}
         options={metricOptions()}
         onChange={(next) => setMetric(next as SwimTechniqueMetric)}
@@ -157,6 +167,7 @@ export function SwimTechniquePanel({ swims, summaries, settled }: SwimTechniqueP
       {onePool && pools.length > 1 ? (
         <OptionGroup
           label={t("swim.technique.pool")}
+          motion="roll"
           value={String(pool?.poolLength ?? "")}
           options={pools.map((entry) => ({
             value: String(entry.poolLength),
@@ -176,6 +187,8 @@ export function SwimTechniquePanel({ swims, summaries, settled }: SwimTechniqueP
                 type="number"
                 scale="time"
                 domain={["dataMin", "dataMax"]}
+                // Clips the plot, so points leaving a new window go behind its edge.
+                allowDataOverflow
                 tick={{ fill: colors.text, fontSize: 11 }}
                 stroke={colors.grid}
                 minTickGap={32}
@@ -202,7 +215,7 @@ export function SwimTechniquePanel({ swims, summaries, settled }: SwimTechniqueP
                 stroke="none"
                 dot={{ r: 3, fill: dot, stroke: dot, fillOpacity: 0.55 }}
                 activeDot={{ r: 5, fill: dot, stroke: colors.dotStroke }}
-                isAnimationActive={false}
+                {...motion.line}
               />
               <Line
                 dataKey="median"
@@ -211,7 +224,7 @@ export function SwimTechniquePanel({ swims, summaries, settled }: SwimTechniqueP
                 strokeWidth={2}
                 dot={false}
                 activeDot={false}
-                isAnimationActive={false}
+                {...motion.line}
               />
               <Tooltip
                 cursor={{ stroke: colors.cursor }}

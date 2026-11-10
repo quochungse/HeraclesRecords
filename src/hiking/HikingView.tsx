@@ -18,6 +18,7 @@ import {
 } from "../training/formatters";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { OptionGroup } from "../components/OptionGroup";
+import { MotionFigure } from "../motion/MotionFigure";
 import {
   periodDaysFromValue,
   periodGroupOptions,
@@ -284,6 +285,7 @@ export function HikingView({
       <div className="running-controls">
         <OptionGroup
           label={t("hike.kind")}
+          motion="roll"
           value={hikeType ?? "all"}
           options={[
             { value: "all", label: t("common.all") },
@@ -293,6 +295,7 @@ export function HikingView({
         />
         <OptionGroup
           label={t("activity.filter.period")}
+          motion="roll"
           mode="collapsible"
           className="running-period"
           value={periodValue(periodDays as PeriodDays)}
@@ -307,24 +310,30 @@ export function HikingView({
         <div className="running-totals">
           <div className="running-stat">
             <span>{t("hike.hikes")}</span>
-            <strong>{totals.count}</strong>
+            <strong><MotionFigure text={String(totals.count)} value={totals.count} /></strong>
           </div>
           <div className="running-stat">
             <span>{t("activity.m.distance")}</span>
-            <strong>{formatDistanceMeters(totals.distance, unitSystem)}</strong>
+            <strong>
+              <MotionFigure text={formatDistanceMeters(totals.distance, unitSystem)} />
+            </strong>
           </div>
           <div className="running-stat" title={t("hike.timeTitle")}>
             <span>{t("activity.m.time")}</span>
-            <strong>{formatDurationSpan(totals.duration)}</strong>
+            <strong>
+              <MotionFigure text={formatDurationSpan(totals.duration)} />
+            </strong>
           </div>
           <div className="running-stat">
             <span>{t("hike.ascent")}</span>
-            <strong>{formatElevationMeters(totals.elevationGain, unitSystem)}</strong>
+            <strong>
+              <MotionFigure text={formatElevationMeters(totals.elevationGain, unitSystem)} />
+            </strong>
           </div>
           <div className="running-stat" title={t("hike.avgSpeedTitle")}>
             <span>{t("activity.m.avgSpeed")}</span>
             <strong>
-              {averageSpeed === undefined ? "—" : formatSpeedValue(averageSpeed, unitSystem)}
+              <MotionFigure text={averageSpeed === undefined ? "—" : formatSpeedValue(averageSpeed, unitSystem)} />
             </strong>
           </div>
         </div>

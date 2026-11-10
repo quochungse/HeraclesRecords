@@ -1,0 +1,80 @@
+/*
+ * A figure while it moves (MotionFigure.tsx). At rest a `.motion-figure` is
+ * plain text and none of this applies. The old characters live only in
+ * generated content (`data-was`), so the element's text is the new figure from
+ * the first frame.
+ */
+.motion-figure.is-moving {
+  white-space: nowrap;
+}
+
+/* The figure and its parts are spans, so a feature's rule for the spans in a
+   stat (`.stat span`, meant for its label) reaches them too. What would move a
+   wheel off the line — a size, a clip that makes an inline-block sit on its
+   bottom edge — is taken back here; a feature scopes its label rule to `> span`
+   so the figure itself keeps its parent's look. */
+.motion-figure .motion-cell,
+.motion-figure .motion-wheel,
+.motion-figure .motion-slide,
+.motion-figure .motion-slide-now {
+  overflow: visible;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-overflow: clip;
+}
+
+/* A roll: each changed character is a window onto a wheel holding the new
+   character, with the old one stacked on the side it leaves by. The window
+   clips by painting only, so the line keeps its baseline. */
+.motion-cell {
+  display: inline-block;
+  clip-path: inset(-0.1em -0.05em);
+}
+
+/* `pre`: a space alone in a wheel keeps its width, or "168h 47m" reads
+   "168h47m" while it moves and jumps when it settles. */
+.motion-wheel {
+  display: inline-block;
+  position: relative;
+  white-space: pre;
+}
+
+.motion-wheel[data-was]::before {
+  content: attr(data-was);
+  position: absolute;
+  left: 0;
+}
+
+.motion-figure.is-rising .motion-wheel::before {
+  bottom: 100%;
+}
+
+.motion-figure.is-falling .motion-wheel::before {
+  top: 100%;
+}
+
+/* A character the new figure no longer has: the wheel holds nothing new, so
+   the old character is what gives the window its width as it closes. */
+.motion-cell.is-out .motion-wheel::before {
+  position: static;
+}
+
+/* A slide: the new figure comes in from the side of the option pressed and the
+   old one, in generated content, leaves by the other. */
+.motion-slide {
+  display: inline-block;
+  position: relative;
+  clip-path: inset(-0.2em 0);
+}
+
+.motion-slide::before {
+  content: attr(data-was);
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.motion-slide-now {
+  display: inline-block;
+}

@@ -10,6 +10,7 @@ import {
 } from "react";
 import { Check } from "lucide-react";
 import { SelectDropdown, type SelectOption } from "./SelectDropdown";
+import { markFigureMotion, optionDirection, type FigureMotionKind } from "../motion/figureMotion";
 
 /**
  * The one way to offer a choice between options in this app.
@@ -112,6 +113,14 @@ export interface OptionGroupProps<T extends string> {
    * `detail` wraps at its floor, which is otherwise the trigger's own width.
    */
   minMenuWidth?: number;
+  /**
+   * The figures and charts on screen that this choice changes move when it is
+   * pressed (`src/motion/figureMotion.ts`): `roll` for the same measure over
+   * other data — a period, a filter — and `slide` for another measure. Only a
+   * control beside what it changes says so; a setting changed elsewhere
+   * changes figures nobody is watching move.
+   */
+  motion?: FigureMotionKind;
   className?: string;
   disabled?: boolean;
 }
@@ -133,9 +142,16 @@ export function OptionGroup<T extends string>({
   iconOnly = false,
   fill = false,
   minMenuWidth,
+  motion,
   className,
   disabled = false
 }: OptionGroupProps<T>) {
+  const choose = (next: T, from?: HTMLButtonElement) => {
+    if (motion && next !== value) {
+      markFigureMotion(motion, optionDirection(options.map((option) => option.value), value, next));
+    }
+    onChange(next, from);
+  };
   const trackRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const leadRef = useRef<HTMLButtonElement>(null);
@@ -247,7 +263,7 @@ export function OptionGroup<T extends string>({
       <SelectDropdown
         value={value}
         options={selectOptions}
-        onChange={onChange}
+        onChange={choose}
         label={label}
         disabled={disabled}
         portal
@@ -290,7 +306,7 @@ export function OptionGroup<T extends string>({
     const target = event.currentTarget.querySelector<HTMLButtonElement>(
       `[data-option="${CSS.escape(next.value)}"]`
     );
-    onChange(next.value, target ?? undefined);
+    choose(next.value, target ?? undefined);
     target?.focus();
   };
 
@@ -324,7 +340,7 @@ export function OptionGroup<T extends string>({
             setOpen(true);
             return;
           }
-          onChange(option.value, event.currentTarget);
+          choose(option.value, event.currentTarget);
           if (inRest) {
             returnFocusRef.current = true;
             close();
@@ -433,6 +449,8 @@ export interface OptionChipsProps<T extends string> {
    * lists, not for filters pressed while reading.
    */
   appearance?: "chips" | "tiles";
+  /** As on `OptionGroup`: a filter's figures roll when a chip is pressed. */
+  motion?: FigureMotionKind;
 }
 
 /** The multi-select variant: separate chips, no shared track, `aria-pressed`. */
@@ -445,7 +463,8 @@ export function OptionChips<T extends string>({
   className,
   disabled = false,
   colorOf,
-  appearance = "chips"
+  appearance = "chips",
+  motion
 }: OptionChipsProps<T>) {
   const tiles = appearance === "tiles";
   return (
@@ -478,7 +497,10 @@ export function OptionChips<T extends string>({
                   } as CSSProperties
                 }
               : {})}
-            onClick={() => onToggle(option.value)}
+            onClick={() => {
+              if (motion) markFigureMotion(motion);
+              onToggle(option.value);
+            }}
           >
             {color ? <i className="option-chip-dot" aria-hidden="true" /> : null}
             {option.icon}

@@ -24878,6 +24878,12 @@ body.is-backgrounded .spin {
   background: var(--zone-color);
 }
 
+/* Heart rate or pace chosen beside the list: each bar changes length where it
+   stands. Only then (src/motion/figureMotion.ts). */
+.activity-zone-time.is-moving .activity-zone-time-track i {
+  transition: width var(--dur-slow) var(--ease);
+}
+
 .activity-zone-time-figure {
   display: flex;
   align-items: baseline;
@@ -24892,7 +24898,7 @@ body.is-backgrounded .spin {
   font-weight: 600;
 }
 
-.activity-zone-time-figure span {
+.activity-zone-time-figure > span {
   color: var(--text-muted);
   font-size: 11px;
 }

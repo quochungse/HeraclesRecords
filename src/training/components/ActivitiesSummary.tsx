@@ -10,6 +10,8 @@ import {
 } from "../formatters";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import { formatCount, plural, t } from "../../i18n/core";
+import { MotionFigure } from "../../motion/MotionFigure";
+import { useFigureMotionFor } from "../../motion/useFigureMotionFor";
 
 interface ActivitiesSummaryProps {
   /** Everything the filters admit: what the four figures add up. */
@@ -146,6 +148,8 @@ export function ActivitiesSummary({
     });
     // The bands carry their sport's name, so a new language rebuilds them.
   }, [mixTotal, mix.sports, locale]);
+  // Another period: the bands grow and shrink to the new mix (src/motion/).
+  const mixMotion = useFigureMotionFor(bands);
 
   /*
    * Held as an index rather than a category so the arrow keys have something
@@ -257,7 +261,9 @@ export function ActivitiesSummary({
         {tiles.map((tile) => (
           <div className="activities-summary-tile" key={tile.key}>
             <p className="activities-summary-label">{tile.label}</p>
-            <p className="activities-summary-value">{tile.value}</p>
+            <p className="activities-summary-value">
+              <MotionFigure text={tile.value} />
+            </p>
             <p className="activities-summary-caption">
               {noMatch ? "\u00a0" : tile.caption}
             </p>
@@ -272,7 +278,7 @@ export function ActivitiesSummary({
             * can be read without reaching a single band.
             */}
           <div
-            className={`activities-mix-bar${active ? " is-probing" : ""}`}
+            className={`activities-mix-bar${active ? " is-probing" : ""}${mixMotion ? " is-moving" : ""}`}
             role="img"
             tabIndex={0}
             aria-label={t("activity.summary.mix", { bands: bands.map(bandPhrase).join("; ") })}
@@ -356,6 +362,7 @@ export function ActivitiesSummary({
               className="activities-sports"
               options={legend}
               values={selectedSports}
+              motion="roll"
               colorOf={(category) => `var(--sport-${category})`}
               onToggle={(category) => onToggleSport(category as SportColorCategory)}
             />

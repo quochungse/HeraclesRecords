@@ -15,6 +15,7 @@ import {
   techniqueWindow
 } from "./swimMetrics";
 import { formatDecimal, plural, t } from "../i18n/core";
+import { MotionFigure } from "../motion/MotionFigure";
 
 interface SwimmingHeroProps {
   /**
@@ -99,7 +100,7 @@ export function SwimmingHero({ swims, summaries, settled, nowMs }: SwimmingHeroP
       <div className="run-hero-card">
         <span className="run-hero-label">{t("activity.hero.thisWeek")}</span>
         <strong className="run-hero-value">
-          {count > 0 ? formatDistanceMeters(thisWeek?.current.distance, unitSystem, true) : "—"}
+          <MotionFigure text={count > 0 ? formatDistanceMeters(thisWeek?.current.distance, unitSystem, true) : "—"} />
         </strong>
         <div className="run-hero-foot">
           <span>{plural("swim.count", count)}</span>
@@ -110,7 +111,7 @@ export function SwimmingHero({ swims, summaries, settled, nowMs }: SwimmingHeroP
       <div className="run-hero-card" title={t("swim.hero.cssTitle")}>
         <span className="run-hero-label">{t("swim.hero.css")}</span>
         <strong className="run-hero-value">
-          {css.speed ? formatPer100(css.speed.secondsPer100, unitSystem) : "—"}
+          <MotionFigure text={css.speed ? formatPer100(css.speed.secondsPer100, unitSystem) : "—"} />
         </strong>
         <div className="run-hero-foot">
           <span>
@@ -131,7 +132,7 @@ export function SwimmingHero({ swims, summaries, settled, nowMs }: SwimmingHeroP
       <div className="run-hero-card" title={t("swim.hero.swolfTitle")}>
         <span className="run-hero-label">{t("swim.hero.swolf")}</span>
         <strong className="run-hero-value">
-          {swolf?.median !== undefined ? formatDecimal(swolf.median, 0) : "—"}
+          <MotionFigure text={swolf?.median !== undefined ? formatDecimal(swolf.median, 0) : "—"} />
         </strong>
         <div className="run-hero-foot">
           <span>
@@ -149,7 +150,9 @@ export function SwimmingHero({ swims, summaries, settled, nowMs }: SwimmingHeroP
 
       <div className="run-hero-card" title={t("swim.hero.best100Title")}>
         <span className="run-hero-label">{t("swim.hero.best100")}</span>
-        <strong className="run-hero-value">{best100 ? formatClock(best100.seconds) : "—"}</strong>
+        <strong className="run-hero-value">
+          <MotionFigure text={best100 ? formatClock(best100.seconds) : "—"} />
+        </strong>
         <div className="run-hero-foot">
           <span className="swim-hero-name" title={best100?.activity.name}>
             {best100

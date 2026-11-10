@@ -13,6 +13,7 @@ import type {
 import { formatDistanceMeters, formatDurationSpan } from "../training/formatters";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { OptionGroup } from "../components/OptionGroup";
+import { MotionFigure } from "../motion/MotionFigure";
 import {
   periodDaysFromValue,
   periodGroupOptions,
@@ -275,6 +276,7 @@ export function SwimmingView({
       <div className="running-controls">
         <OptionGroup
           label={t("swim.kind")}
+          motion="roll"
           value={swimType ?? "all"}
           options={[
             { value: "all", label: t("common.all") },
@@ -284,6 +286,7 @@ export function SwimmingView({
         />
         <OptionGroup
           label={t("activity.filter.period")}
+          motion="roll"
           mode="collapsible"
           className="running-period"
           value={periodValue(periodDays as PeriodDays)}
@@ -298,26 +301,30 @@ export function SwimmingView({
         <div className="running-totals">
           <div className="running-stat">
             <span>{t("swim.swims")}</span>
-            <strong>{totals.count}</strong>
+            <strong><MotionFigure text={String(totals.count)} value={totals.count} /></strong>
           </div>
           <div className="running-stat">
             <span>{t("activity.m.distance")}</span>
-            <strong>{formatDistanceMeters(totals.distance, unitSystem, true)}</strong>
+            <strong>
+              <MotionFigure text={formatDistanceMeters(totals.distance, unitSystem, true)} />
+            </strong>
           </div>
           <div className="running-stat" title={t("swim.timeTitle")}>
             <span>{t("activity.m.time")}</span>
-            <strong>{formatDurationSpan(totals.duration)}</strong>
+            <strong>
+              <MotionFigure text={formatDurationSpan(totals.duration)} />
+            </strong>
           </div>
           <div className="running-stat" title={t("swim.avgPaceTitle")}>
             <span>{t("activity.m.avgPace")}</span>
-            <strong>{formatPer100(pace, unitSystem)}</strong>
+            <strong>
+              <MotionFigure text={formatPer100(pace, unitSystem)} />
+            </strong>
           </div>
           <div className="running-stat">
             <span>{t("swim.perSwim")}</span>
             <strong>
-              {totals.count > 0
-                ? formatDistanceMeters(totals.distance / totals.count, unitSystem, true)
-                : "—"}
+              <MotionFigure text={totals.count > 0 ? formatDistanceMeters(totals.distance / totals.count, unitSystem, true) : "—"} />
             </strong>
           </div>
         </div>

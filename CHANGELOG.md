@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### What's new
+- **Figures move when you change what they show** - choose another period or filter and the figures roll up or down to their new values while a weekly chart zooms along its weeks; choose another measure (time, distance, load, sets) and the figures slide across while the bars change height in place. On Overview, Running, Cycling, Hiking, Swimming, Strength and Activities, and a session's time in zones. A change you did not make here, such as new data or units changed in Personal, just appears.
+
 ## [1.4.7] - 2026-11-05
 
 Make an image of any session to post, and planned figures that say how they are known.

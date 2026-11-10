@@ -37,6 +37,7 @@ import { shareStats, sportColor, type PageStat } from "../share/buildShareSessio
 import { shareFileName } from "../share/shareModel";
 import type { ShareSession } from "../share/shareTypes";
 import type { MuscleId } from "./muscles";
+import { MotionFigure } from "../motion/MotionFigure";
 
 /** Sessions this short open with every exercise's sets showing; longer ones start folded. */
 const EXPANDED_EXERCISE_LIMIT = 3;
@@ -110,7 +111,9 @@ function Stat({ label, value, caption, title }: { label: string; value: string; 
   return (
     <div className="strength-session-stat" title={title}>
       <span>{label}</span>
-      <strong>{value}</strong>
+      <strong>
+        <MotionFigure text={value} />
+      </strong>
       {/* Always drawn, so every stat in the band is the same height. */}
       <em>{caption ?? ""}</em>
     </div>

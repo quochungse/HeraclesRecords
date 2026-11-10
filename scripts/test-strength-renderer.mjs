@@ -62,6 +62,12 @@ async function assertHealthy() {
   assert.equal(await harness("exists", ".strength-hero"), true);
   assert.deepEqual(await harness("consoleErrors"), []);
   assert.equal(await evaluate('/NaN|undefined|Infinity/.test(document.querySelector(".strength-muscle-panel").textContent)'), false);
+  // A MotionFigure is a span: a stylesheet's `.stat span` rule meant for a label
+  // shrank the window's figures and knocked their wheels off the line.
+  assert.deepEqual(await evaluate(`[...document.querySelectorAll(".motion-figure")].flatMap((figure) => {
+    const own = getComputedStyle(figure), parent = getComputedStyle(figure.parentElement);
+    return ["fontSize", "fontWeight", "color"].filter((p) => own[p] !== parent[p]).map((p) => figure.textContent + " " + p + " " + own[p] + " ≠ " + parent[p]);
+  })`), [], "a figure looks like what holds it");
 }
 
 async function mount({ sessions = [session], scope = "window", metric = "load", source = "heracles", units = "metric", map = false } = {}) {

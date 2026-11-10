@@ -7,6 +7,8 @@ import type {
 } from "../../../electron/types";
 import { workoutSportView } from "../../calendar/workoutSportIcons";
 import { OptionGroup } from "../../components/OptionGroup";
+import { MotionFigure } from "../../motion/MotionFigure";
+import { useFigureMotionFor } from "../../motion/useFigureMotionFor";
 import {
   defineSelectionPreference,
   selectionIsOneOf,
@@ -226,7 +228,10 @@ function WeekDay({
           ))}
           {total > 0 ? (
             <span className="overview-week-value figure">
-              {markFigure(amount(total, chart.measure, unitSystem), column.mark, chart.measure === "time" ? "end" : "number")}
+              <MotionFigure
+                text={markFigure(amount(total, chart.measure, unitSystem), column.mark, chart.measure === "time" ? "end" : "number")}
+                value={total}
+              />
             </span>
           ) : null}
           {rest ? <span className="overview-week-rest">{t("overview.heatmap.rest")}</span> : null}
@@ -304,6 +309,8 @@ export function TodayWeek({
     () => buildWeekChart({ dayList, activities, upcoming: upcomingWorkouts, now, unitSystem, measure, loadSource }),
     [dayList, activities, upcomingWorkouts, now, unitSystem, measure, loadSource]
   );
+  // Time, distance, load: the blocks change height where they stand.
+  const chartMotion = useFigureMotionFor(chart);
   // Load Impact, Base Fitness, Intensity Trend and the range in the chosen
   // load; COROS's own beside them on hover, as the COROS app shows those.
   const fitnessDays = useMemo(() => fitnessInLoadSource(dayList, loadSource), [dayList, loadSource]);
@@ -360,6 +367,7 @@ export function TodayWeek({
             { value: "load", label: t("overview.tiles.load") }
           ]}
           onChange={setMeasure}
+          motion="slide"
         />
       </div>
 
@@ -388,7 +396,7 @@ export function TodayWeek({
       <div className="overview-today-cell overview-today-vis is-week">
         {answered ? (
           <div
-            className="overview-week-chart"
+            className={chartMotion ? "overview-week-chart is-moving" : "overview-week-chart"}
             role="group"
             aria-label={t(
               measure === "time"

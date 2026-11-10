@@ -17,6 +17,7 @@ import {
 import { buildSampleStrengthSessions } from "./sampleSessions";
 import { useWorkoutExerciseCatalog } from "../calendar/useWorkoutExerciseCatalog";
 import { strengthSessionsWithCatalog } from "./exerciseTargets";
+import { answerFigureMotion, freshFigureMotion } from "../motion/figureMotion";
 import {
   buildStrengthAnalytics,
   type StrengthAnalytics
@@ -73,7 +74,16 @@ interface UseStrengthDataOptions {
 }
 
 export interface StrengthData {
+  /** The window chosen. */
   days: number;
+  /**
+   * The window the figures are of: the chosen one once its sessions are read,
+   * the one before it until then. Sessions are read for a window, so the
+   * figures, the weekly chart and the words naming the window wait for them
+   * together and change once — not a chart of the new window over the old
+   * window's sessions, filled in a moment later.
+   */
+  shownDays: number;
   setDays: (days: number) => void;
   source: StrengthDataSource;
   setSource: (source: StrengthDataSource) => void;
@@ -128,6 +138,7 @@ export function useStrengthData({
   const [hevyStatus, setHevyStatus] = useState<HevyStatus | null>(null);
   const [hevyStatusLoading, setHevyStatusLoading] = useState(true);
   const [loadedSessions, setLoadedSessions] = useState<StrengthSession[]>([]);
+  const [loadedDays, setLoadedDays] = useState<number | null>(null);
   const [pending, setPending] = useState(0);
   const [loading, setLoading] = useState(false);
   const [settled, setSettled] = useState(false);
@@ -195,6 +206,8 @@ export function useStrengthData({
       }
 
       const sequence = ++syncSequenceRef.current;
+      // A window chosen on the screen moves its figures when its sessions land.
+      const press = freshFigureMotion();
       setLoading(true);
       setError(null);
       setWarnings([]);
@@ -204,7 +217,9 @@ export function useStrengthData({
         if (syncSequenceRef.current !== sequence) {
           return;
         }
+        answerFigureMotion(press);
         setLoadedSessions(result.sessions);
+        setLoadedDays(days);
         setPending(result.pending);
         setWarnings(result.warnings ?? []);
 
@@ -294,9 +309,10 @@ export function useStrengthData({
     [sampleMode, days, loadedSessions, catalog.options]
   );
 
+  const shownDays = sampleMode ? days : loadedDays ?? days;
   const analytics = useMemo(
-    () => buildStrengthAnalytics(sessions, days),
-    [sessions, days]
+    () => buildStrengthAnalytics(sessions, shownDays),
+    [sessions, shownDays]
   );
 
   // A connected source with no finished read behind it is a screen still
@@ -306,6 +322,7 @@ export function useStrengthData({
 
   return {
     days,
+    shownDays,
     setDays,
     source,
     setSource,

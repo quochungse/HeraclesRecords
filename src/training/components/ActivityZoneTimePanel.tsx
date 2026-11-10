@@ -5,6 +5,8 @@ import type {
   UnitSystem
 } from "../../../electron/types";
 import { OptionGroup } from "../../components/OptionGroup";
+import { MotionFigure } from "../../motion/MotionFigure";
+import { useFigureMotionFor } from "../../motion/useFigureMotionFor";
 import { zoneName } from "../../i18n/zoneNames";
 import { t } from "../../i18n/core";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
@@ -92,6 +94,8 @@ export function ActivityZoneTimePanel({
   const scale: ZoneScale =
     picked === "pace" && paceRows.length > 0 ? "pace" : hrRows.length > 0 ? "hr" : "pace";
   const rows = scale === "hr" ? hrRows : paceRows;
+  // Heart rate or pace chosen here: the bars change length where they stand.
+  const rowMotion = useFigureMotionFor(rows);
   if (rows.length === 0) {
     return null;
   }
@@ -105,6 +109,7 @@ export function ActivityZoneTimePanel({
     options.length > 1 ? (
       <OptionGroup
         label={t("activity.zoneTime.scale")}
+        motion="slide"
         value={scale}
         options={options}
         onChange={setPicked}
@@ -115,7 +120,7 @@ export function ActivityZoneTimePanel({
 
   return (
     <Frame title={t("activity.zoneTime.title")} control={control}>
-      <ul className="activity-zone-time">
+      <ul className={rowMotion ? "activity-zone-time is-moving" : "activity-zone-time"}>
         {rows.map((row) => {
           const name = row.label
             ? zoneName(row.label)
@@ -138,8 +143,12 @@ export function ActivityZoneTimePanel({
                 <i style={{ width: `${(row.share / top) * 100}%` }} />
               </div>
               <div className="activity-zone-time-figure">
-                <strong>{zoneDuration(row.seconds)}</strong>
-                <span>{`${Math.round(row.share * 100)}%`}</span>
+                <strong>
+                  <MotionFigure text={zoneDuration(row.seconds)} value={row.seconds} />
+                </strong>
+                <span>
+                  <MotionFigure text={`${Math.round(row.share * 100)}%`} value={row.share} />
+                </span>
               </div>
             </li>
           );

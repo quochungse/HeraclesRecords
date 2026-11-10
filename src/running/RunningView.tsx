@@ -19,6 +19,7 @@ import {
 } from "../training/formatters";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { OptionGroup } from "../components/OptionGroup";
+import { MotionFigure } from "../motion/MotionFigure";
 import {
   periodDaysFromValue,
   periodGroupOptions,
@@ -435,6 +436,7 @@ export function RunningView({
             the same wherever it sits in the app. */}
         <OptionGroup
           label={t("run.surface")}
+          motion="roll"
           value={surface ?? "all"}
           options={[
             { value: "all", label: t("common.all") },
@@ -453,6 +455,7 @@ export function RunningView({
             fit beside it. */}
         <OptionGroup
           label={t("activity.filter.period")}
+          motion="roll"
           mode="collapsible"
           className="running-period"
           value={periodValue(periodDays as PeriodDays)}
@@ -477,15 +480,15 @@ export function RunningView({
         <div className="running-totals">
           <div className="running-stat">
             <span>{t("run.runs")}</span>
-            <strong>{totals.count}</strong>
+            <strong><MotionFigure text={String(totals.count)} value={totals.count} /></strong>
           </div>
           <div className="running-stat">
             <span>{t("activity.m.distance")}</span>
-            <strong>{formatDistanceMeters(totals.distance, unitSystem)}</strong>
+            <strong><MotionFigure text={formatDistanceMeters(totals.distance, unitSystem)} value={totals.distance} /></strong>
           </div>
           <div className="running-stat">
             <span>{t("activity.m.time")}</span>
-            <strong>{formatDurationSeconds(totals.duration)}</strong>
+            <strong><MotionFigure text={formatDurationSeconds(totals.duration)} value={totals.duration} /></strong>
           </div>
           {/* A trail's average pace is an average over its gradients, which
               says how hilly the period was rather than how it was run. Its
@@ -494,20 +497,25 @@ export function RunningView({
             <div className="running-stat">
               <span>{t("run.climbPer", { unit: distanceUnit(unitSystem) })}</span>
               <strong>
-                {climbPerKm === undefined
-                  ? "—"
-                  : `${Math.round(climbPerDistanceUnit(climbPerKm, unitSystem))} ${elevationUnit(unitSystem)}`}
+                <MotionFigure
+                  text={
+                    climbPerKm === undefined
+                      ? "—"
+                      : `${Math.round(climbPerDistanceUnit(climbPerKm, unitSystem))} ${elevationUnit(unitSystem)}`
+                  }
+                  value={climbPerKm}
+                />
               </strong>
             </div>
           ) : (
             <div className="running-stat">
               <span>{t("activity.m.avgPace")}</span>
-              <strong>{formatPaceSecondsPerKm(averagePace, unitSystem)}</strong>
+              <strong><MotionFigure text={formatPaceSecondsPerKm(averagePace, unitSystem)} value={averagePace} /></strong>
             </div>
           )}
           <div className="running-stat">
             <span>{t("activity.m.climb")}</span>
-            <strong>{formatElevationMeters(totals.elevationGain, unitSystem)}</strong>
+            <strong><MotionFigure text={formatElevationMeters(totals.elevationGain, unitSystem)} value={totals.elevationGain} /></strong>
           </div>
         </div>
 

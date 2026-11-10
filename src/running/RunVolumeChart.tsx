@@ -13,6 +13,8 @@ import {
 import type { TooltipContentProps } from "recharts";
 import type { TrainingHubActivity, UnitSystem } from "../../electron/types";
 import { OptionGroup } from "../components/OptionGroup";
+import { MotionFigure } from "../motion/MotionFigure";
+import { useChartMotion } from "../motion/useChartMotion";
 import { trainingChartTooltipStyle } from "../training/chartConfig";
 import { useChartColors } from "../training/useChartColors";
 import { useUnitSystem } from "../units/UnitSystemProvider";
@@ -61,6 +63,8 @@ interface RunVolumeChartProps {
 
 interface VolumeRow extends Record<string, number | string> {
   label: string;
+  /** The week itself, the same in every window: what a period change zooms by. */
+  weekStartMs: number;
   total: number;
   longest: number;
 }
@@ -124,6 +128,7 @@ export function RunVolumeChart({
       weekBuckets.map((week, index) => {
         const row: VolumeRow = {
           label: week.label,
+          weekStartMs: week.weekStartMs,
           total: measured(week, measure, unitSystem),
           longest: measured(biggestRun(week), measure, unitSystem),
           average: trailingAverage(
@@ -140,6 +145,9 @@ export function RunVolumeChart({
       }),
     [averageBuckets, measure, surfaces, unitSystem, weekBuckets]
   );
+  // A period zooms the weeks along the axis; a filter or a measure changes
+  // the bars where they stand. Only when chosen here (src/motion/).
+  const motion = useChartMotion(rows, "weekStartMs");
 
   // What the bars add up to, not every run in the period: under "All" the
   // chart stops at two years, and a heading counting six years of runs "over
@@ -163,8 +171,11 @@ export function RunVolumeChart({
         <div>
           <p className="running-eyebrow">{t("run.volume.title")}</p>
           <h3>
-            {formatDecimal(total, 0)} {unit}
-            <span className="run-block-sub"> {plural("run.volume.over", weeks)}</span>
+            <MotionFigure text={`${formatDecimal(total, 0)} ${unit}`} value={total} />
+            <span className="run-block-sub">
+              {" "}
+              <MotionFigure text={plural("run.volume.over", weeks)} value={weeks} />
+            </span>
           </h3>
         </div>
         <div className="sport-volume-aside">
@@ -172,12 +183,16 @@ export function RunVolumeChart({
             <p className="run-block-aside">
               {t("run.volume.yearAgo")}{" "}
               <strong>
-                {formatDecimal(measured(lastYear, measure, unitSystem), 0)} {unit}
+                <MotionFigure
+                  text={`${formatDecimal(measured(lastYear, measure, unitSystem), 0)} ${unit}`}
+                  value={measured(lastYear, measure, unitSystem)}
+                />
               </strong>
             </p>
           ) : null}
           <OptionGroup
             label={t("run.volume.measure")}
+            motion="slide"
             value={measure}
             options={measureOptions()}
             onChange={(next) => setMeasure(next as VolumeMeasure)}
@@ -191,6 +206,8 @@ export function RunVolumeChart({
             <CartesianGrid stroke={colors.grid} strokeDasharray="3 3" vertical={false} />
             <XAxis
               dataKey="label"
+              // Clips the plot, so a period change zooms inside it.
+              allowDataOverflow
               tick={{ fill: colors.text, fontSize: 11 }}
               stroke={colors.grid}
               minTickGap={24}
@@ -214,7 +231,7 @@ export function RunVolumeChart({
                 fill={palette[surface]}
                 fillOpacity={0.75}
                 radius={surface === surfaces[surfaces.length - 1] ? [3, 3, 0, 0] : undefined}
-                isAnimationActive={false}
+                {...motion.bar}
               />
             ))}
 
@@ -224,7 +241,7 @@ export function RunVolumeChart({
               stroke={colors.accentBright}
               strokeWidth={2}
               dot={false}
-              isAnimationActive={false}
+              {...motion.line}
             />
             {/* The week's single longest run: the figure a marathon build is
                 actually steered by, and one a total hides completely.
@@ -236,7 +253,7 @@ export function RunVolumeChart({
               strokeWidth={1.5}
               strokeDasharray="4 3"
               dot={false}
-              isAnimationActive={false}
+              {...motion.line}
             />
 
             <Tooltip

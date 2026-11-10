@@ -158,6 +158,15 @@
     filter var(--dur-fast) var(--ease);
 }
 
+/* Another period chosen here: the bands grow and shrink to the new mix. Only
+   then — a mix that changes on its own just redraws (src/motion/). */
+.activities-mix-bar.is-moving i {
+  transition:
+    flex-grow var(--dur-slow) var(--ease),
+    opacity var(--dur-fast) var(--ease),
+    filter var(--dur-fast) var(--ease);
+}
+
 /* A sport the legend has filtered out stays in the bar, fallen back: the bar
    is the period's mix, and the list is what narrows. */
 .activities-mix-bar i.is-filtered-out {

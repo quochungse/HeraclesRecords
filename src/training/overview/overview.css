@@ -761,6 +761,13 @@
   background: var(--overview-week-fill);
 }
 
+/* Time, distance or load chosen beside the chart: the blocks change height
+   where they stand. Only then — a week that changes on its own just redraws
+   (src/motion/figureMotion.ts). */
+.overview-week-chart.is-moving .overview-week-block {
+  transition: height var(--dur-slow) var(--ease);
+}
+
 .overview-week-block.is-residual {
   background: color-mix(in srgb, var(--overview-week-fill) 45%, transparent);
 }
