@@ -32,7 +32,6 @@ import {
   hikeTerrain
 } from "../hiking/hikeAnalysis";
 import { ClimbsPanel, TerrainPanel } from "../hiking/TerrainPanels";
-import { ActivityZoneTimePanel } from "../training/components/ActivityZoneTimePanel";
 import { RunDetailSkeleton } from "./RunningSkeleton";
 import { useBackGesture } from "./sportPage";
 import {
@@ -479,18 +478,6 @@ export function RunDetailView({
             ))}
           </div>
         </section>
-      ) : null}
-
-      {detail ? (
-        <ActivityZoneTimePanel
-          hrZones={detail.hrZones}
-          hrZoneType={detail.hrZoneType}
-          accountFamily={zoneFamily}
-          // A trail's pace is the gradient's, so its zones are read on GAP.
-          paceZones={trail ? detail.adjustedPaceZones : detail.paceZones}
-          paceIsGradeAdjusted={trail}
-          benefit={benefit}
-        />
       ) : null}
 
       {ground && ground.terrain.length > 0 ? (

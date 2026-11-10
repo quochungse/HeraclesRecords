@@ -84,7 +84,9 @@ export function bindRouteLink(
   route: RouteReplay,
   link: ActivityLink,
   pauses: readonly TrainingHubActivityPause[] | undefined,
-  initialStyle: RouteLinkStyle
+  initialStyle: RouteLinkStyle,
+  /** Told the selected stretch's two ends, or null once it is let go. */
+  onStretchEnds?: (ends: { start: [number, number]; end: [number, number] } | null) => void
 ): RouteLinkBinding | null {
   const moments = routeMoments(route, pauses);
   if (!moments) {
@@ -151,6 +153,7 @@ export function bindRouteLink(
       selected.setLatLngs(points);
       // The rest of the route steps back so the stretch reads as the subject.
       container.classList.toggle("has-stretch", selection !== null);
+      onStretchEnds?.(selection ? { start: spot(selection.from), end: spot(selection.to) } : null);
     }
     const shownPreview = sameSpan(preview, selection) ? null : preview;
     if (!sameSpan(shownPreview, drawn.preview)) {

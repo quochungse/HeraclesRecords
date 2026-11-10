@@ -32,7 +32,6 @@ import { rideMaxSpeedKmh } from "./rideAnalysis";
 import { RideClimbsPanel } from "./RideClimbsPanel";
 import { rideSeconds, speedKmh } from "./rideMetrics";
 import { RidePowerPanel } from "./RidePowerPanel";
-import { ActivityZoneTimePanel } from "../training/components/ActivityZoneTimePanel";
 import { StatGrid, type Stat } from "./StatGrid";
 import {
   untitledRide,
@@ -358,14 +357,6 @@ export function RideDetailView({
 
       {/* Heart rate only: the power zones are the Power panel's, and the pace
           zones COROS scores a ride on are a runner's. */}
-      {detail ? (
-        <ActivityZoneTimePanel
-          hrZones={detail.hrZones}
-          hrZoneType={detail.hrZoneType}
-          accountFamily={zoneFamily}
-          benefit={benefit}
-        />
-      ) : null}
 
       {conditions.length > 0 ? (
         <section className="panel run-detail-panel">

@@ -18,6 +18,11 @@ const TIME_STEPS = [60, 120, 300, 600, 900, 1200, 1800, 3600, 7200, 10800];
 const DISTANCE_STEPS = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100];
 /** At most this many marks; a chart drops more where their labels would touch. */
 const MAX_TICKS = 8;
+/**
+ * A distance axis takes more: its labels are a few characters, and a 12 km run
+ * marked every 2 km leaves a kilometre repeat with no mark of its own.
+ */
+const MAX_DISTANCE_TICKS = 16;
 
 function finite(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
@@ -27,7 +32,9 @@ export function formatXTick(axis: ActivitySeriesAxis, value: number, unitSystem:
   if (axis === "elapsed") {
     return formatDurationSeconds(value);
   }
-  return formatDecimal(metersToDisplayDistance(value, unitSystem), 1);
+  // A whole kilometre or mile is written whole: "5", not "5.0", so a mark a unit apart fits.
+  const shown = metersToDisplayDistance(value, unitSystem);
+  return formatDecimal(shown, Math.abs(shown - Math.round(shown)) < 0.05 ? 0 : 1);
 }
 
 /** A tooltip's heading: the same position as a tick, with its unit. */
@@ -72,7 +79,9 @@ export function activityAxisTicks(
   const unit = axis === "elapsed" ? 1 : displayDistanceToMeters(1, unitSystem);
   const steps = axis === "elapsed" ? TIME_STEPS : DISTANCE_STEPS;
   const step =
-    (steps.find((candidate) => span / (candidate * unit) <= MAX_TICKS - 1) ?? steps[steps.length - 1]!) *
+    (steps.find(
+      (candidate) => span / (candidate * unit) <= (axis === "elapsed" ? MAX_TICKS : MAX_DISTANCE_TICKS) - 1
+    ) ?? steps[steps.length - 1]!) *
     unit;
   const first = Math.ceil(from / step - 1e-9);
   const ticks: number[] = [];

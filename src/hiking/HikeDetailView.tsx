@@ -43,7 +43,6 @@ import {
 import { hikeSeconds } from "./hikeMetrics";
 import { HIKE_TYPE_LABELS, classifyHikeType } from "./hikeType";
 import { ClimbsPanel, TerrainPanel } from "./TerrainPanels";
-import { ActivityZoneTimePanel } from "../training/components/ActivityZoneTimePanel";
 import { formatDecimal, getIntlLocale, t } from "../i18n/core";
 import { isRecoveryLap, lapSections } from "../../electron/lapSections";
 import { LapRecoveryMark, LapSectionRow } from "../training/components/LapSections";
@@ -377,13 +376,6 @@ export function HikeDetailView({
       ) : null}
 
       {/* Heart rate only: the pace zones COROS scores a hike on are a runner's. */}
-      {detail ? (
-        <ActivityZoneTimePanel
-          hrZones={detail.hrZones}
-          hrZoneType={detail.hrZoneType}
-          accountFamily={zoneFamily}
-        />
-      ) : null}
 
       {terrain.length > 0 ? <TerrainPanel terrain={terrain} reading="hike" /> : null}
 

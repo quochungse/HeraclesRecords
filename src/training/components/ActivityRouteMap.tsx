@@ -10,7 +10,6 @@ import type {
 } from "../../../electron/types";
 import type { ActivityLink } from "../activityLink";
 import { bindRouteLink, type RouteLinkBinding } from "./routeLink";
-import { OptionGroup } from "../../components/OptionGroup";
 import { useI18n } from "../../i18n/useI18n";
 import {
   defineSelectionPreference,
@@ -23,6 +22,7 @@ import { formatElevationMeters, formatPaceSecondsPerKm } from "../formatters";
 import { isSpeedSport } from "../sportTypes";
 import {
   BASE_LAYERS,
+  BASE_LAYER_ORDER,
   isLightBaseLayer,
   type BaseLayerConfig,
   type BaseLayerId
@@ -165,6 +165,21 @@ function routeEndMarker(map: L.Map, at: [number, number], kind: "start" | "end")
 
 const ROUTE_COLOR_MODES = ["route", "performance", "heatmap"] as const;
 const ROUTE_METRICS = ["pace", "hr", "elevation"] as const;
+
+/**
+ * What the layer menu offers for the route: the plain line, each thing recorded
+ * along it, or the heat. One list, so nothing about how the route is coloured
+ * is picked anywhere but the menu.
+ */
+type RouteLayerChoice = "route" | RouteMetric | "heatmap";
+
+/**
+ * The base maps a route map offers. Street and Topo are left out: the route is
+ * read on a quiet ground or on the land itself, and those two were neither.
+ */
+const ROUTE_BASE_LAYERS: readonly BaseLayerId[] = BASE_LAYER_ORDER.filter(
+  (layer) => layer !== "street" && layer !== "topo"
+);
 
 /** How the full map colours the route, remembered like the base map. */
 const ROUTE_COLOR_MODE_PREFERENCE = defineSelectionPreference<RouteColorMode>({
@@ -870,6 +885,7 @@ function RouteMapCanvas({
 
     const startMarker = ends ? routeEndMarker(map, start, "start").addTo(map) : undefined;
 
+    let placeEnds: (() => void) | undefined;
     const fitRoute = () => {
       const band =
         visibleBand === undefined
@@ -883,8 +899,14 @@ function RouteMapCanvas({
     };
     fitRoute();
     // Once the map has a view: the link reads the route in the map's own pixels.
+    // A selected stretch takes the two markers to its own ends: where it began
+    // and where it finished. Let go, they return to the route's.
+    let stretchEnds: { start: [number, number]; end: [number, number] } | null = null;
     const routeLink: RouteLinkBinding | null = link
-      ? bindRouteLink(map, route, link, pauses, style)
+      ? bindRouteLink(map, route, link, pauses, style, (next) => {
+          stretchEnds = next;
+          placeEnds?.();
+        })
       : null;
     const routeEnds = ends ? bindRouteEnds(map) : undefined;
     // The heatmap's canvas is hidden through a zoom; the lines are not.
@@ -905,10 +927,19 @@ function RouteMapCanvas({
 
     // The markers sit on the line as drawn, which the heatmap moves off the
     // recorded points.
+    let drawnEnds: PaintedEnds | null = null;
     const paintAt = (progress: number) => {
       const drawn = painter.paint(progress);
-      startMarker?.setLatLng(drawn.start);
-      return drawn.head;
+      drawnEnds = drawn;
+      startMarker?.setLatLng(stretchEnds?.start ?? drawn.start);
+      return stretchEnds?.end ?? drawn.head;
+    };
+    placeEnds = () => {
+      if (!drawnEnds) {
+        return;
+      }
+      startMarker?.setLatLng(stretchEnds?.start ?? drawnEnds.start);
+      endMarker?.setLatLng(stretchEnds?.end ?? drawnEnds.head);
     };
 
     const showWhole = () => {
@@ -1255,9 +1286,12 @@ interface RouteMapLayers {
  * is read once per hook, so two holders would not hear each other.
  */
 function useRouteMapLayers(): RouteMapLayers {
-  const [baseLayer, setBaseLayer] = useBaseLayerPreference(
+  const [storedLayer, setBaseLayer] = useBaseLayerPreference(
     ACTIVITY_ROUTE_BASE_LAYER_PREFERENCE
   );
+  const { theme } = useTheme();
+  // A choice remembered from when Street and Topo were offered follows the theme.
+  const baseLayer = ROUTE_BASE_LAYERS.includes(storedLayer) ? storedLayer : themeBaseLayer(theme);
   const [colorMode, setColorMode] = useSelectionPreference(ROUTE_COLOR_MODE_PREFERENCE);
   const [metric, setMetric] = useSelectionPreference(ROUTE_METRIC_PREFERENCE);
   return { baseLayer, setBaseLayer, colorMode, setColorMode, metric, setMetric };
@@ -1279,7 +1313,7 @@ interface RouteAnalysis {
   heat: RouteHeat | null;
   /** A ride: its pace is read out as speed. */
   speed: boolean;
-  layerSection: MapLayerSection<RouteColorMode>;
+  layerSection: MapLayerSection<RouteLayerChoice>;
 }
 
 function useRouteAnalysis(
@@ -1310,31 +1344,33 @@ function useRouteAnalysis(
   const heatmapShown = mode === "heatmap";
   const heat = useMemo(() => (heatmapShown ? routeHeat(route) : null), [route, heatmapShown]);
 
-  const nothingShown = !ROUTE_METRICS.some(shows);
-  const somethingRecorded = ROUTE_METRICS.some((candidate) => {
-    const entry = performance[candidate];
-    return entry.kind === "none" && entry.recorded;
-  });
-  const layerSection: MapLayerSection<RouteColorMode> = {
+  const layerSection: MapLayerSection<RouteLayerChoice> = {
     title: t("activity.m.route"),
-    value: mode,
-    onChange: layers.setColorMode,
+    value: mode === "performance" ? metric : mode,
+    onChange: (choice) => {
+      if (choice === "route" || choice === "heatmap") {
+        layers.setColorMode(choice);
+        return;
+      }
+      layers.setMetric(choice);
+      layers.setColorMode("performance");
+    },
     options: [
       {
         value: "route",
         label: t("activity.m.route"),
         description: t("activity.route.layer.route.description")
       },
-      {
-        value: "performance",
-        label: t("activity.route.layer.performance"),
-        description: !nothingShown
-          ? t("activity.route.layer.performance.description", { metric: metricLabel("pace", speed) })
-          : somethingRecorded
-            ? t("activity.route.layer.nothingPlaced")
-            : t("activity.route.layer.nothingRecorded"),
-        disabled: nothingShown
-      },
+      // One entry for each thing recorded along the route; one it cannot place says why.
+      ...ROUTE_METRICS.map((candidate) => {
+        const entry = performance[candidate];
+        return {
+          value: candidate,
+          label: metricLabel(candidate, speed),
+          disabled: entry.kind === "none",
+          ...(entry.kind === "none" ? { description: entry.reason } : {})
+        };
+      }),
       {
         value: "heatmap",
         label: t("activity.route.layer.heatmap"),
@@ -1394,7 +1430,7 @@ function RouteMapFrame({
   pauses?: readonly TrainingHubActivityPause[];
   layers: RouteMapLayers;
   /** How the route is coloured, offered in the layer menu below the base maps. */
-  layerSection?: MapLayerSection<RouteColorMode>;
+  layerSection?: MapLayerSection<RouteLayerChoice>;
   className: string;
   scrollWheelZoom?: boolean;
   animate?: boolean;
@@ -1440,6 +1476,7 @@ function RouteMapFrame({
       <MapLayerControl
         value={layers.baseLayer}
         onChange={layers.setBaseLayer}
+        layers={ROUTE_BASE_LAYERS}
         section={layerSection}
       />
       {onReplay ? (
@@ -1499,7 +1536,7 @@ function RouteMapModal({
   const dialogRef = useRef<HTMLDivElement>(null);
   const lightGround = isLightBaseLayer(layers.baseLayer);
   const drawing = useRouteDrawing(analysis, lightGround);
-  const { performance, metric, mode, speed, layerSection } = analysis;
+  const { layerSection } = analysis;
 
   useEffect(() => {
     // Captured on the window and stopped there: the screen underneath may
@@ -1564,22 +1601,6 @@ function RouteMapModal({
           />
           <div className="activity-route-footer">
             <div className="activity-route-coloring">
-              {mode === "performance" ? (
-                <OptionGroup
-                  label={t("activity.route.metric")}
-                  value={metric}
-                  options={ROUTE_METRICS.map((candidate) => {
-                    const entry = performance[candidate];
-                    return {
-                      value: candidate,
-                      label: metricLabel(candidate, speed),
-                      disabled: entry.kind === "none",
-                      ...(entry.kind === "none" ? { title: entry.reason } : {})
-                    };
-                  })}
-                  onChange={layers.setMetric}
-                />
-              ) : null}
               <RouteColoringKey analysis={analysis} lightGround={lightGround} />
             </div>
             <RouteLegend />

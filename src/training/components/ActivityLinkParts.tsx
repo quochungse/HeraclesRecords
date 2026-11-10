@@ -242,12 +242,20 @@ export function LinkedPlotStage({ link, domain, toAxis, toElapsed, onPlotRect, c
     if (!stage) {
       return;
     }
-    // The chart lays itself out a frame after its box is known.
-    const observer = new ResizeObserver(() => window.requestAnimationFrame(remeasure));
+    // The chart lays itself out after its box is known, and redraws on its
+    // own clock: a box that changed width — the map beside it shown or hidden
+    // — is followed by the plot's new edges later, with no resize of the stage
+    // to announce them. Whatever the chart rewrites in its drawing is the cue
+    // to read the area again. Read at once, not on a frame: a window that is
+    // not being painted runs no frames, and the ruler would wait on one.
+    const observer = new ResizeObserver(remeasure);
     observer.observe(stage);
-    const frame = window.requestAnimationFrame(() => window.requestAnimationFrame(remeasure));
+    const redrawn = new MutationObserver(remeasure);
+    redrawn.observe(stage, { subtree: true, childList: true, attributes: true, attributeFilter: ["width", "x"] });
+    const frame = window.requestAnimationFrame(remeasure);
     return () => {
       observer.disconnect();
+      redrawn.disconnect();
       window.cancelAnimationFrame(frame);
     };
   }, [remeasure]);
@@ -532,8 +540,10 @@ export function LapRuler({ link, rect, domain, toAxis, sections, recoveries }: L
               lap={lap}
               recovery={recoveries[position] ?? false}
               style={{ left: `${at.left * 100}%`, width: `${at.width * 100}%` }}
-              // The number is written only where the block is wide enough to hold it.
+              // The number is written only where the block is wide enough to hold it;
+              // a sliver — one of fifty laps — drops the gap to its neighbour too.
               numbered={at.width * rect.width >= 18}
+              sliver={at.width * rect.width < 8}
             />
           ) : null;
         })}
@@ -547,20 +557,26 @@ function LapRulerBlock({
   lap,
   recovery,
   style,
-  numbered
+  numbered,
+  sliver
 }: {
   link: ActivityLink;
   lap: LapSpan;
   recovery: boolean;
   style: CSSProperties;
   numbered: boolean;
+  sliver: boolean;
 }) {
   const { flags } = useLapFlags(link, lap.index);
   return (
     <button
       type="button"
-      className={["activity-lap-ruler-block", recovery ? "is-recovery" : "", flags].filter(Boolean).join(" ")}
+      className={["activity-lap-ruler-block", recovery ? "is-recovery" : "", sliver ? "is-sliver" : "", flags]
+        .filter(Boolean)
+        .join(" ")}
       style={style}
+      // A block too narrow for its number still says which lap it is.
+      title={numbered ? undefined : t("activity.chart.selection.lap", { n: lap.index })}
       aria-pressed={flags.includes("is-lap-selected")}
       aria-label={t("activity.chart.selection.lap", { n: lap.index })}
       onClick={(event) => link.selectLap(lap.index, event.shiftKey)}

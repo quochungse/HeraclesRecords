@@ -28,7 +28,6 @@ import {
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { formatTemperatureValue } from "../units/units";
 import { ActivitySeriesChart } from "../training/components/ActivitySeriesChart";
-import { ActivityZoneTimePanel } from "../training/components/ActivityZoneTimePanel";
 import { RunDetailSkeleton } from "../running/RunningSkeleton";
 import { useBackGesture } from "../running/sportPage";
 import { SwimLengthsChart } from "./SwimLengthsChart";
@@ -377,14 +376,6 @@ export function SwimDetailView({
           activityTime={detail?.duration ?? activity.duration}
           sportType={activity.sportType}
           motion="swim"
-        />
-      ) : null}
-
-      {detail ? (
-        <ActivityZoneTimePanel
-          hrZones={detail.hrZones}
-          hrZoneType={detail.hrZoneType}
-          accountFamily={zoneFamily}
         />
       ) : null}
 

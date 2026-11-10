@@ -762,7 +762,11 @@ async function main() {
       true
     );
     assert.deepEqual(coverMenu.heads, ["Route"], "one section, and no base map");
-    assert.deepEqual(coverMenu.options, ["Route", "Performance", "Heatmap"]);
+    assert.deepEqual(
+      coverMenu.options,
+      ["Route", "Pace", "Heart rate", "Elevation", "Heatmap"],
+      "each thing recorded along the route is an entry of the menu itself, not a second picker"
+    );
     assert.equal(coverMenu.lastOnTop, true, "the menu stands over the heading, not under it or clipped");
     assert.equal(await harness("exists", ".activity-route-modal"), false, "opening the picker opens no map");
     await win.webContents.executeJavaScript(
