@@ -17,6 +17,10 @@ server `heracles` (tools `mcp__heracles__*`).
 - Read tools fetch only what a question is about (date windows, sport family, `sections`,
   `window`, `days`, `night`), and each formatter computes its own totals and deltas so the
   model reads rather than does arithmetic.
+- **A strength step's rest is after every set, the last one included** — on the watch it is
+  also the pause before the next step. The draft schema says so, and a session's read states
+  each exercise's rest and a move to the next exercise that ran well past it
+  (`strengthRestNote`); read without them, Coach never planned or saw the move between exercises.
 - **Recovery heart rate is the one slept at** (`electron/sleepHeartRate.ts`: the main sleep's
   average and lowest against a 28-night median), never COROS's whole-day resting HR.
 - **COROS MCP keeps only what it alone has**: a remote read with a local answer is in

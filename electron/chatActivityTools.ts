@@ -1829,6 +1829,51 @@ function formatSessionSet(set: SessionSet, unitSystem: UnitSystem): string {
   return `${load ? `${load} for ${time}` : time}${counted}`;
 }
 
+/** A move to the next exercise this much longer than the set's rest is worth saying. */
+const TRANSITION_OVER_REST_SECONDS = 30;
+
+/**
+ * The rest the watch gave after each set, the last one included — on COROS a
+ * step's rest is also its pause before the next step — and the time actually
+ * taken to start the next exercise where it ran well past that rest (setting
+ * up, a pause). Without them the coach judged rest from the plan alone and
+ * never saw that moving between exercises took minutes.
+ */
+function strengthRestNote(
+  exerciseIndex: number,
+  exercises: readonly { sets: readonly SessionSet[] }[]
+): string | undefined {
+  const sets = exercises[exerciseIndex]!.sets;
+  const rests = sets.map((set) => set.restSeconds);
+  const parts: string[] = [];
+  if (rests.some((rest) => rest !== undefined)) {
+    const first = rests[0];
+    parts.push(
+      rests.every((rest) => rest === first)
+        ? `rest ${formatDurationSeconds(first!)} after each set`
+        : `rest after each set ${rests
+            .slice(0, MAX_STRENGTH_SETS)
+            .map((rest) => (rest === undefined ? "–" : formatDurationSeconds(rest)))
+            .join(", ")}`
+    );
+  }
+  // On the session's clock, so a superset's alternating sets are read in the
+  // order they were done.
+  const last = sets.reduce((latest, set) => (set.start > latest.start ? set : latest));
+  const lastEnd = last.start + last.seconds;
+  const next = exercises
+    .flatMap((exercise, index) => (index === exerciseIndex ? [] : exercise.sets))
+    .filter((set) => set.start >= lastEnd)
+    .reduce<SessionSet | undefined>((soonest, set) => (!soonest || set.start < soonest.start ? set : soonest), undefined);
+  if (next) {
+    const gap = next.start - lastEnd;
+    if (gap - (last.restSeconds ?? 0) >= TRANSITION_OVER_REST_SECONDS) {
+      parts.push(`${formatDurationSeconds(gap)} before the next exercise`);
+    }
+  }
+  return parts.length > 0 ? parts.join(" · ") : undefined;
+}
+
 /** The reps of the sets that were counted: a timed set's watch count is no rep. */
 function countedReps(sets: readonly SessionSet[]): number {
   return sets.reduce((sum, set) => sum + (set.timed ? 0 : (set.reps ?? 0)), 0);
@@ -1875,7 +1920,7 @@ function formatStrengthDetailForChat(
 
   const rows = exercises
     .slice(0, MAX_STRENGTH_EXERCISES)
-    .map((exercise) => {
+    .map((exercise, exerciseIndex) => {
       const sets = exercise.sets
         .slice(0, MAX_STRENGTH_SETS)
         .map((set) => formatSessionSet(set, unitSystem));
@@ -1893,7 +1938,8 @@ function formatStrengthDetailForChat(
       ]
         .filter(Boolean)
         .join(" — ");
-      return `- ${heading}: ${sets.join(", ")}`;
+      const rest = strengthRestNote(exerciseIndex, exercises);
+      return `- ${heading}: ${sets.join(", ")}${rest ? ` · ${rest}` : ""}`;
     });
 
   if (exercises.length > MAX_STRENGTH_EXERCISES) {

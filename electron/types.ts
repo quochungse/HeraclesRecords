@@ -4115,9 +4115,9 @@ export interface RunWorkoutEditorStep {
   exerciseKind?: number;
   /** Number of sets for a standalone Strength exercise. */
   sets?: number;
-  /** COROS recovery mode used between sets. Strength uses timed rest (1). */
+  /** COROS recovery mode used after each set. Strength uses timed rest (1). */
   restType?: number;
-  /** Recovery duration between sets, in seconds. */
+  /** Recovery after each set, the last one included (the watch's pause before the next step), in seconds. */
   restValue?: number;
   /** Optional per-step instructions. COROS localization keys are not exposed here. */
   overview?: string;

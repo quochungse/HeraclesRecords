@@ -1499,8 +1499,15 @@ export function buildDraftTrainingPlanInputSchema(): Record<string, unknown> {
       exercise_name: { type: "string" },
       exercise_kind: { type: "integer" },
       sets: { type: "integer", minimum: 1, maximum: 99, description: "Strength sets for this exercise." },
-      rest_type: { type: "integer", enum: [1], description: "Timed recovery between Strength sets." },
-      rest_value: { type: "integer", minimum: 0, maximum: 3600, description: "Recovery seconds between Strength sets." },
+      rest_type: { type: "integer", enum: [1], description: "Timed recovery after each Strength set." },
+      rest_value: {
+        type: "integer",
+        minimum: 0,
+        maximum: 3600,
+        description:
+          "Recovery seconds after each set of this step, the last one included: on the watch it is also the pause " +
+          "before the next step. A rest step placed after it adds to that pause."
+      },
       overview: { type: "string", maxLength: COROS_STEP_DESCRIPTION_MAX_BYTES, description: "Optional step instructions, at most 200 UTF-8 bytes." }
     },
     required: ["kind", "target_type"]

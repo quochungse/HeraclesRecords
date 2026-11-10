@@ -329,6 +329,11 @@ const stepSchema = workoutSchema.properties.steps.items.oneOf[0];
 assert.equal(stepSchema.properties.sets.maximum, 99);
 assert.deepEqual(stepSchema.properties.rest_type.enum, [1]);
 assert.equal(stepSchema.properties.rest_value.maximum, 3600);
+// The watch rests after a step's last set too, before the next step: a rest
+// described as "between sets" left Coach never planning the move between
+// exercises.
+assert.match(stepSchema.properties.rest_value.description, /after each set of this step, the last one included/);
+assert.doesNotMatch(JSON.stringify(stepSchema.properties.rest_type), /between/);
 const intensitySchema = JSON.stringify(stepSchema.properties.intensity);
 for (const type of ["ftpPercent", "swimStroke", "heartRatePercent", "climbGrade"]) {
   assert.match(intensitySchema, new RegExp(type));

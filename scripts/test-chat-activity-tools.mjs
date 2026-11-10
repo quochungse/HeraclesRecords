@@ -657,6 +657,43 @@ assert.match(
   "a custom exercise is named, a library code is printed as the code"
 );
 
+// The rest the watch gave after each set — the last one included, the pause
+// before the next exercise — and the time the next exercise actually took to
+// start where it ran well past that rest. Without them the coach judged rest
+// from the plan alone. Stamps are hundredths of a second.
+{
+  const at = (seconds) => 500000 + seconds * 100;
+  const restDetail = parseActivityDetail({
+    labelId: "act-gym-rest",
+    summary: { name: "Rests", sportType: 402, startTimestamp: at(0), totalTime: 60000, sets: 4, totalReps: 42, exercises: 2 },
+    lapList: [{
+      type: 2,
+      lapItemList: [
+        { mode: 14, exerciseIndex: 0, exerciseNameKey: "T1041", startTimestamp: at(0), time: 4000, reps: 10, weight: 60000 },
+        { mode: 15, exerciseIndex: 0, exerciseNameKey: "T1041", startTimestamp: at(40), time: 9000 },
+        { mode: 14, exerciseIndex: 0, exerciseNameKey: "T1041", startTimestamp: at(130), time: 4000, reps: 8, weight: 70000 },
+        { mode: 15, exerciseIndex: 0, exerciseNameKey: "T1041", startTimestamp: at(170), time: 9000 },
+        // Set up for the next movement: it starts at 400 s, 3:50 after the
+        // last set, against the 1:30 the watch rested.
+        { mode: 14, exerciseIndex: 1, exerciseNameKey: "S9999", name: "Bulgarian Split Squat", startTimestamp: at(400), time: 4000, reps: 12, weight: 20000 },
+        { mode: 15, exerciseIndex: 1, exerciseNameKey: "S9999", name: "Bulgarian Split Squat", startTimestamp: at(440), time: 6000 },
+        { mode: 14, exerciseIndex: 1, exerciseNameKey: "S9999", name: "Bulgarian Split Squat", startTimestamp: at(500), time: 4000, reps: 12, weight: 20000 },
+        { mode: 15, exerciseIndex: 1, exerciseNameKey: "S9999", name: "Bulgarian Split Squat", startTimestamp: at(540), time: 7500 }
+      ]
+    }]
+  });
+  const restText = formatActivityDetailForChat(restDetail, false, "metric");
+  assert.match(
+    restText,
+    /- T1041 — 2 sets — 18 reps: 60 kg x10, 70 kg x8 · rest 1:30 after each set · 3:50 before the next exercise\n/
+  );
+  assert.match(
+    restText,
+    /- Bulgarian Split Squat — 2 sets — 24 reps: 20 kg x12, 20 kg x12 · rest after each set 1:00, 1:15(\n|$)/,
+    "rests that differ are listed set by set, and the last exercise has no next one"
+  );
+}
+
 // The card lists the exercises in place of the laps, which are sets and rests
 // with nothing to say which is which.
 const strengthPreview = buildActivityVisualPreview(strengthDetail, "req-gym-3");
