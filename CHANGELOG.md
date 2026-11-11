@@ -12,6 +12,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A tidier Performance chart** - time in heart rate zones is one bar under the chart (hover a zone for its bounds, time and share) instead of a panel of its own; a settings button chooses which channel chips are shown; the distance axis is marked every kilometre or mile where that fits, and the choice of time or distance is remembered.
 - **Route map** - the layer menu lists Route, Pace, Heart rate, Elevation and Heatmap directly, and no longer offers the Street and Topo base maps.
 - **Figures move when you change what they show** - choose another period or filter and the figures roll up or down to their new values while a weekly chart zooms along its weeks; choose another measure (time, distance, load, sets) and the figures slide across while the bars change height in place. On Overview, Running, Cycling, Hiking, Swimming, Strength and Activities, and a session's time in zones. A change you did not make here, such as new data or units changed in Personal, just appears.
+- **Running efficiency reads steadier** - the oxygen cost of your speed is now ACSM's running equation, the usual is read from steady running alone (55-80% of your heart rate reserve), and one scale onto your COROS VO₂max holds for the whole year, so a block of tempo or easy running no longer moves your usual and a run is not re-valued as the weeks roll. The verdict (above, in line with or below your usual) is said in the chart's head, and hovering a run on the Running screen shows the run, the usual it is read against and the 7-day median. The Durability figure is gone: it depended too much on how long your usual runs were.
+- **Strength supersets in the workout builder** - a repeat can now hold strength movements, one set of each a round, with the rest after each set.
+- **Exercises Library** - a movement shows COROS's own description under its clip: starting position, action and tips.
+- **Route replay has a speed** - the full map's Replay gets 0.25×, 0.5×, 1× and 2×, remembered like the map's other choices. The route behind a session's heading is drawn whole instead of replaying as the page opens.
+- **Coach** - a plan card shows a strip for every week (the first four, then Show all), and a plan brief you no longer want can be discarded from its card.
+
+### Changed
+- **Calendar is month only** - the Week view showed nothing the month did not, and is gone.
+- A strength step Coach named for its set ("Bench 60 kg 4x6-10") is shown as its movement with that name under it, and sets done under such a name count toward the movement's records and history again.
+
+### Fixed
+- Coach: a conversation continued on two computers no longer shows a question twice, or as "answering on another device" when it was asked here.
+- Coach: a turn that stopped at a usage limit after drawing its charts or plan says so, with when the limit resets, instead of ending without a word.
+- Coach: a tool error that a later read of the same thing made up for no longer stays under the answer.
+- Coach: jumping to a question, a waiting entry or a plan's place in the conversation lands on it, however far up it is.
+- Coach: a brief cannot be discarded while Coach is still writing in its conversation, and a conversation left with nothing but a discarded brief reads as empty.
+- Coach: pressing a week on a plan card's overview brings that week into view at the end of a conversation too.
+- Coach: a question copied into another editor keeps its line breaks, and a change card's view switch keeps its width beside a long workout name.
+- Coach plans rest between strength exercises as the watch does (the rest after a step's last set), and reads the rest you took in a session.
+- A strength movement written inside a repeat keeps its movement when saved to COROS.
+- A strength workout with a repeat counts every round in its sets and its weight lifted, and the builder's time counts the rest after each set of a superset.
+- Workout builder: a step turned into a repeat is saved as a new repeat instead of over the step it was.
+- Activities: on a session with a pause, a lap marks its own stretch of the chart instead of an earlier one.
+- Running efficiency: better minutes are no longer drawn in the worse colour.
+- Linux (.deb): an update waits for the system's package manager instead of failing while it is busy, and no longer asks for the password again and again on a desktop that cannot ask for it. An update the app cannot install itself now sends you to the download page on heraclesrecords.com.
+- Overview: a training load heatmap card's date no longer runs over its first title.
 
 ## [1.4.7] - 2026-11-05
 

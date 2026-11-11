@@ -252,7 +252,11 @@
   "steps": [
    "[...document.querySelectorAll(\"tr\")].find((t) => t.textContent.startsWith(\"Road6 × 1 km intervals\")).click(), true",
    3500,
+   "document.querySelector(\".activity-chart-settings .activity-chart-toggle\").click(), true",
+   600,
    "demoClick(\"Split\"), true",
+   600,
+   "document.querySelector(\".activity-chart-settings .activity-chart-toggle\").click(), true",
    1000,
    "demoClick(\"Running power\"), true",
    1000,

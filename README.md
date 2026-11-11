@@ -102,8 +102,8 @@ Nights and naps, stages, HRV and stress across the night, kept long after the ni
       <p><strong>Running efficiency</strong>: how much speed each minute bought for the heart rate it cost, on your COROS VO₂max scale and against your usual from the six weeks before. It shows how well you held it to the end, and marks every stretch it could not read fairly.</p>
     </td>
     <td width="50%" valign="top">
-      <img src="docs/readme/28-run-performance.webp" alt="Performance chart split in two: pace and running power above, heart rate below" />
-      <p><strong>Performance</strong>: every surge and stop drawn rather than averaged away, in COROS's own colours. Split it and what you produced sits above what it cost, on one clock, with the laps headed by the workout's parts underneath.</p>
+      <img src="docs/readme/28-run-performance.webp" alt="Performance chart split in two beside the route: pace and running power above, heart rate below" />
+      <p><strong>Performance</strong>: every surge and stop drawn rather than averaged away, in COROS's own colours. Split it and what you produced sits above what it cost, on one clock. The route stands beside it: drag on the chart, press a lap or drag along the route, and that stretch lights up on all three with its own figures.</p>
     </td>
   </tr>
 </table>
@@ -168,7 +168,7 @@ Choose **Heracles TL** under **Strength → Settings → Training load formula**
 
 ### Plan & Library
 
-**Calendar**: planned and done side by side, by week or month, with a plan's compliance on every session. Drag a session to another day and it moves on your COROS calendar too.
+**Calendar**: planned and done side by side, month by month, with a plan's compliance on every session. Drag a session to another day and it moves on your COROS calendar too.
 
 <img src="docs/readme/09-calendar.webp" alt="Calendar: planned and completed sessions by month" />
 
