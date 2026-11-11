@@ -102,6 +102,8 @@ const activity = {
   "activity.chart.selection.laps": "Laps {from}–{to}",
   "activity.chart.selection.zoom": "Zoom to selection",
   "activity.chart.selection.clear": "Clear selection",
+  "activity.chart.selection.from": "Start of the selection",
+  "activity.chart.selection.to": "End of the selection",
   "activity.chart.selection.resetZoom": "Reset zoom",
   "activity.chart.channelsShown": "Channels shown",
   "activity.chart.settings": "Chart settings",

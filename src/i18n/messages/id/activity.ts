@@ -101,6 +101,8 @@ const activity: ActivityMessages = {
   "activity.chart.selection.laps": "Putaran {from}–{to}",
   "activity.chart.selection.zoom": "Perbesar ke pilihan",
   "activity.chart.selection.clear": "Hapus pilihan",
+  "activity.chart.selection.from": "Awal pilihan",
+  "activity.chart.selection.to": "Akhir pilihan",
   "activity.chart.selection.resetZoom": "Atur ulang zoom",
   "activity.chart.channelsShown": "Kanal yang ditampilkan",
   "activity.chart.settings": "Pengaturan grafik",

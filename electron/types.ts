@@ -1445,6 +1445,13 @@ export interface AppUpdateSnapshot {
   downloadPercent?: number;
   releaseNotes?: string;
   error?: string;
+  /**
+   * An error the screen has words of its own for, in its language, with the
+   * download page (`manualInstallUrl`) to send the athlete to: the update's
+   * file is not where the release says, or no release is published to check
+   * against. `error` stays the English for the logs.
+   */
+  errorKind?: "download-missing" | "no-release";
   /** macOS ad-hoc builds cannot self-install; the athlete installs from the site's download page. */
   installMethod?: "restart" | "manual";
   manualInstallUrl?: string;

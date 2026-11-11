@@ -101,6 +101,8 @@ const activity: ActivityMessages = {
   "activity.chart.selection.laps": "รอบ {from}–{to}",
   "activity.chart.selection.zoom": "ซูมไปยังช่วงที่เลือก",
   "activity.chart.selection.clear": "ล้างการเลือก",
+  "activity.chart.selection.from": "จุดเริ่มของช่วงที่เลือก",
+  "activity.chart.selection.to": "จุดสิ้นสุดของช่วงที่เลือก",
   "activity.chart.selection.resetZoom": "รีเซ็ตการซูม",
   "activity.chart.channelsShown": "ช่องข้อมูลที่แสดง",
   "activity.chart.settings": "การตั้งค่ากราฟ",

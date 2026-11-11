@@ -101,6 +101,8 @@ const activity: ActivityMessages = {
   "activity.chart.selection.laps": "ラップ {from}–{to}",
   "activity.chart.selection.zoom": "選択範囲を拡大",
   "activity.chart.selection.clear": "選択を解除",
+  "activity.chart.selection.from": "選択範囲の始点",
+  "activity.chart.selection.to": "選択範囲の終点",
   "activity.chart.selection.resetZoom": "拡大を元に戻す",
   "activity.chart.channelsShown": "表示するチャンネル",
   "activity.chart.settings": "グラフの設定",

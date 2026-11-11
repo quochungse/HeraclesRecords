@@ -101,6 +101,8 @@ const activity: ActivityMessages = {
   "activity.chart.selection.laps": "Круги {from}–{to}",
   "activity.chart.selection.zoom": "Приблизить выделение",
   "activity.chart.selection.clear": "Снять выделение",
+  "activity.chart.selection.from": "Начало выделения",
+  "activity.chart.selection.to": "Конец выделения",
   "activity.chart.selection.resetZoom": "Сбросить масштаб",
   "activity.chart.channelsShown": "Показываемые каналы",
   "activity.chart.settings": "Настройки графика",

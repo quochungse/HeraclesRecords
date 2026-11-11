@@ -596,15 +596,24 @@ export default function App() {
     // unasked: at the top, away from whatever the athlete is doing.
     if (effectiveUpdateSnapshot.status === "error") {
       installAcceptedVersionRef.current = null;
+      const page = effectiveUpdateSnapshot.errorKind ? effectiveUpdateSnapshot.manualInstallUrl : undefined;
       showToast(
-        effectiveUpdateSnapshot.error ?? t("app.update.downloadFailed"),
+        updateErrorText(effectiveUpdateSnapshot, t("app.update.downloadFailed")),
         "error",
-        { placement: "top" },
+        {
+          placement: "top",
+          // The window's own handler hands the page to the browser.
+          ...(page
+            ? { action: { label: t("app.update.openDownload"), run: () => void window.open(page, "_blank", "noreferrer") } }
+            : {}),
+        },
       );
     }
   }, [
     effectiveUpdateSnapshot.availableVersion,
     effectiveUpdateSnapshot.error,
+    effectiveUpdateSnapshot.errorKind,
+    effectiveUpdateSnapshot.manualInstallUrl,
     effectiveUpdateSnapshot.status,
   ]);
 
@@ -1184,7 +1193,7 @@ export default function App() {
       } else if (snapshot.status === "not-available") {
         setMessage(t("app.update.latest"));
       } else if (snapshot.status === "error") {
-        setError(snapshot.error ?? t("app.update.checkFailed"));
+        setError(updateErrorText(snapshot, t("app.update.checkFailed")));
       }
     } catch (caught) {
       setError(toErrorMessage(caught));
@@ -1236,7 +1245,7 @@ export default function App() {
       setAppUpdateSnapshot(snapshot);
 
       if (snapshot.status === "error") {
-        setError(snapshot.error ?? t("app.update.downloadFailed"));
+        setError(updateErrorText(snapshot, t("app.update.downloadFailed")));
       }
     } catch (caught) {
       setError(toErrorMessage(caught));
@@ -2449,6 +2458,22 @@ function BridgeMissing() {
       </div>
     </section>
   );
+}
+
+/**
+ * An update's failure in the athlete's language: the two the main process
+ * names (`errorKind`) say where the download page is; any other is the
+ * updater's own words.
+ */
+function updateErrorText(snapshot: AppUpdateSnapshot, fallback: string): string {
+  const site = (snapshot.manualInstallUrl ?? "").replace(/^https?:\/\//, "");
+  if (snapshot.errorKind === "download-missing") {
+    return t("app.update.downloadMissing", { version: snapshot.availableVersion ?? "", site });
+  }
+  if (snapshot.errorKind === "no-release") {
+    return t("app.update.noRelease", { site });
+  }
+  return snapshot.error ?? fallback;
 }
 
 function toErrorMessage(error: unknown): string {

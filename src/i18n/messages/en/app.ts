@@ -9,6 +9,8 @@ const app = {
   "app.update.notInstalled": "Updates are only available in installed builds.",
   "app.update.latest": "You're on the latest version.",
   "app.update.checkFailed": "Could not check for updates.",
+  "app.update.downloadMissing": "Could not download Heracles Records {version}. Get it from {site}.",
+  "app.update.noRelease": "No release has been published to check against yet. Downloads are at {site}.",
   "app.update.openedDownload": "Opened the download page on heraclesrecords.com. Install the new build over Heracles Records in Applications.",
   "app.coros.enterCode": "Enter the verification code we emailed you.",
   "app.coros.connected": "COROS Training Hub connected.",

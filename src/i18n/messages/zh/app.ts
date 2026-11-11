@@ -8,6 +8,8 @@ const app: AppMessages = {
   "app.update.notInstalled": "只有安装版才能更新。",
   "app.update.latest": "已是最新版本。",
   "app.update.checkFailed": "无法检查更新。",
+  "app.update.downloadMissing": "无法下载 Heracles Records {version}。请从 {site} 获取。",
+  "app.update.noRelease": "尚未发布可供检查的版本。下载地址：{site}。",
   "app.update.openedDownload": "已打开 heraclesrecords.com 下载页面。请将新版本覆盖安装到“应用程序”中的 Heracles Records。",
   "app.coros.enterCode": "请输入我们通过邮件发送的验证码。",
   "app.coros.connected": "已连接 COROS Training Hub。",

@@ -407,7 +407,7 @@ class LinePainter implements Painter {
      * pane: the selected stretch, drawn again over the veil laid on the rest —
      * by this same painter, so it is the route's own line, halo and core.
      */
-    private readonly only?: { from: number; to: number; pane: string }
+    private only?: { from: number; to: number; pane: string }
   ) {
     if (!map.getPane(LINE_HALO_PANE)) {
       map.createPane(LINE_HALO_PANE).style.zIndex = "395";
@@ -493,6 +493,13 @@ class LinePainter implements Painter {
       start: this.curve.points[0]!,
       head: curveHead(this.curve, position)
     };
+  }
+
+  /** Another stretch for a painter of one (`only`): the same lines, cut again. */
+  paintOnly(stretch: { from: number; to: number }): void {
+    if (!this.only) return;
+    this.only = { ...this.only, ...stretch };
+    this.paint(1);
   }
 
   private draw(
@@ -927,10 +934,17 @@ function RouteMapCanvas({
      * painter, the same colours, cut to the stretch. The heatmap is a canvas
      * and has no stretch to draw again; there the veil alone sets it apart.
      */
-    const drawStretch = () => {
+    // A stretch being dragged changes at every step: the painter is kept and
+    // cut again, and built anew only for another drawing or style — it makes
+    // three lines for every run of colour on the whole route.
+    const drawStretch = (rebuild = false) => {
+      const shown = drawnRef.current;
+      if (stretchPainter && stretchAt && !rebuild && shown?.kind !== "glow") {
+        stretchPainter.paintOnly(stretchAt);
+        return;
+      }
       stretchPainter?.remove();
       stretchPainter = null;
-      const shown = drawnRef.current;
       if (!stretchAt || shown?.kind === "glow") {
         return;
       }
@@ -1052,13 +1066,13 @@ function RouteMapCanvas({
         ghostLine.setStyle({ opacity: ghostShown(next) ? style.ghostOpacity : 0 });
         showWhole();
         // After `drawnRef` is the new drawing: the redraw effect sets it first.
-        drawStretch();
+        drawStretch(true);
       },
       restyle: (next) => {
         style = next;
         painter.restyle(next);
         routeLink?.restyle(next);
-        drawStretch();
+        drawStretch(true);
         ghostLine.setStyle({
           color: next.routeColor,
           opacity: ghostShown(drawingRef.current) ? next.ghostOpacity : 0

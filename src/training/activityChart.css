@@ -354,6 +354,11 @@
   pointer-events: auto;
 }
 
+.activity-chart-band-edge:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
 /* A wider reach than the pill is drawn: an edge is pulled without aiming. */
 .activity-chart-band-edge::before {
   position: absolute;

@@ -34,9 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A strength movement written inside a repeat keeps its movement when saved to COROS.
 - A strength workout with a repeat counts every round in its sets and its weight lifted, and the builder's time counts the rest after each set of a superset.
 - Workout builder: a step turned into a repeat is saved as a new repeat instead of over the step it was.
+- Performance chart: the laps above it are one stop for the Tab key, with the arrow keys between them, and a selection's two edges can be moved with the arrow keys (Shift for bigger steps). A zoom no longer carries over to the next session opened in Activities.
 - Activities: on a session with a pause, a lap marks its own stretch of the chart instead of an earlier one.
 - Running efficiency: better minutes are no longer drawn in the worse colour.
-- Linux (.deb): an update waits for the system's package manager instead of failing while it is busy, and no longer asks for the password again and again on a desktop that cannot ask for it. An update the app cannot install itself now sends you to the download page on heraclesrecords.com.
+- Linux (.deb): an update waits for the system's package manager instead of failing while it is busy, and no longer asks for the password again and again on a desktop that cannot ask for it. An update the app cannot install itself now sends you to the download page on heraclesrecords.com, and one whose file could not be downloaded says so in your language with a button to that page.
 - Overview: a training load heatmap card's date no longer runs over its first title.
 
 ## [1.4.7] - 2026-11-05

@@ -101,6 +101,8 @@ const activity: ActivityMessages = {
   "activity.chart.selection.laps": "랩 {from}–{to}",
   "activity.chart.selection.zoom": "선택 구간 확대",
   "activity.chart.selection.clear": "선택 해제",
+  "activity.chart.selection.from": "선택 구간의 시작",
+  "activity.chart.selection.to": "선택 구간의 끝",
   "activity.chart.selection.resetZoom": "확대 초기화",
   "activity.chart.channelsShown": "표시할 채널",
   "activity.chart.settings": "그래프 설정",

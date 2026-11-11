@@ -8,6 +8,8 @@ const app: AppMessages = {
   "app.update.notInstalled": "Gli aggiornamenti sono disponibili solo nelle versioni installate.",
   "app.update.latest": "Hai già l’ultima versione.",
   "app.update.checkFailed": "Impossibile cercare aggiornamenti.",
+  "app.update.downloadMissing": "Impossibile scaricare Heracles Records {version}. Scaricalo da {site}.",
+  "app.update.noRelease": "Non è ancora stata pubblicata alcuna versione con cui confrontare. I download sono su {site}.",
   "app.update.openedDownload": "Pagina di download di heraclesrecords.com aperta. Installa la nuova versione sopra Heracles Records in Applicazioni.",
   "app.coros.enterCode": "Inserisci il codice di verifica che ti abbiamo inviato via email.",
   "app.coros.connected": "COROS Training Hub collegato.",

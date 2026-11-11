@@ -46,6 +46,7 @@ import type {
   WorkoutSport
 } from "../../electron/types";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
+import { useWorkoutExerciseCatalog } from "./useWorkoutExerciseCatalog";
 import { COROS_NAME_MAX_BYTES, COROS_WORKOUT_DESCRIPTION_MAX_BYTES, clampCorosUtf8, corosUtf8Length } from "../../electron/corosTextLimits";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { RunnerIcon } from "../running/runnerIcon";
@@ -1151,8 +1152,6 @@ export function useWorkoutBuilder(api: HeraclesRecordsApi, options: UseWorkoutBu
   const [builderGradeSystem, setBuilderGradeSystemState] = useState<keyof typeof CLIMB_SYSTEM_IDS>(
     seededGrade ?? "yds"
   );
-  const [builderExercises, setBuilderExercises] = useState<WorkoutExerciseOption[]>([]);
-  const [builderExercisesLoading, setBuilderExercisesLoading] = useState(false);
   const [builderContext, setBuilderContext] = useState<WorkoutEditorContext>();
   // Until the account's context answers, a heart-rate step's figure waits for it.
   const [builderContextPending, setBuilderContextPending] = useState(true);
@@ -1230,20 +1229,13 @@ export function useWorkoutBuilder(api: HeraclesRecordsApi, options: UseWorkoutBu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api, unitSystem]);
 
-  useEffect(() => {
-    if (builderSport !== "strength" && builderSport !== "hyrox") {
-      setBuilderExercises([]);
-      setBuilderExercisesLoading(false);
-      return;
-    }
-    let active = true;
-    setBuilderExercisesLoading(true);
-    void api.listWorkoutExercises(builderSport)
-      .then((options) => { if (active) setBuilderExercises(options); })
-      .catch(() => { if (active) setBuilderExercises([]); })
-      .finally(() => { if (active) setBuilderExercisesLoading(false); });
-    return () => { active = false; };
-  }, [api, builderSport]);
+  // The catalogue every other surface reads, fetched once a session: asked for
+  // here on its own, each opening of the builder brought the whole of it over
+  // again, COROS's descriptions of every movement included.
+  const { options: builderExercises, loading: builderExercisesLoading } = useWorkoutExerciseCatalog(
+    api,
+    builderSport
+  );
 
   useEffect(() => {
     if (seededGrade && seed?.sport === builderSport) return;

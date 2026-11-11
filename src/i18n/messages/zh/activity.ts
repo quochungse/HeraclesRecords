@@ -101,6 +101,8 @@ const activity: ActivityMessages = {
   "activity.chart.selection.laps": "第 {from}–{to} 圈",
   "activity.chart.selection.zoom": "放大到选中区段",
   "activity.chart.selection.clear": "取消选择",
+  "activity.chart.selection.from": "所选区间的起点",
+  "activity.chart.selection.to": "所选区间的终点",
   "activity.chart.selection.resetZoom": "重置缩放",
   "activity.chart.channelsShown": "显示的通道",
   "activity.chart.settings": "图表设置",

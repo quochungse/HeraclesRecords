@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode
 } from "react";
@@ -24,6 +25,7 @@ import {
 } from "../activityLink";
 import { formatDurationSeconds } from "../formatters";
 import { useLinkValue } from "../useActivityLink";
+import { useColumnFocus } from "../overview/chartFocus";
 import { lapSectionLabel } from "./LapSections";
 
 /*
@@ -438,6 +440,34 @@ function PlotLinkLayer({
   };
 
   const selected = band(selection);
+  /**
+   * An edge of the selection as a slider: the arrow keys pull it five seconds
+   * at a time, half a minute with Shift, as far as the plot shows and never
+   * past the other edge.
+   */
+  const edge = (which: "from" | "to") => {
+    if (!selection) return {};
+    return {
+      role: "slider",
+      tabIndex: 0,
+      "aria-label": t(which === "from" ? "activity.chart.selection.from" : "activity.chart.selection.to"),
+      "aria-valuenow": Math.round(selection[which]),
+      "aria-valuetext": formatDurationSeconds(selection[which]),
+      onKeyDown: (event: ReactKeyboardEvent<HTMLSpanElement>) => {
+        const way = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+        if (way === 0) return;
+        event.preventDefault();
+        const moved = Math.max(0, selection[which] + way * (event.shiftKey ? 30 : 5));
+        const at = px(moved);
+        if (at === undefined || at < 0 || at > rect.width) return;
+        link.setSelection(
+          which === "from"
+            ? { from: Math.min(moved, selection.to - MIN_SELECTION_SECONDS), to: selection.to }
+            : { from: selection.from, to: Math.max(moved, selection.from + MIN_SELECTION_SECONDS) }
+        );
+      }
+    } as const;
+  };
   const previewed = sameSpan(preview, selection) ? null : band(preview);
   const cursorAt = cursor === null ? undefined : px(cursor);
 
@@ -449,8 +479,8 @@ function PlotLinkLayer({
       {previewed ? <div className="activity-chart-band is-preview" style={previewed.style} /> : null}
       {selected ? (
         <div className="activity-chart-band is-selected" style={selected.style}>
-          {selected.fromShown ? <span className="activity-chart-band-edge is-from" data-edge="from" /> : null}
-          {selected.toShown ? <span className="activity-chart-band-edge is-to" data-edge="to" /> : null}
+          {selected.fromShown ? <span className="activity-chart-band-edge is-from" data-edge="from" {...edge("from")} /> : null}
+          {selected.toShown ? <span className="activity-chart-band-edge is-to" data-edge="to" {...edge("to")} /> : null}
         </div>
       ) : null}
       {cursorAt !== undefined && cursorAt >= 0 && cursorAt <= rect.width ? (
@@ -484,20 +514,27 @@ export function LapRuler({ link, rect, domain, toAxis, sections, recoveries }: L
   const laps = link.laps();
   const [low, high] = domain;
   const span = high - low;
-  if (span <= 0) {
-    return null;
-  }
   /** A stretch as a share of the ruler, clipped to it; null when it is off the zoom. */
   const place = (stretch: LinkSpan) => {
     const from = toAxis(stretch.from);
     const to = toAxis(stretch.to);
-    if (from === undefined || to === undefined) {
+    if (span <= 0 || from === undefined || to === undefined) {
       return null;
     }
     const left = Math.max(0, (from - low) / span);
     const right = Math.min(1, (to - low) / span);
     return left < right ? { left, width: right - left } : null;
   };
+  // The blocks the zoom shows, as one stop in the tab order with the arrow
+  // keys between them: sixty laps were sixty stops on the way to the chart.
+  const blocks = laps.flatMap((lap, position) => {
+    const at = place(lap);
+    return at ? [{ lap, position, at }] : [];
+  });
+  const blockFocus = useColumnFocus(blocks.length, 0);
+  if (span <= 0) {
+    return null;
+  }
 
   // The parts, each over the laps it holds.
   const parts: { section: ActivityLapSection; stretch: LinkSpan }[] = [];
@@ -532,22 +569,20 @@ export function LapRuler({ link, rect, domain, toAxis, sections, recoveries }: L
         </div>
       ) : null}
       <div className="activity-lap-ruler-track" role="group" aria-label={t("activity.m.laps")}>
-        {laps.map((lap, position) => {
-          const at = place(lap);
-          return at ? (
-            <LapRulerBlock
-              key={lap.index}
-              link={link}
-              lap={lap}
-              recovery={recoveries[position] ?? false}
-              style={{ left: `${at.left * 100}%`, width: `${at.width * 100}%` }}
-              // The number is written only where the block is wide enough to hold it;
-              // a sliver — one of fifty laps — drops the gap to its neighbour too.
-              numbered={at.width * rect.width >= 18}
-              sliver={at.width * rect.width < 8}
-            />
-          ) : null;
-        })}
+        {blocks.map(({ lap, position, at }, order) => (
+          <LapRulerBlock
+            key={lap.index}
+            link={link}
+            lap={lap}
+            focus={blockFocus(order)}
+            recovery={recoveries[position] ?? false}
+            style={{ left: `${at.left * 100}%`, width: `${at.width * 100}%` }}
+            // The number is written only where the block is wide enough to hold it;
+            // a sliver — one of fifty laps — drops the gap to its neighbour too.
+            numbered={at.width * rect.width >= 18}
+            sliver={at.width * rect.width < 8}
+          />
+        ))}
       </div>
     </div>
   );
@@ -556,6 +591,7 @@ export function LapRuler({ link, rect, domain, toAxis, sections, recoveries }: L
 function LapRulerBlock({
   link,
   lap,
+  focus,
   recovery,
   style,
   numbered,
@@ -563,6 +599,8 @@ function LapRulerBlock({
 }: {
   link: ActivityLink;
   lap: LapSpan;
+  /** Its place in the ruler's one tab stop (`useColumnFocus`). */
+  focus: ReturnType<ReturnType<typeof useColumnFocus>>;
   recovery: boolean;
   style: CSSProperties;
   numbered: boolean;
@@ -582,6 +620,13 @@ function LapRulerBlock({
       aria-label={t("activity.chart.selection.lap", { n: lap.index })}
       onClick={(event) => link.selectLap(lap.index, event.shiftKey)}
       {...lapHandlers(link, lap)}
+      ref={focus.ref}
+      tabIndex={focus.tabIndex}
+      onKeyDown={focus.onKeyDown}
+      onFocus={() => {
+        focus.onFocus();
+        link.setPreview({ from: lap.from, to: lap.to });
+      }}
     >
       {numbered ? lap.index : null}
     </button>

@@ -98,26 +98,40 @@ function linuxInstallRoute(): LinuxInstallRoute {
   }
 }
 
-function formatUpdaterError(error: unknown): string {
+/**
+ * An updater failure as the snapshot holds it. A 404 is one the screen says in
+ * its own words, with the download page beside it (`errorKind`): the status of
+ * the response where the error carries one, else the number standing alone in
+ * its message, never "404" inside a byte count or a file's name.
+ */
+function updaterFailure(
+  error: unknown
+): Pick<AppUpdateSnapshot, "status" | "error" | "errorKind" | "manualInstallUrl"> {
   const message =
     error instanceof Error
       ? error.message
       : typeof error === "string"
         ? error
         : "Could not check for updates.";
+  const statusCode = (error as { statusCode?: unknown } | null)?.statusCode;
+  const missing = typeof statusCode === "number" ? statusCode === 404 : /\b404\b/.test(message);
 
-  if (message.includes("404")) {
+  if (missing) {
     const version = snapshot.availableVersion;
     // No version yet means the check itself found nothing: no release has
     // been published for this platform (true of every build before the first
     // one), not a download that failed.
-    if (!version) {
-      return `No published release was found to check against. Downloads are at ${DOWNLOAD_PAGE_URL}.`;
-    }
-    return `Update download failed. Download Heracles Records ${version} from ${DOWNLOAD_PAGE_URL}`;
+    return {
+      status: "error",
+      error: version
+        ? `Update download failed. Download Heracles Records ${version} from ${DOWNLOAD_PAGE_URL}`
+        : `No published release was found to check against. Downloads are at ${DOWNLOAD_PAGE_URL}.`,
+      errorKind: version ? "download-missing" : "no-release",
+      manualInstallUrl: DOWNLOAD_PAGE_URL
+    };
   }
 
-  return message;
+  return { status: "error", error: message, errorKind: undefined };
 }
 
 function resolveInstallDetails(): Pick<
@@ -238,7 +252,9 @@ function publishSnapshot(): void {
 }
 
 function setSnapshot(next: Partial<AppUpdateSnapshot>): void {
-  snapshot = { ...snapshot, ...next };
+  // An error let go takes its kind with it.
+  const cleared = "error" in next && next.error === undefined ? { errorKind: undefined } : {};
+  snapshot = { ...snapshot, ...cleared, ...next };
   publishSnapshot();
 }
 
@@ -301,10 +317,7 @@ function registerAutoUpdaterListeners(): void {
   });
 
   autoUpdater.on("error", (error) => {
-    setSnapshot({
-      status: "error",
-      error: formatUpdaterError(error)
-    });
+    setSnapshot(updaterFailure(error));
   });
 }
 
@@ -357,7 +370,7 @@ export async function checkForAppUpdates(): Promise<AppUpdateSnapshot> {
   try {
     await autoUpdater.checkForUpdates();
   } catch (error) {
-    setSnapshot({ status: "error", error: formatUpdaterError(error) });
+    setSnapshot(updaterFailure(error));
   }
 
   return getAppUpdateSnapshot();
@@ -380,7 +393,7 @@ export async function downloadAppUpdate(): Promise<AppUpdateSnapshot> {
     setSnapshot({ status: "downloading", downloadPercent: 0, error: undefined });
     await autoUpdater.downloadUpdate();
   } catch (error) {
-    setSnapshot({ status: "error", error: formatUpdaterError(error) });
+    setSnapshot(updaterFailure(error));
   }
 
   return getAppUpdateSnapshot();

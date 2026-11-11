@@ -101,6 +101,8 @@ const activity: ActivityMessages = {
   "activity.chart.selection.laps": "Vòng {from}–{to}",
   "activity.chart.selection.zoom": "Phóng vào đoạn chọn",
   "activity.chart.selection.clear": "Bỏ chọn",
+  "activity.chart.selection.from": "Đầu đoạn chọn",
+  "activity.chart.selection.to": "Cuối đoạn chọn",
   "activity.chart.selection.resetZoom": "Bỏ phóng",
   "activity.chart.channelsShown": "Các kênh hiển thị",
   "activity.chart.settings": "Cài đặt biểu đồ",

@@ -8,6 +8,8 @@ const app: AppMessages = {
   "app.update.notInstalled": "Pembaruan hanya tersedia di versi yang terpasang.",
   "app.update.latest": "Anda sudah memakai versi terbaru.",
   "app.update.checkFailed": "Tidak dapat memeriksa pembaruan.",
+  "app.update.downloadMissing": "Tidak dapat mengunduh Heracles Records {version}. Unduh dari {site}.",
+  "app.update.noRelease": "Belum ada rilis yang diterbitkan untuk diperiksa. Unduhan tersedia di {site}.",
   "app.update.openedDownload": "Halaman unduhan heraclesrecords.com sudah dibuka. Pasang versi baru di atas Heracles Records di folder Applications.",
   "app.coros.enterCode": "Masukkan kode verifikasi yang kami kirim lewat email.",
   "app.coros.connected": "COROS Training Hub terhubung.",

@@ -438,6 +438,11 @@ export function ActivitySeriesChart({
     }
     setRange(null);
   }, [availableKey, motion]);
+  // Another session's samples: a zoom is rows of the one it was cut on, and the
+  // pane opens the next session of the same sport on this same chart.
+  useEffect(() => {
+    setRange(null);
+  }, [series]);
 
   const rows = useMemo<ChartRow[]>(() => {
     const key = axis === "elapsed" ? "elapsed" : "distance";

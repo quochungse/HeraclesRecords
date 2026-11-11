@@ -61,11 +61,16 @@ wall clock every lap after a pause lit an earlier stretch. Each of the three set
 - **The plot's area is read again whenever the chart redraws** (a `MutationObserver` on the
   stage, read at once, never on a frame): Recharts moves its edges some time after its box
   changes — the map shown or hidden — and the lap ruler stands on those edges.
+- **By keyboard**: the lap ruler is one tab stop with the arrow keys between its blocks
+  (`useColumnFocus`, over the blocks the zoom shows), and each edge of the selection is a slider
+  the arrow keys pull 5 s at a time, 30 s with Shift. A zoom is let go when `series` changes.
 - A selected stretch takes the map's start and finish markers to its own ends, and **keeps the
   colours the route is drawn in**: the rest of the route goes under a veil in the ground's colour
   (`routeLink.ts`), never a dimmed pane or a one-colour line over the stretch. Over the veil the
   stretch is drawn again **by the route's own `LinePainter`** cut to it (`only`), so it has the
-  route's halo, body and core in the route's colours; a hand-made line there lost the neon. The
+  route's halo, body and core in the route's colours; a hand-made line there lost the neon. That
+  painter is kept and cut again as a selection is dragged (`paintOnly`), and built anew only for
+  another drawing or style. The
   heatmap is a canvas and gets the veil alone.
 - **Chart settings** (the head's one button) holds the axis (`activity.chart.axis`), one plot or
   two, and which channels have a chip (`activity.chart.hiddenChannels`) — as switches in a list,

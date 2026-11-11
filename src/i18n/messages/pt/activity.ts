@@ -101,6 +101,8 @@ const activity: ActivityMessages = {
   "activity.chart.selection.laps": "Voltas {from}–{to}",
   "activity.chart.selection.zoom": "Ampliar a seleção",
   "activity.chart.selection.clear": "Limpar a seleção",
+  "activity.chart.selection.from": "Início da seleção",
+  "activity.chart.selection.to": "Fim da seleção",
   "activity.chart.selection.resetZoom": "Repor o zoom",
   "activity.chart.channelsShown": "Canais mostrados",
   "activity.chart.settings": "Definições do gráfico",

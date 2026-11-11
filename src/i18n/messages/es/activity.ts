@@ -101,6 +101,8 @@ const activity: ActivityMessages = {
   "activity.chart.selection.laps": "Vueltas {from}–{to}",
   "activity.chart.selection.zoom": "Ampliar la selección",
   "activity.chart.selection.clear": "Quitar la selección",
+  "activity.chart.selection.from": "Inicio de la selección",
+  "activity.chart.selection.to": "Fin de la selección",
   "activity.chart.selection.resetZoom": "Restablecer el zoom",
   "activity.chart.channelsShown": "Canales mostrados",
   "activity.chart.settings": "Ajustes del gráfico",
