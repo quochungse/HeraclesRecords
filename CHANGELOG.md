@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.8] - 2026-11-11
+
+A session's chart, route and laps point at one stretch, figures move when you change what they show, and running efficiency reads steadier.
+
 ### What's new
 - **The chart, the map and the laps point at one stretch** - on a run, ride, hike or swim the route now stands beside the Performance chart (the map button in its corner shows or hides it). Move over the chart and a dot follows the route; move over the route and the chart follows. Drag on the chart, press a lap, or drag along the route to select a stretch: it lights up on all three, and the figures under the chart read that stretch alone, each against the whole session, with its own time in heart rate zones. A strip of laps above the chart selects one lap, or several with Shift. Zoom to selection is a button at the chart's head, and Escape lets the selection go.
 - **A tidier Performance chart** - time in heart rate zones is one bar under the chart (hover a zone for its bounds, time and share) instead of a panel of its own; a settings button chooses which channel chips are shown; the distance axis is marked every kilometre or mile where that fits, and the choice of time or distance is remembered.
