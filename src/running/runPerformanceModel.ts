@@ -7,6 +7,7 @@ import {
   STEADY_SHARE_MAX,
   STEADY_SHARE_MIN,
   athleteScale,
+  athleteShape,
   median,
   performanceBaseline,
   performanceRun,
@@ -14,7 +15,8 @@ import {
   sportHasRunPerformance,
   type PerformanceBaseline,
   type PerformanceProfile,
-  type PerformanceRun
+  type PerformanceRun,
+  type PerformanceShape
 } from "../../electron/runPerformance";
 import { buildRunWeeks, paceSecondsPerKm, startOfRunWeekMs } from "./runMetrics";
 
@@ -118,6 +120,8 @@ export interface PerformanceContext {
   baseline?: PerformanceBaseline;
   /** Raw figure → COROS's VO2max scale. */
   scale?: number;
+  /** The fall over a long run a figure is levelled by: the athlete's, or the usual's until the year is read. */
+  shape?: PerformanceShape;
   /** Past runs with a curve. */
   runs: number;
 }
@@ -133,40 +137,56 @@ function storedRuns(
 }
 
 /**
- * The athlete's scale onto COROS's VO2max, from the year's runs
+ * What is the athlete's and not a period's: read once over the year, the same
+ * for the Running screen and every run's page.
+ */
+export interface PerformanceAthlete {
+  /** Onto COROS's VO2max; absent until a run of the year carries one. */
+  scale?: number;
+  /** The fall over a long run every run is levelled by. */
+  shape?: PerformanceShape;
+}
+
+/**
+ * The athlete's scale onto COROS's VO2max and fall over a long run, from the year's runs
  * (`performanceScaleRuns`) and their own read of the stored summaries: a
  * screen works it out apart from its usual, so a change of period or a run's
  * page reads it again only when the year itself changes.
  */
-export function performanceAthleteScale(
+export function performanceAthlete(
   scaleRuns: readonly TrainingHubActivity[],
   summaries: ReadonlyMap<string, ActivityDetailSummary>,
   profile: PerformanceProfile
-): number | undefined {
-  return athleteScale(storedRuns(scaleRuns, summaries, profile));
+): PerformanceAthlete {
+  const runs = storedRuns(scaleRuns, summaries, profile);
+  const scale = athleteScale(runs);
+  const shape = athleteShape(runs);
+  return { ...(scale !== undefined ? { scale } : {}), ...(shape ? { shape } : {}) };
 }
 
 /**
  * The usual as of a moment, from the runs before it (`history`), on the
- * athlete's scale (`performanceAthleteScale`) — the same on every screen.
+ * athlete's scale and shape (`performanceAthlete`) — the same on every screen.
  * Until the year is read, or when none of its runs carries COROS's VO2max,
  * the scale is read off these runs and `own`, the run being read: a figure
  * left unscaled read 40 where COROS says 47, for as long as the year's
- * curves took to arrive.
+ * curves took to arrive. The shape stands in the same way, from these runs.
  */
 export function performanceContext(
   history: readonly TrainingHubActivity[],
   summaries: ReadonlyMap<string, ActivityDetailSummary>,
   profile: PerformanceProfile,
-  athleteScaleValue: number | undefined,
+  athlete: PerformanceAthlete | undefined,
   own?: PerformanceRun
 ): PerformanceContext {
   const runs = storedRuns(history, summaries, profile);
-  const baseline = performanceBaseline(runs);
-  const scale = athleteScaleValue ?? athleteScale(own ? [...runs, own] : runs);
+  const baseline = performanceBaseline(runs, athlete?.shape);
+  const scale = athlete?.scale ?? athleteScale(own ? [...runs, own] : runs);
+  const shape = athlete?.shape ?? baseline?.shape;
   return {
     ...(baseline ? { baseline } : {}),
     ...(scale !== undefined ? { scale } : {}),
+    ...(shape ? { shape } : {}),
     runs: runs.length
   };
 }
@@ -196,7 +216,7 @@ export function performanceSessions(
     const at = startedAtMs(activity);
     const run = storedRun(activity, summaries, profile);
     if (at === undefined || !run) continue;
-    const raw = runFigure(run.points, context.baseline?.shape);
+    const raw = runFigure(run.points, context.shape);
     if (raw === undefined) continue;
     const pace = paceSecondsPerKm(activity);
     sessions.push({

@@ -28,7 +28,7 @@ import { secondsPerKmToDisplayPace } from "../units/units";
 import { periodLabel, periodPhrase, type PeriodDays } from "../preferences/periodScale";
 import {
   niceScale,
-  performanceAthleteScale,
+  performanceAthlete,
   performanceContext,
   performanceCoverage,
   performanceForm,
@@ -120,8 +120,8 @@ export function RunPerformancePanel({
   }, [allRuns, runs, scaleRuns, scaleSummaries, summaries]);
 
   // Worked out apart from the period: it moves only when the year does.
-  const athleteScaleValue = useMemo(
-    () => (profile ? performanceAthleteScale(scaleRuns, scaleSummaries, profile) : undefined),
+  const athlete = useMemo(
+    () => (profile ? performanceAthlete(scaleRuns, scaleSummaries, profile) : undefined),
     [profile, scaleRuns, scaleSummaries]
   );
 
@@ -131,7 +131,7 @@ export function RunPerformancePanel({
       performanceHistory(allRuns, nowMs + 1),
       summaries,
       profile,
-      athleteScaleValue
+      athlete
     );
     const sessions = performanceSessions(runs, summaries, profile, context);
     const rows = performanceWeeks(sessions, weeks, nowMs);
@@ -142,7 +142,7 @@ export function RunPerformancePanel({
       form: performanceForm(sessions),
       trend: performanceTrend(rows)
     };
-  }, [allRuns, athleteScaleValue, nowMs, profile, runs, summaries, weeks]);
+  }, [allRuns, athlete, nowMs, profile, runs, summaries, weeks]);
 
   const scale = model?.context.scale ?? 1;
   const usual = model?.context.baseline ? model.context.baseline.value * scale : undefined;

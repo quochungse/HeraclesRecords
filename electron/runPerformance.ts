@@ -592,13 +592,18 @@ function comparableSessions(
   });
 }
 
-/** The usual from a set of past runs, or nothing when there are too few. */
+/**
+ * The usual from a set of past runs, or nothing when there are too few. Their
+ * fall over a long run is the athlete's (`athleteShape`) when it is given, and
+ * these runs' own until it is.
+ */
 export function performanceBaseline(
-  runs: readonly PerformanceRun[]
+  runs: readonly PerformanceRun[],
+  athlete?: PerformanceShape
 ): PerformanceBaseline | undefined {
   // The fall over a long run is read from every reading: its last minutes are
   // the ones most likely to have drifted out of the band.
-  const shape = performanceShape(runs.map((run) => run.points));
+  const shape = athlete ?? performanceShape(runs.map((run) => run.points));
   const sessions = comparableSessions(runs, shape).map((session) => session.value);
   if (sessions.length < MIN_BASELINE_RUNS) {
     return undefined;
@@ -636,7 +641,17 @@ export const SCALE_DAYS = 365;
  * figure — a 5% fall in the usual read as no change, the scale rising to cover it.
  */
 export function athleteScale(runs: readonly PerformanceRun[]): number | undefined {
-  return performanceScale(runs, performanceShape(runs.map((run) => run.points)));
+  return performanceScale(runs, athleteShape(runs));
+}
+
+/**
+ * The athlete's one fall over a long run, from the same year: every run is
+ * levelled by it, on the Running screen and on its own page, so its figure is
+ * one figure. Levelled by the six weeks before whichever moment a screen read
+ * from, a run past its fortieth minute read a few tenths apart on the two.
+ */
+export function athleteShape(runs: readonly PerformanceRun[]): PerformanceShape | undefined {
+  return performanceShape(runs.map((run) => run.points));
 }
 
 export type PerformanceVerdict = "better" | "usual" | "worse";

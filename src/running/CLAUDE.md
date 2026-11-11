@@ -46,13 +46,14 @@ Swain's share of HR reserve. Road and track runs only (100, 103).
   usual and a tempo run read above it for being one. A run with too few steady readings is read
   whole (`runFigure`), and when fewer than three runs have enough the usual takes every run by
   that figure. A run is still drawn whole, minute by minute.
-- **One scale onto COROS's VO2max per athlete, over the year before now** (`athleteScale`,
-  `performanceScaleRuns`), the same on the Running screen and every run's page. **The fall over
-  a long run is not one**: the screen levels every run by the six weeks before now, a page by
-  the six before its run, so a run longer than 40 minutes can read a few tenths apart on the two. A six-week scale
+- **One scale onto COROS's VO2max and one fall over a long run per athlete, over the year
+  before now** (`athleteScale`, `athleteShape`, `performanceScaleRuns`; `performanceAthlete`
+  reads both), the same on the Running screen and every run's page, so a run's figure is one
+  figure. The usual is still six weeks of runs, levelled by that shape: levelled by its own six
+  weeks, a run past its fortieth minute read a few tenths apart on the screen and its page. A six-week scale
   pinned the usual to COROS's figure (a 5% fall read as none) and re-valued every run as the
   window rolled. Until the year is read, the screen's own six weeks (and a page's run) stand in
-  for it, never no scale. The year's read sweeps on its own allowance (`SCALE_YEAR_BUDGET`, newest
+  for it, scale and shape alike, never no scale. The year's read sweeps on its own allowance (`SCALE_YEAR_BUDGET`, newest
   run first), so a first sweep of a year cannot spend the one the screens share. An allowance
   is charged for what COROS was asked (`fetched`), never for a summary worked out again from
   the cached file.
@@ -60,7 +61,7 @@ Swain's share of HR reserve. Road and track runs only (100, 103).
   the six weeks before; a run's page for the six weeks before it; never under Trail. **The
   scale's year is a read of its own** (a second `useActivityDetailSummaries`, keyed by the year's
   runs alone, opened the first time in a session once the screen's own read settles, and left
-  open), and the scale is memoised on it alone (`performanceAthleteScale`): keyed with the
+  open), and the scale and shape are memoised on it alone (`performanceAthlete`): keyed with the
   screen's runs, a period switch or a run's page read the whole year out of SQLite again.
   `test:running-renderer` holds it. The line is a rolling seven-day median
   (`performanceRollingMedian`). `npm run test:run-performance`.

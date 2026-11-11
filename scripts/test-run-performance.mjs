@@ -344,7 +344,7 @@ const context = model.performanceContext(
   model.performanceHistory(all, NOW),
   summaries,
   PROFILE,
-  model.performanceAthleteScale(model.performanceScaleRuns(all, NOW), summaries, PROFILE)
+  model.performanceAthlete(model.performanceScaleRuns(all, NOW), summaries, PROFILE)
 );
 assert.equal(context.runs, 4);
 close(context.baseline.value * context.scale, 47, 0.01, "over the same runs, the usual reads as COROS's VO2max");
@@ -399,15 +399,34 @@ assert.equal(model.performanceTrend(weeks.slice(-1)), undefined, "a single week 
   for (const id of ["y1", "y2", "y3", "y4", "y5"]) {
     yearRead.set(id, { ...summaries.get("r1"), activityId: id, performance: curveOf(53) });
   }
-  const scale = model.performanceAthleteScale(model.performanceScaleRuns(year, NOW), yearRead, PROFILE);
-  const screen = model.performanceContext(model.performanceHistory(year, NOW), summaries, PROFILE, scale);
+  const athlete = model.performanceAthlete(model.performanceScaleRuns(year, NOW), yearRead, PROFILE);
+  const scale = athlete.scale;
+  const screen = model.performanceContext(model.performanceHistory(year, NOW), summaries, PROFILE, athlete);
   assert.equal(screen.scale, scale, "the context takes the athlete's scale as given");
+  assert.equal(screen.shape, athlete.shape, "and the athlete's fall over a long run");
+  assert.equal(screen.baseline.shape, athlete.shape, "which the usual is levelled by too");
+  // One figure for a run wherever it is read: the screen reads it against
+  // today's six weeks, its page against the six before it.
+  const page = model.performanceContext(
+    model.performanceHistory(year, NOW - 20 * DAY),
+    summaries,
+    PROFILE,
+    athlete
+  );
+  assert.equal(page.shape, screen.shape, "a run's page levels it by the same shape as the screen");
+  const onScreen = model.performanceSessions(all, summaries, PROFILE, screen);
+  const onPage = model.performanceSessions(all, summaries, PROFILE, page);
+  assert.deepEqual(
+    onPage.map((session) => session.value),
+    onScreen.map((session) => session.value),
+    "so its figure is the same on both"
+  );
   assert.ok(
     screen.baseline.value * screen.scale < 46,
     `six weeks short of the year read below COROS's 47: ${screen.baseline.value * screen.scale}`
   );
   assert.notEqual(
-    model.performanceAthleteScale(model.performanceScaleRuns(year, NOW), summaries, PROFILE),
+    model.performanceAthlete(model.performanceScaleRuns(year, NOW), summaries, PROFILE).scale,
     scale,
     "worked out from the screen's own read, the year's runs would be missing"
   );
