@@ -37,8 +37,7 @@ import { useBackGesture } from "./sportPage";
 import {
   paceHrDecoupling,
   paceSecondsPerKm,
-  runSeconds,
-  withPausesRemoved
+  runSeconds
 } from "./runMetrics";
 import {
   RUN_SURFACE_LABELS,
@@ -53,8 +52,7 @@ import { RunPerformanceChart } from "./RunPerformanceChart";
 import { isRecoveryLap, lapSections } from "../../electron/lapSections";
 import { LapRecoveryMark, LapSectionRow } from "../training/components/LapSections";
 import { LinkedLapRow } from "../training/components/ActivityLinkParts";
-import { useActivityLink } from "../training/useActivityLink";
-import { heartRateZoneFamily } from "../training/zoneTime";
+import { useSessionChart } from "../training/useSessionChart";
 import { ShareButton } from "../share/ShareButton";
 import { buildActivityShareSession, shareTrainingLabel } from "../share/buildShareSession";
 
@@ -141,14 +139,10 @@ export function RunDetailView({
   // Read the way the list row's summary was, so a row and its page agree.
   const benefit = detailTrainingBenefit(detail, activity.sportType, benefitFamily);
 
-  const laps = detail?.laps ?? [];
+  // The chart, the map beside it and the lap table point at one stretch.
+  const session = useSessionChart(detail, zoneFamily);
+  const { laps, series, link } = session;
   const lapSectionList = lapSections(laps);
-  // On activity time, which is what the laps, the headline and every figure
-  // read off the chart are stated in. See `withPausesRemoved`.
-  const series = useMemo(
-    () => withPausesRemoved(detail?.series ?? [], detail?.pauses),
-    [detail]
-  );
 
   // A trail run's ground, read as the hike page reads a day in the hills —
   // the same analysis, which never asked what sport it was reading. It takes
@@ -168,8 +162,6 @@ export function RunDetailView({
     };
   }, [detail, trail]);
 
-  // The chart, the map beside it and the lap table point at one stretch.
-  const link = useActivityLink(laps, detail?.activityId);
 
   /**
    * How far pace and heart rate drifted apart over the run. Above roughly 5%
@@ -498,14 +490,8 @@ export function RunDetailView({
 
       {series.length > 0 ? (
         <ActivitySeriesChart
-          series={series}
-          laps={laps}
-          hrZones={detail?.hrZones ?? []}
-          link={link}
-          track={detail?.track}
-          routeDetail={detail ?? undefined}
-          pauses={detail?.pauses}
-          zoneFamily={heartRateZoneFamily(detail?.hrZoneType, zoneFamily)}
+          {...session.chart}
+          {...session.page}
           activityTime={detail?.duration ?? activity.duration}
           motion={trail ? "trail" : "pace"}
         />

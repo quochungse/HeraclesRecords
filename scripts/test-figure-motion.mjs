@@ -109,6 +109,26 @@ assert.equal(motion.figureTrend("—", "28.5 km"), 1, "a figure appearing grows"
 assert.equal(motion.figureTrend("9.6", "12.0", 9.6, 12), 1);
 assert.equal(motion.figureTrend("1.234,5", "999,0", 1234.5, 999), -1, "the values outrank the digits");
 
+// Figures whose decimals or parts change with their size, read off the text alone.
+for (const [from, to] of [
+  ["9.85 km", "12.3 km"],
+  ["9h 55m", "10h"],
+  ["45h 30m", "120h"],
+  ["59m", "1h 2m"],
+  ["59:30", "1:02:10"],
+  ["999,0", "1.234,5"],
+  // Thousands grouped by a narrow no-break space, as fr and ru write them.
+  ["12\u202f345", "1\u202f234\u202f567"],
+  ["0.95", "1.2"],
+  ["4:59 /100 m", "5:02 /100 m"]
+]) {
+  assert.equal(motion.figureTrend(from, to), 1, `${from} → ${to} grows`);
+  assert.equal(motion.figureTrend(to, from), -1, `${to} → ${from} shrinks`);
+}
+assert.equal(motion.figureTrend("−5%", "−3%"), 1, "below zero, the smaller number is the larger figure");
+assert.equal(motion.figureTrend("−3%", "−5%"), -1);
+assert.equal(motion.figureTrend("28.5 km", "—"), -1, "a figure giving way to a dash shrinks");
+
 // --- chart marks ----------------------------------------------------------
 
 const bar = (week, x, y, height, width = 10) => ({ x, y, width, height, payload: { weekStartMs: week } });

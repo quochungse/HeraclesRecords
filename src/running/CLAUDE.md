@@ -11,7 +11,7 @@ scroll). **Shared, never copied**:
   opens a session on the whole page and restores its scroll (`useSessionPage`), the mouse's
   back button (`useBackGesture`). Fix it there, not in a screen.
 - `src/running/sportVolume.ts`: volume measures, the four-week `trailingAverage`,
-  `oneYearEarlier`. `formatVerticalRate` (`unitSystem.ts`) writes a height gained per hour.
+  `oneYearEarlier`. `VolumeChartHead` is the head of all four weekly volume charts. `formatVerticalRate` (`unitSystem.ts`) writes a height gained per hour.
 - `RunIntensityPanel` (`sport="ride"|"hike"`) over `intensityMix`, `LoadRatioCard` over
   `acuteChronicLoad`, `DeltaChip`, the skeletons.
 - Renderer suites pin `force-device-scale-factor` to 1 (a scaled display puts every box a few

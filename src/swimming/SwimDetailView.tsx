@@ -13,12 +13,10 @@ import {
   styleDistancePerStroke,
   swimStyleTotals
 } from "../../electron/swimDetail";
-import { withPausesRemoved } from "../../electron/activityMetrics";
 import type { TrainingHubLoadStatus } from "../training/types";
 import { activityCoachRequest } from "../training/askCoachAbout";
 import { ActivityRouteCover, hasActivityRoute } from "../training/components/ActivityRouteMap";
-import { useActivityLink } from "../training/useActivityLink";
-import { heartRateZoneFamily } from "../training/zoneTime";
+import { useSessionChart } from "../training/useSessionChart";
 import {
   formatDistanceMeters,
   formatDurationSeconds,
@@ -106,13 +104,9 @@ export function SwimDetailView({
   const swim = detail?.swim;
   const openWater = type === "open";
 
-  const series = useMemo(
-    () => withPausesRemoved(detail?.series ?? [], detail?.pauses),
-    [detail]
-  );
-  const laps = useMemo(() => detail?.laps ?? [], [detail]);
   // The chart and the map beside it point at one stretch.
-  const link = useActivityLink(laps, detail?.activityId);
+  const session = useSessionChart(detail, zoneFamily);
+  const { series } = session;
   const styleTotals = useMemo(() => (swim ? swimStyleTotals(swim.lengths) : []), [swim]);
   const best = useMemo(() => (swim ? bestSwimEfforts(swim.lengths) : []), [swim]);
 
@@ -365,14 +359,8 @@ export function SwimDetailView({
 
       {series.length > 0 ? (
         <ActivitySeriesChart
-          series={series}
-          laps={laps}
-          hrZones={detail?.hrZones ?? []}
-          link={link}
-          track={detail?.track}
-          routeDetail={detail ?? undefined}
-          pauses={detail?.pauses}
-          zoneFamily={heartRateZoneFamily(detail?.hrZoneType, zoneFamily)}
+          {...session.chart}
+          {...session.page}
           activityTime={detail?.duration ?? activity.duration}
           sportType={activity.sportType}
           motion="swim"

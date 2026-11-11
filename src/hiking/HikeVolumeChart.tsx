@@ -11,8 +11,7 @@ import {
 } from "recharts";
 import type { TooltipContentProps } from "recharts";
 import type { TrainingHubActivity, UnitSystem } from "../../electron/types";
-import { OptionGroup } from "../components/OptionGroup";
-import { MotionFigure } from "../motion/MotionFigure";
+import { VolumeChartHead } from "../running/VolumeChartHead";
 import { useChartMotion } from "../motion/useChartMotion";
 import { trainingChartTooltipStyle } from "../training/chartConfig";
 import { useChartColors } from "../training/useChartColors";
@@ -30,7 +29,7 @@ import {
 import { buildHikeWeeks, summariseHikes, type HikeWeek } from "./hikeMetrics";
 import { HIKE_TYPE_LABELS, type HikeType } from "./hikeType";
 import { hikeTypeColors } from "./hikeTypeColors";
-import { formatDecimal, plural, t } from "../i18n/core";
+import { formatDecimal, t } from "../i18n/core";
 
 /**
  * What a week of hiking is measured in.
@@ -126,38 +125,22 @@ export function HikeVolumeChart({ hikes, hikesAllTime, weeks, types, nowMs }: Hi
 
   return (
     <section className="panel run-block">
-      <header className="run-block-head">
-        <div>
-          <p className="running-eyebrow">{t("run.volume.title")}</p>
-          <h3>
-            <MotionFigure text={`${formatDecimal(total, 0)} ${unit}`} value={total} />
-            <span className="run-block-sub">
-              {" "}
-              <MotionFigure text={plural("run.volume.over", weeks)} value={weeks} />
-            </span>
-          </h3>
-        </div>
-        <div className="sport-volume-aside">
-          {lastYear !== undefined ? (
-            <p className="run-block-aside">
-              {t("run.volume.yearAgo")}{" "}
-              <strong>
-                <MotionFigure
-                  text={`${formatDecimal(measured(lastYear, measure, unitSystem), 0)} ${unit}`}
-                  value={measured(lastYear, measure, unitSystem)}
-                />
-              </strong>
-            </p>
-          ) : null}
-          <OptionGroup
-            label={t("run.volume.measure")}
-            motion="slide"
-            value={measure}
-            options={measureOptions()}
-            onChange={(next) => setMeasure(next as VolumeMeasure)}
-          />
-        </div>
-      </header>
+      <VolumeChartHead
+        totalText={`${formatDecimal(total, 0)} ${unit}`}
+        total={total}
+        weeks={weeks}
+        lastYear={
+          lastYear === undefined
+            ? undefined
+            : {
+                text: `${formatDecimal(measured(lastYear, measure, unitSystem), 0)} ${unit}`,
+                value: measured(lastYear, measure, unitSystem)
+              }
+        }
+        measure={measure}
+        options={measureOptions()}
+        onMeasureChange={setMeasure}
+      />
 
       <div className="run-block-plot">
         <ResponsiveContainer width="100%" height={240}>

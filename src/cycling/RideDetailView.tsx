@@ -25,7 +25,6 @@ import {
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { formatSpeedValue, formatTemperatureValue } from "../units/units";
 import { ActivitySeriesChart } from "../training/components/ActivitySeriesChart";
-import { withPausesRemoved } from "../../electron/activityMetrics";
 import { RunDetailSkeleton } from "../running/RunningSkeleton";
 import { useBackGesture } from "../running/sportPage";
 import { rideMaxSpeedKmh } from "./rideAnalysis";
@@ -45,8 +44,7 @@ import { TrainingBenefitChips } from "../training/components/TrainingBenefitChip
 import { isRecoveryLap, lapSections } from "../../electron/lapSections";
 import { LapRecoveryMark, LapSectionRow } from "../training/components/LapSections";
 import { LinkedLapRow } from "../training/components/ActivityLinkParts";
-import { useActivityLink } from "../training/useActivityLink";
-import { heartRateZoneFamily } from "../training/zoneTime";
+import { useSessionChart } from "../training/useSessionChart";
 import { ShareButton } from "../share/ShareButton";
 import { buildActivityShareSession, shareTrainingLabel } from "../share/buildShareSession";
 
@@ -122,15 +120,10 @@ export function RideDetailView({
   // Read the way the list row's summary was, so a row and its page agree.
   const benefit = detailTrainingBenefit(detail, activity.sportType, benefitFamily);
 
-  const laps = detail?.laps ?? [];
-  const lapSectionList = lapSections(laps);
-  const series = useMemo(
-    () => withPausesRemoved(detail?.series ?? [], detail?.pauses),
-    [detail]
-  );
-
   // The chart, the map beside it and the lap table point at one stretch.
-  const link = useActivityLink(laps, detail?.activityId);
+  const session = useSessionChart(detail, zoneFamily);
+  const { laps, series, link } = session;
+  const lapSectionList = lapSections(laps);
 
   const maxSpeed = useMemo(() => rideMaxSpeedKmh(series), [series]);
 
@@ -364,14 +357,8 @@ export function RideDetailView({
 
       {series.length > 0 ? (
         <ActivitySeriesChart
-          series={series}
-          laps={laps}
-          hrZones={detail?.hrZones ?? []}
-          link={link}
-          track={detail?.track}
-          routeDetail={detail ?? undefined}
-          pauses={detail?.pauses}
-          zoneFamily={heartRateZoneFamily(detail?.hrZoneType, zoneFamily)}
+          {...session.chart}
+          {...session.page}
           activityTime={detail?.duration ?? activity.duration}
           motion="speed"
         />

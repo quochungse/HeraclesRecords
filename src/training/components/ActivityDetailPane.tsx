@@ -57,10 +57,9 @@ import { detailTrainingBenefit, type BenefitZoneFamily } from "../trainingBenefi
 import { TrainingBenefitChips, TrainingBenefitReason } from "./TrainingBenefitChip";
 import { formatCount, formatDecimal, t } from "../../i18n/core";
 import { isRecoveryLap, lapSections } from "../../../electron/lapSections";
-import { withPausesRemoved } from "../../../electron/activityMetrics";
 import { LapRecoveryMark, LapSectionRow } from "./LapSections";
 import { LinkedLapRow } from "./ActivityLinkParts";
-import { useActivityLink } from "../useActivityLink";
+import { useSessionChart } from "../useSessionChart";
 
 interface ActivityDetailPaneProps {
   detail: TrainingHubActivityDetail | null;
@@ -208,11 +207,8 @@ export function ActivityDetailPane({
 
   // The chart, the route map and the lap table point at one stretch; a new
   // activity starts with none.
-  const linkLaps = useMemo(() => detail?.laps ?? [], [detail]);
-  const link = useActivityLink(linkLaps, activityId);
-  // On activity time, as on a sport's page: COROS times a lap without its
-  // pauses, so on the wall clock every lap after a pause lit an earlier stretch.
-  const series = useMemo(() => withPausesRemoved(detail?.series ?? [], detail?.pauses), [detail]);
+  const session = useSessionChart(detail, undefined, activityId);
+  const { link, series } = session;
 
   const request =
     detailRequest && detailRequest.activityId === listActivity?.activityId
@@ -684,10 +680,7 @@ export function ActivityDetailPane({
 
           {hasSeries ? (
             <ActivitySeriesChart
-              series={series}
-              laps={detail.laps}
-              hrZones={detail.hrZones}
-              link={link}
+              {...session.chart}
               activityTime={duration}
               embedded
               sportType={sportType}
@@ -715,8 +708,7 @@ export function ActivityDetailPane({
               <ActivityRouteMap
                 track={detail.track}
                 detail={detail}
-                link={hasSeries ? link : undefined}
-                pauses={detail.pauses}
+                {...(hasSeries ? session.map : {})}
               />
             </section>
           ) : null}

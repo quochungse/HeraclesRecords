@@ -66,9 +66,9 @@ another screen, data arriving, a sync: no motion (a figure counting on its own r
 - `MotionFigure`'s text is the new figure from the first frame; the old characters live only
   in `data-was` generated content, so tests and screen readers read what it says. A change
   landing while it moves joins a motion of the same kind (from where it started, as far
-  along as it got) rather than cutting it and starting over. A figure whose decimals or parts
-  change with its size ("9.85 km" → "12.3 km", "9h 55m" → "10h") is given its `value`: read off
-  the digits alone it rolls the wrong way.
+  along as it got) rather than cutting it and starting over. Which way a figure rolls is its `value` where the
+  caller gives one, else its numbers read in order (`figureTrend`: "9.85 km" → "12.3 km" and
+  "9h 55m" → "10h" grow); only two one-part figures in different units ("2h" → "45m") need the value.
 - A screen whose answer to a press is read from main keeps the press (`freshFigureMotion()`
   when the read starts) and calls `answerFigureMotion` before setting what came back; past
   `ANSWER_WINDOW_MS` the answer just appears. Strength does, and holds its window until then.

@@ -6,6 +6,7 @@ import { app, BrowserWindow, shell } from "electron";
 import { autoUpdater } from "electron-updater";
 import { getSetting, setSetting } from "./database";
 import type { AppUpdateSnapshot } from "./types";
+import { classifyDebInstallExit } from "./debInstallExit";
 import { openableExternalUrl } from "./externalLinks";
 import { ScreenError } from "./screenText";
 
@@ -502,17 +503,13 @@ async function installOnLinux(
   }
 }
 
-/** apt's words, under `LC_ALL=C`, for a lock another program still holds. */
-const DPKG_LOCK_HELD =
-  /Could not get lock|Unable to acquire the dpkg frontend lock|Unable to lock (the administration )?directory/;
-
 /**
  * One `pkexec` authorisation, one apt-get: it installs the package and any
  * dependency it lacks in one step, and waits up to five minutes for dpkg's
  * lock. unattended-upgrades holds that lock for minutes after a boot, and
  * dpkg, which never waits, failed on it outright. The path travels as `$1`,
  * never inside the script, so no quoting can break it; `LC_ALL=C` keeps apt's
- * errors in the English `DPKG_LOCK_HELD` reads.
+ * errors in the English `classifyDebInstallExit` reads.
  */
 function installDebPackage(file: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -540,19 +537,15 @@ function installDebPackage(file: string): Promise<void> {
       );
     });
     child.on("close", (code) => {
-      if (code === 0) {
+      const outcome = classifyDebInstallExit(code, stderr);
+      if (outcome === "installed") {
         resolve();
-      } else if (code === 126) {
-        // pkexec: the dialog was dismissed. 127 is not that: it is also a desktop
-        // with no agent to ask for the password, where asking again never helps,
-        // so it fails and the athlete is sent to the download page.
+      } else if (outcome === "cancelled") {
         reject(new LinuxInstallCancelled("pkexec authorisation was not given"));
-      } else if (code === 127) {
-        reject(new Error(`pkexec could not get authorisation: ${stderr.trim()}`));
-      } else if (DPKG_LOCK_HELD.test(stderr)) {
+      } else if (outcome === "busy") {
         reject(new LinuxInstallBusy(`dpkg is locked by another program: ${stderr.trim()}`));
       } else {
-        reject(new Error(`apt-get exited with ${code}: ${stderr.trim()}`));
+        reject(new Error(`pkexec apt-get exited with ${code}: ${stderr.trim()}`));
       }
     });
   });

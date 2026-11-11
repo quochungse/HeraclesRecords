@@ -41,8 +41,10 @@ that is not a screen's own names its own, as Running's scale year does.
 
 ## One stretch on the chart, the map and the laps (`activityLink.ts`)
 
-A session's page makes one link (`useActivityLink`) and hands it to the chart, the route map
-and each lap row (`LinkedLapRow`): a cursor (a moment) and a selection (a stretch), in seconds
+A session's page makes one link and hands it to the chart, the route map and each lap row
+(`LinkedLapRow`) **through `useSessionChart`**, which works out the series on activity time, the
+link and the pauses together and returns them as props to spread (`chart`, `map`, and `page` for
+a sport's page with its docked map) — a screen that built them by hand forgot the pauses. The link is a cursor (a moment) and a selection (a stretch), in seconds
 **on the clock the chart's `series` is on** — activity time, pauses out (`withPausesRemoved`), on
 a sport's page and in the Activities pane alike: COROS times a lap without its pauses, so on the
 wall clock every lap after a pause lit an earlier stretch. Each of the three sets them and draws them (`ActivityLinkParts.tsx`,

@@ -28,7 +28,6 @@ import {
   formatVerticalRate
 } from "../units/units";
 import { ActivitySeriesChart } from "../training/components/ActivitySeriesChart";
-import { withPausesRemoved } from "../../electron/activityMetrics";
 import { RunDetailSkeleton } from "../running/RunningSkeleton";
 import { useBackGesture } from "../running/sportPage";
 import {
@@ -47,8 +46,7 @@ import { formatDecimal, getIntlLocale, t } from "../i18n/core";
 import { isRecoveryLap, lapSections } from "../../electron/lapSections";
 import { LapRecoveryMark, LapSectionRow } from "../training/components/LapSections";
 import { LinkedLapRow } from "../training/components/ActivityLinkParts";
-import { useActivityLink } from "../training/useActivityLink";
-import { heartRateZoneFamily } from "../training/zoneTime";
+import { useSessionChart } from "../training/useSessionChart";
 import { ShareButton } from "../share/ShareButton";
 import { buildActivityShareSession } from "../share/buildShareSession";
 
@@ -126,14 +124,12 @@ export function HikeDetailView({
   const type = classifyHikeType(activity.sportType);
   const kindLabel = type ? HIKE_TYPE_LABELS[type] : t("hike.type.hike");
 
-  const laps = detail?.laps ?? [];
+  // The chart, the map beside it and the lap table point at one stretch.
+  const session = useSessionChart(detail, zoneFamily);
+  const { laps, series, link } = session;
   const lapSectionList = lapSections(laps);
+  // The wall clock's samples, pauses and all: the movement is read off them.
   const rawSeries = useMemo(() => detail?.series ?? [], [detail]);
-  // On activity time, which is what the laps and the chart are stated in.
-  const series = useMemo(
-    () => withPausesRemoved(rawSeries, detail?.pauses),
-    [detail, rawSeries]
-  );
 
   const movement = useMemo(
     () => hikeMovement(rawSeries, detail?.pauses ?? []),
@@ -144,8 +140,6 @@ export function HikeDetailView({
   const legs = useMemo(() => hikeLegs(rawSeries, movement), [movement, rawSeries]);
   const range = useMemo(() => altitudeRange(rawSeries), [rawSeries]);
 
-  // The chart, the map beside it and the lap table point at one stretch.
-  const link = useActivityLink(laps, detail?.activityId);
 
   const hasRoute = useMemo(() => hasActivityRoute(detail?.track), [detail]);
   const loading = detailStatus === "pending" && detail === null;
@@ -379,14 +373,8 @@ export function HikeDetailView({
 
       {series.length > 0 ? (
         <ActivitySeriesChart
-          series={series}
-          laps={laps}
-          hrZones={detail?.hrZones ?? []}
-          link={link}
-          track={detail?.track}
-          routeDetail={detail ?? undefined}
-          pauses={detail?.pauses}
-          zoneFamily={heartRateZoneFamily(detail?.hrZoneType, zoneFamily)}
+          {...session.chart}
+          {...session.page}
           activityTime={detail?.duration ?? activity.duration}
           motion="hike"
         />

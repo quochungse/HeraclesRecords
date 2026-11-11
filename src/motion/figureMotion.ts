@@ -172,19 +172,74 @@ function alignRight(from: string, to: string): RollCell[] {
   return cells.reverse();
 }
 
+/** One number of a written figure, and what stands between it and the next. */
+interface FigurePart {
+  /** Its whole part, digits only; a group of three after a separator is thousands. */
+  whole: string;
+  /** Its decimals, digits only. */
+  fraction: string;
+  /** The unit or separator after it: "h", ":", " km". */
+  unit: string;
+}
+
+function figureParts(text: string): FigurePart[] {
+  const parts: FigurePart[] = [];
+  const pattern = /\d+(?:[.,\u00a0\u202f']\d+)*/g;
+  let match: RegExpExecArray | null;
+  let last: FigurePart | undefined;
+  let lastEnd = 0;
+  while ((match = pattern.exec(text))) {
+    if (last) last.unit = text.slice(lastEnd, match.index).trim();
+    const groups = match[0].split(/\D/);
+    // "1,034" and "1.234,5": every group of three is thousands; a last group of
+    // any other length is the decimals, whichever mark the locale writes.
+    const tail = groups.length > 1 && groups[groups.length - 1]!.length !== 3 ? groups.pop()! : "";
+    last = { whole: groups.join("").replace(/^0+(?=\d)/, ""), fraction: tail, unit: "" };
+    parts.push(last);
+    lastEnd = match.index + match[0].length;
+  }
+  if (last) last.unit = text.slice(lastEnd).trim();
+  return parts;
+}
+
+/** -1, 0 or 1: one written number against another. */
+function comparePart(a: FigurePart, b: FigurePart): number {
+  if (a.whole.length !== b.whole.length) return a.whole.length < b.whole.length ? -1 : 1;
+  if (a.whole !== b.whole) return a.whole < b.whole ? -1 : 1;
+  const width = Math.max(a.fraction.length, b.fraction.length);
+  const left = a.fraction.padEnd(width, "0");
+  const right = b.fraction.padEnd(width, "0");
+  return left === right ? 0 : left < right ? -1 : 1;
+}
+
 /**
  * Whether a figure grew (1) or shrank (-1): the values when the caller has
- * them, else the digits read in order — "1h 46m" → "2h 28m" grows, as does
- * "65:27:59" → "270:51:25". That reading holds only between two figures of one
- * shape: "9.85 km" → "12.3 km" and "9h 55m" → "10h" both read as falling, so a
- * figure whose decimals or parts change with its size is given its values.
+ * them, else its numbers read in order, largest unit first — "1h 46m" →
+ * "2h 28m" grows, as do "9.85 km" → "12.3 km", "9h 55m" → "10h" and
+ * "65:27:59" → "270:51:25". Where the two lead with different units ("59m" →
+ * "1h 2m", "59:30" → "1:02:10") the one written in more parts is the larger.
+ * Two figures of one part in different units ("2h" → "45m") cannot be told
+ * apart here: a screen that writes such a figure hands over its `value`.
  */
 export function figureTrend(fromText: string, toText: string, fromValue?: number, toValue?: number): 1 | -1 {
   if (fromValue !== undefined && toValue !== undefined && Number.isFinite(fromValue) && Number.isFinite(toValue) && fromValue !== toValue) {
     return toValue > fromValue ? 1 : -1;
   }
-  const a = fromText.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
-  const b = toText.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
-  if (a.length !== b.length) return b.length > a.length ? 1 : -1;
-  return b < a ? -1 : 1;
+  const from = figureParts(fromText);
+  const to = figureParts(toText);
+  // A figure appearing grows; one giving way to a dash shrinks.
+  if (from.length === 0) return 1;
+  if (to.length === 0) return -1;
+  // Below zero, the larger number is the smaller figure.
+  const negative = /^\s*[-\u2212]/.test(fromText) && /^\s*[-\u2212]/.test(toText) ? -1 : 1;
+  const clock = from[0]!.unit === ":" || to[0]!.unit === ":";
+  if (from.length !== to.length && (clock || from[0]!.unit !== to[0]!.unit)) {
+    return to.length > from.length ? 1 : -1;
+  }
+  for (let index = 0; index < Math.min(from.length, to.length); index += 1) {
+    const order = comparePart(from[index]!, to[index]!);
+    if (order !== 0) return (order * -1 * negative) as 1 | -1;
+  }
+  // Alike as far as both go: the one with a part more is the larger.
+  return to.length >= from.length ? 1 : -1;
 }
