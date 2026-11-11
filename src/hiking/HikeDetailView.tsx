@@ -375,8 +375,6 @@ export function HikeDetailView({
         </section>
       ) : null}
 
-      {/* Heart rate only: the pace zones COROS scores a hike on are a runner's. */}
-
       {terrain.length > 0 ? <TerrainPanel terrain={terrain} reading="hike" /> : null}
 
       {series.length > 0 ? (

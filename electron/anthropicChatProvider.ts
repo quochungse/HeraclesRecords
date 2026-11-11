@@ -305,8 +305,8 @@ export interface StreamAnthropicChatOptions {
   signal: AbortSignal;
   onToken(delta: string): void;
   onThinking?(delta: string): void;
-  onToolCallStart?(toolName: string): void;
-  onToolCallError?(toolName: string, message: string): void;
+  onToolCallStart?(toolName: string, args?: unknown): void;
+  onToolCallError?(toolName: string, message: string, args?: unknown): void;
   onToolCall(
     toolName: string,
     args: Record<string, unknown>
@@ -443,7 +443,7 @@ export async function streamAnthropicChatCompletion(
       // teaches the model to stop calling tools in parallel.
       const results: Anthropic.Beta.BetaToolResultBlockParam[] = [];
       for (const call of toolUses) {
-        options.onToolCallStart?.(call.name);
+        options.onToolCallStart?.(call.name, call.input ?? {});
         try {
           const output = await options.onToolCall(
             call.name,
@@ -456,7 +456,7 @@ export async function streamAnthropicChatCompletion(
           });
         } catch (caught) {
           const detail = safeErrorMessage(caught);
-          options.onToolCallError?.(call.name, detail);
+          options.onToolCallError?.(call.name, detail, call.input ?? {});
           results.push({
             type: "tool_result",
             tool_use_id: call.id,

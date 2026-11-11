@@ -1401,7 +1401,9 @@ export function ChatView({
   /** A brief the athlete asked to discard, waiting on their yes. */
   const [discardAsk, setDiscardAsk] = useState<string | null>(null);
   const discardBrief = async (artifactId: string) => {
-    if (!api) return;
+    // A turn running here may be writing this brief's outline: it would end on
+    // a brief that is gone. The confirm can outlive the moment it was opened in.
+    if (!api || (activeSessionId && turnsBusyIn(activeSessionId))) return;
     onError(null);
     try {
       await api.discardPlanBrief(artifactId);
@@ -1410,6 +1412,8 @@ export function ChatView({
       setEditingBriefId((current) => (current === artifactId ? null : current));
       setEditingOutlineId((current) => (current === artifactId ? null : current));
       setRedrawAsk((current) => (current === artifactId ? null : current));
+      // Its anchor stays in the transcript, which is all the automatic outline looks for.
+      setAutoOutline((current) => (current?.artifactId === artifactId ? null : current));
     } catch (caught) {
       onError(remoteErrorMessage(caught, t("chat.err.briefNotDiscarded")));
     } finally {
@@ -4733,6 +4737,13 @@ export function ChatView({
   const isBusy = streaming || exportingLatestActivity;
   /* A turn running in the conversation on screen, or in another one (UAT). */
   const turnHere = streaming && turnSessionId === activeSessionId;
+  // A conversation whose every entry draws nothing — a brief that was discarded,
+  // and the outline step sent for it unasked — is an empty page, not a blank one.
+  const nothingDrawn = timeline.every(
+    (entry, index) =>
+      (entry.kind === "planBrief" && planBriefs[entry.artifactId] === null) ||
+      isAutomaticOutlineStep(timeline, index)
+  );
   const turnElsewhere = streaming && turnSessionId !== activeSessionId;
   /** Why a send waits while Coach answers in another conversation (UAT). */
   const answeringElsewhere = `Coach is still answering in "${
@@ -5726,7 +5737,7 @@ export function ChatView({
               scrollRef={scrollRef}
             />
           ) : null}
-          {timeline.length === 0 && !turnHere ? (
+          {nothingDrawn && !turnHere ? (
             <div className="chat-empty">
               <div className="chat-empty-icon">
                 <Sparkles size={28} aria-hidden="true" />
@@ -6138,6 +6149,9 @@ export function ChatView({
                   <div className="chat-bubble chat-bubble-plan">
                     <CoachCreationCard
                       draft={draft}
+                      onJump={() => {
+                        stickToEndRef.current = false;
+                      }}
                       version={versionInfo?.version}
                       editing={draft.draftId === editingPlanDraftId || draft.draftId === editingWorkoutDraftId}
                       document={planDocuments[documentKey] ?? undefined}

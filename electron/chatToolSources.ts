@@ -116,29 +116,72 @@ export function groupChatToolsBySource(tools: readonly string[]): ChatToolSource
 /** One `kind: "mcp"` event of a turn's stream, as far as its failures go. */
 export interface ChatToolEvent {
   tool?: string;
+  /** What the call was asked for (`toolCallTarget`), when the provider says. */
+  target?: string;
   status: string;
   message?: string;
 }
+
+/**
+ * What a call of a tool was asked for, short enough to ride every event: a
+ * hash of its arguments, the same for the same arguments in any key order.
+ */
+export function toolCallTarget(args: unknown): string {
+  let parsed = args;
+  if (typeof args === "string") {
+    try {
+      parsed = JSON.parse(args);
+    } catch {
+      parsed = args;
+    }
+  }
+  const ordered = (value: unknown): unknown =>
+    Array.isArray(value)
+      ? value.map(ordered)
+      : value && typeof value === "object"
+        ? Object.fromEntries(
+            Object.entries(value as Record<string, unknown>)
+              .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+              .map(([key, entry]) => [key, ordered(entry)])
+          )
+        : value;
+  const text = JSON.stringify(ordered(parsed)) ?? "";
+  let hash = 5381;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = ((hash << 5) + hash + text.charCodeAt(index)) | 0;
+  }
+  return (hash >>> 0).toString(36);
+}
+
+const TARGET_SEPARATOR = "\n";
 
 /**
  * The failures a turn still stands by, by tool name ("" for a failure that
  * names none), oldest first. A call of a tool clears that tool's failure: a
  * model that reads an activity again after COROS's `1001 Service exceptions`
  * and gets it has the run in full, and an answer that kept the first call's
- * error under it told the athlete it had not. A call already under way when
- * the failure arrives does not clear it — it may be reading something else.
+ * error under it told the athlete it had not. Only a call for the same thing
+ * (`target`) clears it: reading another activity after one failed leaves the
+ * failure standing. A provider that does not say what a call was for clears
+ * by the tool's name alone.
  */
 export function nextChatToolFailures(
   failures: ReadonlyMap<string, string>,
   event: ChatToolEvent
 ): Map<string, string> {
   const next = new Map(failures);
-  const key = event.tool ?? "";
+  const tool = event.tool ?? "";
+  const key = `${tool}${TARGET_SEPARATOR}${event.target ?? ""}`;
   if (/fail|error/i.test(event.status) || event.message) {
     next.delete(key);
     next.set(key, event.message ?? event.status);
   } else if (event.status === "call" && event.tool) {
-    next.delete(key);
+    for (const held of failures.keys()) {
+      const at = held.indexOf(TARGET_SEPARATOR);
+      if (held.slice(0, at) !== tool) continue;
+      const target = held.slice(at + 1);
+      if (!target || event.target === undefined || target === event.target) next.delete(held);
+    }
   }
   return next;
 }

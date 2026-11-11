@@ -14,14 +14,12 @@
    * screen settled on.
    */
   --ax-edge: color-mix(in srgb, var(--text-primary) 11%, transparent);
-  --ax-raised: color-mix(in srgb, var(--text-primary) 5%, transparent);
   --ax-well: color-mix(in srgb, #000 22%, transparent);
   --ax-heading: color-mix(in srgb, var(--bg-base) 89%, var(--text-primary));
 }
 
 :root[data-theme="paper"] .activities-view {
   --ax-edge: rgba(19, 26, 40, 0.14);
-  --ax-raised: #ffffff;
   --ax-well: rgba(19, 26, 40, 0.06);
   --ax-heading: #ffffff;
 }
@@ -212,7 +210,7 @@
   border: 1px solid var(--surface-line, var(--ax-edge));
   border-radius: var(--radius-md);
   /*
-   * `--surface`, not `--ax-raised`: a raised face on this screen is a tint of
+   * `--surface`, not a raised tint: a raised face on this screen is a tint of
    * the ink, which is transparent, and the filter row it lands on top of read
    * straight through it. Popovers in this app are opaque — the same token the
    * export dropdown uses, and it flips to white on paper on its own.
@@ -976,14 +974,6 @@
 
 .activity-lap-table tbody tr:last-child td {
   border-bottom: 0;
-}
-
-.activity-lap-table tbody tr.is-pickable {
-  cursor: pointer;
-}
-
-.activity-lap-table tbody tr.is-pickable:hover td {
-  background: var(--ax-raised);
 }
 
 /*

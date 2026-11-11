@@ -126,14 +126,15 @@ function TiedLapRow({
       tabIndex={0}
       className={["lap-link-row", className, flags].filter(Boolean).join(" ")}
       title={t("activity.lap.select")}
+      // A Shift press reaches from the last lap; it is not a text selection.
+      onMouseDown={(event) => {
+        if (event.shiftKey) event.preventDefault();
+      }}
       onClick={(event) => link.selectLap(lapIndex, event.shiftKey)}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           link.selectLap(lapIndex, event.shiftKey);
-        } else if (event.key === "Escape" && link.getState().selection) {
-          event.stopPropagation();
-          link.setSelection(null);
         }
       }}
       {...lapHandlers(link, lap)}

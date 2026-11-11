@@ -306,8 +306,17 @@ export function RunPerformanceChart({
     return stops;
   })();
   const xTicks = activityAxisTicks(xExtent[0], xExtent[1], axis, unitSystem);
+  // The dot under the pointer in its own minute's colour. Left to the chart it
+  // takes the line's stroke, a gradient that then splits inside the dot's box.
+  const activeDot = ({ cx, cy, payload }: { cx?: number; cy?: number; payload?: { value?: number; usual?: number } }) => {
+    if (cx === undefined || cy === undefined || payload?.value === undefined) return <g />;
+    const usualHere = effective === "percent" ? 0 : payload.usual;
+    const fill =
+      usualHere === undefined ? colors.accentBright : payload.value < usualHere ? colors.worse : colors.better;
+    return <circle cx={cx} cy={cy} r={4} fill={fill} stroke={colors.dotStroke} strokeWidth={1.5} />;
+  };
 
-  if (own.points.length === 0) {
+  if (readings.length === 0) {
     return (
       <section className="panel run-block run-performance">
         <p className="running-eyebrow">{t("run.perf.title")}</p>
@@ -482,6 +491,7 @@ export function RunPerformanceChart({
                 stroke="url(#run-performance-split)"
                 strokeWidth={2}
                 fill="url(#run-performance-split-fill)"
+                activeDot={activeDot}
                 connectNulls={false}
                 isAnimationActive={false}
               />
@@ -491,6 +501,7 @@ export function RunPerformanceChart({
                 stroke={usualStops ? "url(#run-performance-usual-split)" : colors.accentBright}
                 strokeWidth={2}
                 dot={false}
+                activeDot={activeDot}
                 connectNulls={false}
                 isAnimationActive={false}
               />

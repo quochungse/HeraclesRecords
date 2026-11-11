@@ -2704,6 +2704,8 @@ export type ChatStreamInfo =
       kind: "mcp";
       /** The MCP tool name, when known. */
       tool?: string;
+      /** What the call was asked for, so a retry of it is told from another read. */
+      target?: string;
       /** Raw event type, e.g. "response.mcp_call.completed". */
       status: string;
       message?: string;

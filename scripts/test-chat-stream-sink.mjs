@@ -268,6 +268,29 @@ assert.deepEqual(
     "sleep failed",
     "the failure still standing is the one shown"
   );
+  // A provider that says what a call was for: only a call for the same thing
+  // makes up for the failure.
+  const callFor = (tool, target) => ["chat:streamInfo", { kind: "mcp", status: "call", tool, target }];
+  const failureFor = (tool, target, message) => ["chat:streamInfo", { kind: "mcp", status: "failed", tool, target, message }];
+  assert.equal(
+    turn([
+      callFor("get_activity_detail", "x"),
+      failureFor("get_activity_detail", "x", "X failed"),
+      callFor("get_activity_detail", "y")
+    ]).mcpError,
+    "X failed",
+    "a call of the same tool for something else leaves the failure standing"
+  );
+  assert.equal(
+    turn([
+      callFor("get_activity_detail", "x"),
+      failureFor("get_activity_detail", "x", "X failed"),
+      callFor("get_activity_detail", "y"),
+      callFor("get_activity_detail", "x")
+    ]).mcpError,
+    undefined,
+    "and the same read again clears it"
+  );
 }
 
 // --- a turn's charts are named in the order drawn --------------------------

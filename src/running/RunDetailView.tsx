@@ -168,8 +168,6 @@ export function RunDetailView({
     };
   }, [detail, trail]);
 
-  // Set from a lap row below, consumed by the chart, then cleared — a lap stays
-  // selectable a second time, and the chart is not re-focused on every render.
   // The chart, the map beside it and the lap table point at one stretch.
   const link = useActivityLink(laps, detail?.activityId);
 

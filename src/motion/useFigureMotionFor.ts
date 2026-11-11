@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useReducer, useRef } from "react";
 import {
   FIGURE_MOTION_MS,
   INTENT_WINDOW_MS,
@@ -6,6 +6,8 @@ import {
   prefersReducedMotion,
   type FigureMotionIntent
 } from "./figureMotion";
+
+const clock = (): number => (typeof performance !== "undefined" ? performance.now() : Date.now());
 
 /**
  * The press this drawing answers, or null: decided once each time `data`
@@ -21,7 +23,17 @@ export function useFigureMotionFor(data: unknown): FigureMotionIntent | null {
     memo.current = { data, intent: prefersReducedMotion() ? null : freshFigureMotion() };
   }
   const { intent } = memo.current;
-  if (intent === null) return null;
-  const now = typeof performance !== "undefined" ? performance.now() : Date.now();
-  return now - intent.at <= INTENT_WINDOW_MS + FIGURE_MOTION_MS.roll ? intent : null;
+  // Nothing renders the caller again once its motion is over, so the answer
+  // would stand for good and the chart's next redraw of its own (a window
+  // resized) would move as if pressed for. A timer draws it once more, settled.
+  const [, settle] = useReducer((count: number) => count + 1, 0);
+  const until = intent === null ? null : intent.at + INTENT_WINDOW_MS + FIGURE_MOTION_MS.roll;
+  useEffect(() => {
+    if (until === null) return;
+    const left = until - clock();
+    if (left < 0) return;
+    const timer = setTimeout(settle, left + 1);
+    return () => clearTimeout(timer);
+  }, [until]);
+  return intent !== null && until !== null && clock() <= until ? intent : null;
 }

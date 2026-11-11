@@ -166,6 +166,7 @@ function WeekStrip({
  */
 export function CoachCreationCard({
   draft,
+  onJump,
   version,
   document,
   uploading,
@@ -180,6 +181,8 @@ export function CoachCreationCard({
   onOpenSession
 }: {
   draft: PlanDraftPreview;
+  /** A ridge bar was pressed: the card is about to grow and scroll to a week. */
+  onJump?: () => void;
   /** Which version of its creation this is; shown from the second on. */
   version?: number;
   /** The plan the draft becomes; absent while it loads, or for a workout. */
@@ -236,6 +239,9 @@ export function CoachCreationCard({
     cardRef.current?.querySelector(`[data-week="${picked.week}"]`)?.scrollIntoView({ block: "nearest" });
   }, [picked]);
   const jumpToWeek = (week: number) => {
+    // The card grows as it unfolds: a transcript holding its end would follow
+    // the card's foot and leave the week pressed for above the fold.
+    onJump?.();
     if (week >= CARD_WEEKS) setAllWeeks(true);
     setPicked({ week });
   };

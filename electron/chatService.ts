@@ -192,7 +192,7 @@ import {
 import { addTokenUsage, countableUsage } from "./tokenUsage";
 import { inlineSuggestionsSection } from "./chatCoachContext";
 import { COROS_WORKOUT_DESCRIPTION_MAX_BYTES } from "./corosTextLimits";
-import { WEB_SEARCH_TOOL, chatToolFailureNotice, nextChatToolFailures } from "./chatToolSources";
+import { WEB_SEARCH_TOOL, chatToolFailureNotice, nextChatToolFailures, toolCallTarget } from "./chatToolSources";
 import { chartHandle, chartHandleNote, isChartKind, orderTurn } from "./chartPlacement";
 import {
   createChatSession,
@@ -1662,7 +1662,8 @@ export function createCollectorSink(
       const status = typeof payload.status === "string" ? payload.status : "";
       const message =
         typeof payload.message === "string" ? payload.message : undefined;
-      toolFailures = nextChatToolFailures(toolFailures, { tool, status, message });
+      const target = typeof payload.target === "string" ? payload.target : undefined;
+      toolFailures = nextChatToolFailures(toolFailures, { tool, target, status, message });
       const mcpError = chatToolFailureNotice(toolFailures);
       const { mcpError: _settled, ...rest } = base;
       source = {
@@ -2154,19 +2155,21 @@ async function streamChatTurn(
         onThinking: (delta) => {
           send("chat:streamInfo", { requestId, kind: "thinking", delta });
         },
-        onToolCallStart: (toolName) => {
+        onToolCallStart: (toolName, args) => {
           send("chat:streamInfo", {
             requestId,
             kind: "mcp",
             tool: toolName,
+            ...(args === undefined ? {} : { target: toolCallTarget(args) }),
             status: "call"
           });
         },
-        onToolCallError: (toolName, message) => {
+        onToolCallError: (toolName, message, args) => {
           send("chat:streamInfo", {
             requestId,
             kind: "mcp",
             tool: toolName,
+            ...(args === undefined ? {} : { target: toolCallTarget(args) }),
             status: "failed",
             message
           });
@@ -2248,6 +2251,7 @@ async function streamChatTurn(
             requestId,
             kind: "mcp",
             tool: call.name,
+            target: toolCallTarget(call.arguments),
             status: "call"
           });
         },
@@ -2256,6 +2260,7 @@ async function streamChatTurn(
             requestId,
             kind: "mcp",
             tool: call.name,
+            target: toolCallTarget(call.arguments),
             status: "failed",
             message
           });
@@ -2332,19 +2337,21 @@ async function streamChatTurn(
         onThinking: (delta) => {
           send("chat:streamInfo", { requestId, kind: "thinking", delta });
         },
-        onToolCallStart: (toolName) => {
+        onToolCallStart: (toolName, args) => {
           send("chat:streamInfo", {
             requestId,
             kind: "mcp",
             tool: toolName,
+            ...(args === undefined ? {} : { target: toolCallTarget(args) }),
             status: "call"
           });
         },
-        onToolCallError: (toolName, message) => {
+        onToolCallError: (toolName, message, args) => {
           send("chat:streamInfo", {
             requestId,
             kind: "mcp",
             tool: toolName,
+            ...(args === undefined ? {} : { target: toolCallTarget(args) }),
             status: "failed",
             message
           });
@@ -2426,6 +2433,7 @@ async function streamChatTurn(
             requestId,
             kind: "mcp",
             tool: call.name,
+            target: toolCallTarget(call.arguments),
             status: "call"
           });
         },
@@ -2434,6 +2442,7 @@ async function streamChatTurn(
             requestId,
             kind: "mcp",
             tool: call.name,
+            target: toolCallTarget(call.arguments),
             status: "failed",
             message
           });
@@ -2586,6 +2595,7 @@ async function streamChatTurn(
           requestId,
           kind: "mcp",
           tool: call.name,
+          target: toolCallTarget(call.arguments),
           status: "call"
         });
         let output: string;
@@ -2608,6 +2618,7 @@ async function streamChatTurn(
             requestId,
             kind: "mcp",
             tool: call.name,
+            target: toolCallTarget(call.arguments),
             status: "failed",
             message: output
           });

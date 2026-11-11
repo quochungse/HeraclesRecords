@@ -67,8 +67,8 @@ export class ClaudeCodeProviderError extends Error {
 export interface ClaudeCodeToolCallbacks {
   onToken(delta: string): void;
   onThinking?(delta: string): void;
-  onToolCallStart?(toolName: string): void;
-  onToolCallError?(toolName: string, message: string): void;
+  onToolCallStart?(toolName: string, args?: unknown): void;
+  onToolCallError?(toolName: string, message: string, args?: unknown): void;
   onToolCall(
     toolName: string,
     args: Record<string, unknown>
@@ -951,14 +951,14 @@ export async function streamClaudeCodeCompletion(
         inputShape,
         async (args) => {
           const parsedArgs = args as Record<string, unknown>;
-          options.onToolCallStart?.(sourceTool.name);
+          options.onToolCallStart?.(sourceTool.name, parsedArgs);
           armIdleTimeout();
           try {
             const output = await options.onToolCall(sourceTool.name, parsedArgs);
             return { content: [{ type: "text" as const, text: output }] };
           } catch (caught) {
             const message = safeErrorMessage(caught);
-            options.onToolCallError?.(sourceTool.name, message);
+            options.onToolCallError?.(sourceTool.name, message, parsedArgs);
             return {
               content: [{ type: "text" as const, text: `Error: ${message}` }],
               isError: true

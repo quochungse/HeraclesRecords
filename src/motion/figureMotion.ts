@@ -175,9 +175,9 @@ function alignRight(from: string, to: string): RollCell[] {
 /**
  * Whether a figure grew (1) or shrank (-1): the values when the caller has
  * them, else the digits read in order — "1h 46m" → "2h 28m" grows, as does
- * "65:27:59" → "270:51:25". Figures written to a fixed number of decimals,
- * which the screens' are, compare that way without knowing the locale's
- * separators.
+ * "65:27:59" → "270:51:25". That reading holds only between two figures of one
+ * shape: "9.85 km" → "12.3 km" and "9h 55m" → "10h" both read as falling, so a
+ * figure whose decimals or parts change with its size is given its values.
  */
 export function figureTrend(fromText: string, toText: string, fromValue?: number, toValue?: number): 1 | -1 {
   if (fromValue !== undefined && toValue !== undefined && Number.isFinite(fromValue) && Number.isFinite(toValue) && fromValue !== toValue) {

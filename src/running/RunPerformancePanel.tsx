@@ -53,6 +53,8 @@ interface RunPerformancePanelProps {
   summaries: ReadonlyMap<string, ActivityDetailSummary>;
   /** The year the scale is read over, read on its own (`performanceScaleRuns`). */
   scaleSummaries: ReadonlyMap<string, ActivityDetailSummary>;
+  /** Whether either read is still under way; a sweep that stopped short is not. */
+  reading: boolean;
   profile: PerformanceProfile | undefined;
   weeks: number;
   /** The period chosen on the screen, which the headline and the quadrant read. */
@@ -92,6 +94,7 @@ export function RunPerformancePanel({
   allRuns,
   summaries,
   scaleSummaries,
+  reading,
   profile,
   weeks,
   periodDays,
@@ -195,7 +198,9 @@ export function RunPerformancePanel({
     );
   }
 
-  const pending = coverage.read < coverage.total;
+  // A sweep that stopped short (its allowance spent, COROS unreachable) is not
+  // still reading: the runs it left are read on a later visit.
+  const pending = reading && coverage.read < coverage.total;
   const headline = model?.form === undefined ? "—" : formatDecimal(model.form, 1);
   // From the Monday the period starts on, as its runs are cut: `now − weeks`
   // reached back into the week before, days no run on the chart can sit in.
@@ -374,8 +379,10 @@ interface DotProps {
 
 function TrendDot({ cx, cy, payload, colors, usual }: DotProps & { colors: Colors; usual?: number }) {
   if (cx === undefined || cy === undefined || !payload?.session) return null;
-  const below = usual !== undefined && payload.session.value < usual;
-  return <circle cx={cx} cy={cy} r={4} fill={below ? colors.worse : colors.better} stroke={colors.dotStroke} strokeWidth={1.5} />;
+  // With no usual yet there is nothing to be above or below.
+  const fill =
+    usual === undefined ? colors.neutralFill : payload.session.value < usual ? colors.worse : colors.better;
+  return <circle cx={cx} cy={cy} r={4} fill={fill} stroke={colors.dotStroke} strokeWidth={1.5} />;
 }
 
 function QuadrantDot({ cx, cy, payload, colors }: DotProps & { colors: Colors }) {

@@ -207,6 +207,11 @@ Coach never writes to COROS directly; it writes drafts and change sets the athle
   answered elsewhere (`unansweredKind`) only when its `mid` names another machine
   (`entryDeviceFromMid` against `chat:getDeviceId`) and it is recent; one asked here, with no
   turn running here, went unanswered.
+- **A tool failure stands until the same read succeeds** (`nextChatToolFailures`, node-free
+  `electron/chatToolSources.ts`, in the headless sink and `ChatView` alike): a `kind: "mcp"`
+  event carries `target`, a hash of the call's arguments (`toolCallTarget`), and only a later
+  call of that tool for that target clears its failure. A provider that passes no arguments
+  (a server web tool) clears by the tool's name. `npm run test:chat-stream-sink`.
 - **A turn that errors after producing output keeps it** (with a "stopped before finishing"
   notice); only a turn that produced nothing is undone. `streamedTextRef` exists because state
   is stale inside the subscription.

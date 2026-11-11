@@ -21,19 +21,19 @@ function restLabel(seconds: number): string {
 }
 
 // The movement, even when the step was named for its set (that name is drawn
-// under it, `exerciseStepLabel`), falling back to a generic "Exercise N" label
+// under it, `exerciseStepLabel`), falling back to "Unnamed exercise"
 // when the key is still an unresolved COROS code (rare: an exercise absent from
 // both the catalogue dictionary and the body-region table).
-function displayExerciseName(exercise: NamedExercise, index: number): string {
+function displayExerciseName(exercise: NamedExercise): string {
   const resolved = resolveMovementName(exercise);
-  return /^[TS]\d/.test(resolved) ? `Exercise ${index + 1}` : resolved;
+  return /^[TS]\d/.test(resolved) ? t("strength.unnamedExercise") : resolved;
 }
 
 function ExerciseName({ exercise, index }: { exercise: NamedExercise; index: number }) {
   const label = exerciseStepLabel(exercise);
   return (
     <span className="strength-exercise-name">
-      {index + 1}. {displayExerciseName(exercise, index)}
+      {index + 1}. {displayExerciseName(exercise)}
       {label ? <small className="strength-exercise-label">{label}</small> : null}
     </span>
   );

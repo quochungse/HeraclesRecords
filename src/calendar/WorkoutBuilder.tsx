@@ -754,9 +754,9 @@ function BuilderStepFields({
         </label>
 
         <label className="calendar-builder-control">
-          <span>{sport === "strength" && row.kind === "training" ? t("workout.b.s.measureByShort") : t("workout.b.s.target")}</span>
+          <span>{t("workout.b.s.target")}</span>
           <SelectDropdown<BuilderRow["targetType"]>
-            label={sport === "strength" && row.kind === "training" ? t("workout.b.s.measureByShort") : t("workout.b.s.target")}
+            label={t("workout.b.s.target")}
             value={row.targetType}
             options={targetTypes.map((target) => ({
               value: target,
@@ -783,32 +783,6 @@ function BuilderStepFields({
             />
           )}
         </label>
-
-        {sport === "strength" && row.kind === "training" ? (
-          <>
-            <label className="calendar-builder-control">
-              <span>{t("workout.b.s.sets")}</span>
-              <input
-                type="number"
-                min="1"
-                max="99"
-                value={row.sets}
-                onChange={(event) => onChange({ sets: event.target.value })}
-              />
-            </label>
-            <label className="calendar-builder-control">
-              <span>{t("workout.b.s.restBetweenSec")}</span>
-              <input
-                type="number"
-                min="0"
-                max="3600"
-                step="5"
-                value={row.restSeconds}
-                onChange={(event) => onChange({ restSeconds: event.target.value })}
-              />
-            </label>
-          </>
-        ) : null}
       </div>
 
       <BuilderIntensityFields

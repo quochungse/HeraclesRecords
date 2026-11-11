@@ -6,6 +6,7 @@ import { app, BrowserWindow, shell } from "electron";
 import { autoUpdater } from "electron-updater";
 import { getSetting, setSetting } from "./database";
 import type { AppUpdateSnapshot } from "./types";
+import { openableExternalUrl } from "./externalLinks";
 import { ScreenError } from "./screenText";
 
 const AUTO_CHECK_KEY = "updater.autoCheck";
@@ -422,7 +423,9 @@ export async function quitAndInstallUpdate(): Promise<{
   }
 
   if (snapshot.installMethod === "manual") {
-    await shell.openExternal(snapshot.manualInstallUrl ?? DOWNLOAD_PAGE_URL);
+    // A snapshot's own address is opened only when the OS may be handed it.
+    const page = openableExternalUrl(snapshot.manualInstallUrl) ?? new URL(DOWNLOAD_PAGE_URL);
+    await shell.openExternal(page.toString());
     return { installMethod: "manual" };
   }
 
@@ -526,9 +529,13 @@ function installDebPackage(file: string): Promise<void> {
     child.on("close", (code) => {
       if (code === 0) {
         resolve();
-      } else if (code === 126 || code === 127) {
-        // pkexec: the dialog was dismissed (126) or the password refused (127).
+      } else if (code === 126) {
+        // pkexec: the dialog was dismissed. 127 is not that: it is also a desktop
+        // with no agent to ask for the password, where asking again never helps,
+        // so it fails and the athlete is sent to the download page.
         reject(new LinuxInstallCancelled("pkexec authorisation was not given"));
+      } else if (code === 127) {
+        reject(new Error(`pkexec could not get authorisation: ${stderr.trim()}`));
       } else if (DPKG_LOCK_HELD.test(stderr)) {
         reject(new LinuxInstallBusy(`dpkg is locked by another program: ${stderr.trim()}`));
       } else {

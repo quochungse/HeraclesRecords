@@ -88,7 +88,7 @@ function stepMagnitudeLabel(
     : formatStepTimeLabel(step.magnitude);
 }
 
-export function flatSteps(view: ScheduledStructureView): ScheduledStepView[] {
+function flatSteps(view: ScheduledStructureView): ScheduledStepView[] {
   const steps: ScheduledStepView[] = [];
   for (const node of view.nodes) {
     if (node.type === "step") {
@@ -353,18 +353,29 @@ export function formatTonnage(kg: number, unitSystem: UnitSystem): string {
   return formatWeightValue(kg, unitSystem, 0);
 }
 
-/** Total weight moved, in kilograms. Shared with the view's hero figures. */
-export function strengthTonnage(steps: ScheduledStepView[]): number {
-  return steps.reduce(
-    (sum, step) =>
-      sum +
-      (step.sets ?? 1) *
-        (step.reps ?? 0) *
-        (step.weightUnit === "lb"
-          ? (step.weight ?? 0) / POUNDS_PER_KILOGRAM
-          : (step.weight ?? 0)),
-    0
-  );
+/**
+ * The sets a session holds and the weight they move, in kilograms: a step in a
+ * repeat is done once a round. Shared with the view's hero figures.
+ */
+export function strengthWork(view: ScheduledStructureView): { sets: number; tonnage: number } {
+  let sets = 0;
+  let tonnage = 0;
+  const count = (step: ScheduledStepView, rounds: number) => {
+    const done = (step.sets ?? 1) * rounds;
+    sets += done;
+    tonnage +=
+      done *
+      (step.reps ?? 0) *
+      (step.weightUnit === "lb" ? (step.weight ?? 0) / POUNDS_PER_KILOGRAM : (step.weight ?? 0));
+  };
+  for (const node of view.nodes) {
+    if (node.type === "step") {
+      count(node.step, 1);
+    } else {
+      node.steps.forEach((step) => count(step, node.repeat));
+    }
+  }
+  return { sets, tonnage };
 }
 
 /**
@@ -424,8 +435,7 @@ function StrengthStructure({
   exercises?: ReadonlyMap<string, WorkoutExerciseOption>;
 }) {
   const steps = flatSteps(view);
-  const totalSets = steps.reduce((sum, step) => sum + (step.sets ?? 1), 0);
-  const tonnage = strengthTonnage(steps);
+  const { sets: totalSets, tonnage } = strengthWork(view);
 
   return (
     <>

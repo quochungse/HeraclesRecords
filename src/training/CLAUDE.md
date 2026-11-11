@@ -43,8 +43,9 @@ that is not a screen's own names its own, as Running's scale year does.
 
 A session's page makes one link (`useActivityLink`) and hands it to the chart, the route map
 and each lap row (`LinkedLapRow`): a cursor (a moment) and a selection (a stretch), in seconds
-**on the clock the chart's `series` is on** — pauses out on a sport's page, the wall clock in
-the Activities pane. Each of the three sets them and draws them (`ActivityLinkParts.tsx`,
+**on the clock the chart's `series` is on** — activity time, pauses out (`withPausesRemoved`), on
+a sport's page and in the Activities pane alike: COROS times a lap without its pauses, so on the
+wall clock every lap after a pause lit an earlier stretch. Each of the three sets them and draws them (`ActivityLinkParts.tsx`,
 `routeLink.ts`). `npm run test:activity-link`.
 - **A drag on the plot selects; it does not zoom.** There is no brush: the head's Zoom to
   selection cuts the plot to the stretch (a little either side) and becomes Reset zoom. Pressing
@@ -54,7 +55,7 @@ the Activities pane. Each of the three sets them and draws them (`ActivityLinkPa
   the plot's area off Recharts' own clip rectangle and draws the band, its two edges and the
   cursor as elements of its own, so a moving cursor redraws a line, not a thousand-row chart.
   Whatever reads the cursor reads a primitive through `useLinkValue`.
-- **The route is stamped by the wall clock**: a page that took the pauses out of its series
+- **The route is stamped by the wall clock**: whoever took the pauses out of its series
   hands them to the map (`pauses`), or every stretch after a pause lights the wrong road. A
   route with no clock (a track merged from two sources) is drawn untied.
 - **The plot's area is read again whenever the chart redraws** (a `MutationObserver` on the

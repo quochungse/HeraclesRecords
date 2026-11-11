@@ -467,8 +467,14 @@ export function changeBuilderRowKind(
     exerciseKind: row.exerciseKind,
     context: seed.context
   });
+  // A step and a repeat are different rows on COROS: one turned into the
+  // other is written new, never over the row it was read from — a group saved
+  // over a movement's row kept that movement's id and muscles.
+  const wasGroup = row.kind === "intervals";
+  const origin = wasGroup === (kind === "intervals") ? row.origin : undefined;
   return {
     ...row,
+    origin,
     kind,
     keepBasis: undefined,
     ...defaultsToRowFields(defaults, sport, seed.unitSystem ?? "metric"),
@@ -872,11 +878,11 @@ export function builderSessionFigures(
     let seconds = 0;
     // A rep row has no time to add: the sum is then only at least the timed rows'.
     let everyRowTimed = true;
-    const addRow = (row: BuilderRow, multiplier = 1) => {
+    const addRow = (row: BuilderRow, multiplier = 1, inRepeat = false) => {
       if (row.locked) return;
       if (row.kind === "intervals") {
         const repeats = Math.max(1, Number(row.repeats) || 1);
-        for (const child of row.children ?? []) addRow(child, multiplier * repeats);
+        for (const child of row.children ?? []) addRow(child, multiplier * repeats, true);
         return;
       }
       if (row.targetType !== "time") {
@@ -884,10 +890,12 @@ export function builderSessionFigures(
         return;
       }
       const value = Number(row.targetValue) || 0;
-      // Strength time targets are per set, in seconds, with rest between.
+      // Strength time targets are per set, in seconds. A step's rest is between
+      // its sets; in a repeat it follows every set, as the move to the next
+      // movement of the round, so a superset's one-set steps count theirs.
       const sets = row.kind === "training" ? Math.max(1, Number(row.sets) || 1) : 1;
       const restSec = row.kind === "training" ? Number(row.restSeconds) || 0 : 0;
-      seconds += multiplier * (sets * value + Math.max(0, sets - 1) * restSec);
+      seconds += multiplier * (sets * value + (inRepeat ? sets : Math.max(0, sets - 1)) * restSec);
     };
     for (const row of rows) addRow(row);
     return {
@@ -1319,11 +1327,12 @@ function rowToEditorNode(
   if (row.kind !== "intervals") {
     return rowToEditorStep(row, sport, unitSystem, false);
   }
+  const group = origin?.nodeType === "repeat" ? origin : undefined;
   return {
-    id: origin?.id ?? draftNodeId("group", row),
-    ...(origin?.sourceExerciseId ? { sourceExerciseId: origin.sourceExerciseId } : {}),
+    id: group?.id ?? draftNodeId("group", row),
+    ...(group?.sourceExerciseId ? { sourceExerciseId: group.sourceExerciseId } : {}),
     nodeType: "repeat",
-    name: origin?.nodeType === "repeat" ? origin.name : "Repeat",
+    name: group ? group.name : "Repeat", // i18n-ignore: saved to COROS
     repeat: Math.max(1, Math.round(Number(row.repeats) || 1)),
     steps: (row.children ?? []).map((child) => rowToEditorStep(child, sport, unitSystem, true)),
     editable: true

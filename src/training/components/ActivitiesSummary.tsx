@@ -37,6 +37,8 @@ interface SummaryTile {
   key: string;
   label: string;
   value: string;
+  /** What `value` writes, so the figure rolls the way it changed. */
+  amount?: number;
   caption: string;
 }
 
@@ -214,12 +216,14 @@ export function ActivitiesSummary({
       key: "sessions",
       label: t("activity.summary.sessions"),
       value: formatCount(totals.count),
+      amount: totals.count,
       caption: perWeekPhrase(totals.count, totals.weeks, "sessions")
     },
     {
       key: "time",
       label: t("activity.m.time"),
       value: formatDurationSpan(totals.duration),
+      amount: totals.duration,
       caption:
         totals.weeks > 0 && totals.duration > 0
           ? t("activity.summary.aWeek", { value: formatDurationSpan(totals.duration / totals.weeks) })
@@ -233,6 +237,7 @@ export function ActivitiesSummary({
           key: "distance",
           label: t("activity.m.distance"),
           value: formatDistanceMeters(totals.distance, unitSystem),
+          amount: totals.distance,
           caption:
             totals.elevationGain > 0
               ? t("activity.summary.climbed", { value: formatElevationMeters(totals.elevationGain, unitSystem) })
@@ -242,12 +247,14 @@ export function ActivitiesSummary({
           key: "days",
           label: t("activity.summary.daysTrained"),
           value: formatCount(totals.activeDays),
+          amount: totals.activeDays,
           caption: perWeekPhrase(totals.activeDays, totals.weeks, "days")
         },
     {
       key: "load",
       label: t("activity.m.trainingLoad"),
       value: totals.trainingLoad > 0 ? formatCount(Math.round(totals.trainingLoad)) : "—",
+      amount: totals.trainingLoad > 0 ? totals.trainingLoad : undefined,
       caption:
         totals.trainingLoad > 0 && totals.weeks > 0
           ? t("activity.summary.aWeek", { value: formatCount(Math.round(totals.trainingLoad / totals.weeks)) })
@@ -262,7 +269,7 @@ export function ActivitiesSummary({
           <div className="activities-summary-tile" key={tile.key}>
             <p className="activities-summary-label">{tile.label}</p>
             <p className="activities-summary-value">
-              <MotionFigure text={tile.value} />
+              <MotionFigure text={tile.value} value={tile.amount} />
             </p>
             <p className="activities-summary-caption">
               {noMatch ? "\u00a0" : tile.caption}

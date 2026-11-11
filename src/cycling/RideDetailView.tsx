@@ -355,9 +355,6 @@ export function RideDetailView({
         />
       ) : null}
 
-      {/* Heart rate only: the power zones are the Power panel's, and the pace
-          zones COROS scores a ride on are a runner's. */}
-
       {conditions.length > 0 ? (
         <section className="panel run-detail-panel">
           <p className="running-eyebrow">{t("run.detail.effect")}</p>

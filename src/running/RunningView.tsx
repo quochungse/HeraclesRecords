@@ -49,7 +49,6 @@ import {
   type RunZoneScale
 } from "./runMetrics";
 import {
-  useActivityDetailSummaries,
   useActivityDetailSummariesState,
   type SummaryFetchBudget
 } from "../training/useActivityDetailSummaries";
@@ -309,7 +308,7 @@ export function RunningView({
     }
   }, [readsPerformance, summariesSettled]);
   const scaleRuns = useMemo(() => performanceScaleRuns(allRuns, nowMs), [allRuns, nowMs]);
-  const scaleSummaries = useActivityDetailSummaries({
+  const { summaries: scaleSummaries, settled: scaleSettled } = useActivityDetailSummariesState({
     api,
     activities: scaleRuns,
     enabled: connected && yearOpen,
@@ -542,6 +541,7 @@ export function RunningView({
                 allRuns={allRuns}
                 summaries={summaries}
                 scaleSummaries={scaleSummaries}
+                reading={!summariesSettled || !scaleSettled}
                 profile={perfProfile}
                 weeks={chartWeeks}
                 periodDays={periodDays as PeriodDays}

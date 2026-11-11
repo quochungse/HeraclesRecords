@@ -361,25 +361,25 @@ export function CyclingView({
           <div className="running-stat">
             <span>{t("activity.m.distance")}</span>
             <strong>
-              <MotionFigure text={formatDistanceMeters(totals.distance, unitSystem)} />
+              <MotionFigure text={formatDistanceMeters(totals.distance, unitSystem)} value={totals.distance} />
             </strong>
           </div>
           <div className="running-stat">
             <span>{t("activity.m.time")}</span>
             <strong>
-              <MotionFigure text={formatDurationSpan(totals.duration)} />
+              <MotionFigure text={formatDurationSpan(totals.duration)} value={totals.duration} />
             </strong>
           </div>
           <div className="running-stat" title={t("ride.avgSpeedTitle")}>
             <span>{t("activity.m.avgSpeed")}</span>
             <strong>
-              <MotionFigure text={averageSpeed === undefined ? "—" : formatSpeedValue(averageSpeed, unitSystem)} />
+              <MotionFigure text={averageSpeed === undefined ? "—" : formatSpeedValue(averageSpeed, unitSystem)} value={averageSpeed} />
             </strong>
           </div>
           <div className="running-stat">
             <span>{t("activity.m.climb")}</span>
             <strong>
-              <MotionFigure text={formatElevationMeters(totals.elevationGain, unitSystem)} />
+              <MotionFigure text={formatElevationMeters(totals.elevationGain, unitSystem)} value={totals.elevationGain} />
             </strong>
           </div>
         </div>

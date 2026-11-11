@@ -392,17 +392,32 @@ export function ActivitySeriesChart({
   const mapShown = hasRoute && mapPreference;
   const [plotRect, setPlotRect] = useState<PlotRect | null>(null);
   const selection = useLinkValue(link, (state) => state.selection);
+  // Escape lets the selection go, and nothing else: the page is not left with
+  // it. Heard on the window, since a drag on the plot or a press on the route
+  // leaves the focus where it was, outside this chart. A dialog or a menu that
+  // is open closes on its own Escape first and keeps the selection.
+  const hasSelection = selection !== null;
+  useEffect(() => {
+    if (!hasSelection) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (document.querySelector('dialog[open], [role="dialog"], [aria-modal="true"], .basemap-control.is-open')) return;
+      link.setSelection(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [hasSelection, link]);
   const splittable = canSplitActivityChannels(available);
   const split = splitPreference && splittable;
   // One id per mounted chart: it names the elevation gradients and, split, ties
-  // the two plots' tooltip and brush together — and nothing on another screen.
+  // the two plots' tooltip and zoom together — and nothing on another screen.
   const syncId = `activity-chart-${useId().replace(/[^\w-]/g, "")}`;
 
   // A different set of channels means different chips; re-open on their
   // defaults rather than leaving chips selected that have no readings. Keyed on
   // which channels exist, not on the array: "Try again" re-fetches the same run
   // and hands back a new detail object, and an identity key wiped the athlete's
-  // chip choice and brush on a run they never left.
+  // chip choice and zoom on a run they never left.
   const availableKey = available.map((channel) => channel.key).join(",");
   const availableRef = useRef(available);
   availableRef.current = available;
@@ -445,7 +460,7 @@ export function ActivitySeriesChart({
     (value: number) => (axis === "elapsed" ? value : elapsedAtDistance(clock, value)),
     [axis, clock]
   );
-  /** A stretch of the clock as the rows the brush speaks in. */
+  /** A stretch of the clock as the rows the zoom speaks in. */
   const rowsOf = useCallback(
     (from: number, to: number) => {
       const low = toAxis(from);
@@ -518,30 +533,39 @@ export function ActivitySeriesChart({
 
   /**
    * The figures under the chart: the whole of it, and — when a stretch is
-   * selected, or the brush has cut one — that stretch. Off the recorded
+   * selected, or the zoom has cut one — that stretch. Off the recorded
    * samples, never the chart's rows (`stretchFigures`).
    */
-  const segment = useMemo(() => {
-    const reading = {
+  const reading = useMemo(
+    () => ({
       // Only a ride states it: a run's power is the watch's own estimate.
       power: motion === "speed",
       // A ride's cadence is averaged over the pedalling, as the watch states
       // it, and a hike's over the walking: its watch records through every rest.
       cadenceSkipsZeros: !readsPace(motion),
       gain: true
-    };
-    // Each zone's floor in bpm, easiest first; the easiest has none.
-    const bands =
+    }),
+    [motion]
+  );
+  // Each zone's floor in bpm, easiest first; the easiest has none.
+  const bands = useMemo(
+    () =>
       zoneRows.length > 1 && zoneRows.slice(1).every((row) => row.easyEdge !== undefined)
         ? zoneRows.map((row) => row.easyEdge ?? 0)
-        : undefined;
-    const key = hasElapsed ? "elapsed" : "distance";
-    const measured = stretchFigures(series, key, -Infinity, Infinity, reading, bands);
-    if (!measured) {
+        : undefined,
+    [zoneRows]
+  );
+  // The whole session's, apart from the stretch: a selection being dragged
+  // changes every step, and this is a pass over every recorded sample.
+  const whole = useMemo<StretchFigures | null>(() => {
+    const measured = stretchFigures(series, hasElapsed ? "elapsed" : "distance", -Infinity, Infinity, reading, bands);
+    // COROS's own activity time, stated for the whole of it.
+    return measured && activityTime !== undefined ? { ...measured, duration: activityTime } : measured;
+  }, [activityTime, bands, hasElapsed, reading, series]);
+  const segment = useMemo(() => {
+    if (!whole) {
       return null;
     }
-    // COROS's own activity time, stated for the whole of it.
-    const whole: StretchFigures = activityTime !== undefined ? { ...measured, duration: activityTime } : measured;
 
     let stretch: StretchFigures | null = null;
     let title: string | null = null;
@@ -574,9 +598,9 @@ export function ActivitySeriesChart({
       stretch = stretchFigures(series, axisKey, visible[0]!.x, visible[visible.length - 1]!.x, reading, bands);
     }
     return { whole, stretch, title };
-  }, [activityTime, axis, hasElapsed, laps, lapStretches, motion, range, selection, series, visible, zoneRows]);
+  }, [axis, bands, hasElapsed, laps, lapStretches, range, reading, selection, series, visible, whole]);
 
-  /** The x at the plot's two edges: the whole of it, or what the brush has cut. */
+  /** The x at the plot's two edges: the whole of it, or what the zoom has cut. */
   const domain = useMemo<readonly [number, number]>(
     () => (visible.length > 1 ? [visible[0]!.x, visible[visible.length - 1]!.x] : [0, 1]),
     [visible]
@@ -976,16 +1000,7 @@ export function ActivitySeriesChart({
     : zoneRows.map((row) => row.seconds);
 
   return (
-    <section
-      className={surfaceClass}
-      onKeyDown={(event) => {
-        // Escape lets the selection go, and nothing else: the page is not left with it.
-        if (event.key === "Escape" && link.getState().selection) {
-          event.stopPropagation();
-          link.setSelection(null);
-        }
-      }}
-    >
+    <section className={surfaceClass}>
       <div className="activity-chart-head">
         {heading}
         <div className="activity-chart-controls">

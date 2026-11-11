@@ -306,25 +306,25 @@ export function SwimmingView({
           <div className="running-stat">
             <span>{t("activity.m.distance")}</span>
             <strong>
-              <MotionFigure text={formatDistanceMeters(totals.distance, unitSystem, true)} />
+              <MotionFigure text={formatDistanceMeters(totals.distance, unitSystem, true)} value={totals.distance} />
             </strong>
           </div>
           <div className="running-stat" title={t("swim.timeTitle")}>
             <span>{t("activity.m.time")}</span>
             <strong>
-              <MotionFigure text={formatDurationSpan(totals.duration)} />
+              <MotionFigure text={formatDurationSpan(totals.duration)} value={totals.duration} />
             </strong>
           </div>
           <div className="running-stat" title={t("swim.avgPaceTitle")}>
             <span>{t("activity.m.avgPace")}</span>
             <strong>
-              <MotionFigure text={formatPer100(pace, unitSystem)} />
+              <MotionFigure text={formatPer100(pace, unitSystem)} value={pace} />
             </strong>
           </div>
           <div className="running-stat">
             <span>{t("swim.perSwim")}</span>
             <strong>
-              <MotionFigure text={totals.count > 0 ? formatDistanceMeters(totals.distance / totals.count, unitSystem, true) : "—"} />
+              <MotionFigure text={totals.count > 0 ? formatDistanceMeters(totals.distance / totals.count, unitSystem, true) : "—"} value={totals.count > 0 ? totals.distance / totals.count : undefined} />
             </strong>
           </div>
         </div>

@@ -57,6 +57,7 @@ import { detailTrainingBenefit, type BenefitZoneFamily } from "../trainingBenefi
 import { TrainingBenefitChips, TrainingBenefitReason } from "./TrainingBenefitChip";
 import { formatCount, formatDecimal, t } from "../../i18n/core";
 import { isRecoveryLap, lapSections } from "../../../electron/lapSections";
+import { withPausesRemoved } from "../../../electron/activityMetrics";
 import { LapRecoveryMark, LapSectionRow } from "./LapSections";
 import { LinkedLapRow } from "./ActivityLinkParts";
 import { useActivityLink } from "../useActivityLink";
@@ -209,6 +210,9 @@ export function ActivityDetailPane({
   // activity starts with none.
   const linkLaps = useMemo(() => detail?.laps ?? [], [detail]);
   const link = useActivityLink(linkLaps, activityId);
+  // On activity time, as on a sport's page: COROS times a lap without its
+  // pauses, so on the wall clock every lap after a pause lit an earlier stretch.
+  const series = useMemo(() => withPausesRemoved(detail?.series ?? [], detail?.pauses), [detail]);
 
   const request =
     detailRequest && detailRequest.activityId === listActivity?.activityId
@@ -511,7 +515,6 @@ export function ActivityDetailPane({
       (lap.duration !== undefined && lap.duration > 0)
   );
   const lapSectionList = lapSections(laps);
-  const series = detail.series ?? [];
   const hasSeries = series.length > 1;
   const gpsPoints =
     detail.track?.points.filter(
@@ -709,7 +712,12 @@ export function ActivityDetailPane({
           {gpsPoints > 1 ? (
             <section className="activity-detail-block">
               <h3>{t("activity.m.route")}</h3>
-              <ActivityRouteMap track={detail.track} detail={detail} link={hasSeries ? link : undefined} />
+              <ActivityRouteMap
+                track={detail.track}
+                detail={detail}
+                link={hasSeries ? link : undefined}
+                pauses={detail.pauses}
+              />
             </section>
           ) : null}
 

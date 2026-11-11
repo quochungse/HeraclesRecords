@@ -38,9 +38,8 @@ import {
 } from "./scheduledStructure";
 import {
   WorkoutStructure,
-  flatSteps,
   formatTonnage,
-  strengthTonnage
+  strengthWork
 } from "./WorkoutStructureView";
 import { workoutSportView } from "./workoutSportIcons";
 import { isStrengthStyleWorkout, workoutSportLabel } from "../training/workoutSport";
@@ -412,7 +411,7 @@ export function WorkoutReadOnlyBody({
   const { category, icon: SportIcon } = workoutSportView(draft.sport);
   const isStrength = isStrengthStyleWorkout(draft.sport);
   const strength = useMemo(() => strengthTotals(draft), [draft]);
-  const tonnage = useMemo(() => strengthTonnage(flatSteps(view)), [view]);
+  const tonnage = useMemo(() => strengthWork(view).tonnage, [view]);
 
   const poolLength = draft.sport === "swim"
     ? (draft.sportOptions?.poolLength ?? context.defaultPoolLength)

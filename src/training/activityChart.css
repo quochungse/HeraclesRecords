@@ -573,13 +573,6 @@ table tbody tr.lap-link-row:focus-visible {
   font-size: 12px;
 }
 
-.activity-chart-segment-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-left: auto;
-}
-
 .activity-chart-action {
   display: inline-flex;
   align-items: center;
