@@ -924,6 +924,8 @@ export interface ActivityDetailSummarySync {
   computed: number;
   remaining: number;
   failed: number;
+  /** How many of the pass's reads asked COROS, rather than the cached file. */
+  fetched?: number;
   /**
    * The summaries this pass wrote. Handed back so the caller can merge them
    * rather than re-read the whole list after every few — which on a long

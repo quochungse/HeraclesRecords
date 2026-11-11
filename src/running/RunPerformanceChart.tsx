@@ -29,7 +29,7 @@ import {
   performanceVerdict,
   readingGapReason,
   runPerformanceSteps,
-  sessionPerformance,
+  runFigure,
   shapeAt,
   type PerformanceGapKind,
   type PerformanceGapReason,
@@ -195,7 +195,7 @@ export function RunPerformanceChart({
   const scale = context.scale ?? 1;
   const effective: Reading = baseline ? reading : "absolute";
 
-  const raw = sessionPerformance(own.points, shape);
+  const raw = runFigure(own.points, shape);
   const change = raw !== undefined && baseline ? (raw / baseline.value - 1) * 100 : undefined;
   const verdict = raw !== undefined && baseline ? performanceVerdict(raw, baseline.value) : undefined;
   const held = shape && durationSeconds / 60 > shape.lastMinute ? shape.lastMinute : undefined;
@@ -276,7 +276,8 @@ export function RunPerformanceChart({
   const yMin = Math.min(effective === "percent" ? -6 : Infinity, ...values);
   const yMax = Math.max(effective === "percent" ? 6 : -Infinity, ...values);
   const { domain, ticks: yTicks } = niceScale(yMin, yMax, { includeZero: effective === "percent" });
-  const hoverRows = rows.map((row) => ({ ...row, hover: domain[0] }));
+  const floor = domain[0];
+  const hoverRows = useMemo(() => rows.map((row) => ({ ...row, hover: floor })), [floor, rows]);
   // Where zero falls, for the gradients that colour above and below it — each in
   // its own shape's box, not the plot's: the line spans its readings, the fill
   // its readings down (or up) to zero.
@@ -284,6 +285,9 @@ export function RunPerformanceChart({
   const lowest = Math.min(...readings);
   const highest = Math.max(...readings);
   const lineZeroAt = zeroOffsetIn(lowest, highest);
+  // A line with every reading alike has a box of no height, and a gradient
+  // counted in that box paints nothing: it is drawn in its one colour.
+  const flat = !(highest > lowest);
   const fillZeroAt = zeroOffsetIn(Math.min(0, lowest), Math.max(0, highest));
   // In ml/kg/min the usual is a curve, so the line changes colour where it
   // crosses it, along the axis: stops across the line's own box, left to right.
@@ -488,7 +492,7 @@ export function RunPerformanceChart({
               <Area
                 dataKey="value"
                 baseValue={0}
-                stroke="url(#run-performance-split)"
+                stroke={flat ? (lowest < 0 ? colors.worse : colors.better) : "url(#run-performance-split)"}
                 strokeWidth={2}
                 fill="url(#run-performance-split-fill)"
                 activeDot={activeDot}
@@ -498,7 +502,13 @@ export function RunPerformanceChart({
             ) : (
               <Line
                 dataKey="value"
-                stroke={usualStops ? "url(#run-performance-usual-split)" : colors.accentBright}
+                stroke={
+                  !usualStops
+                    ? colors.accentBright
+                    : flat
+                      ? usualStops[0]!.below ? colors.worse : colors.better
+                      : "url(#run-performance-usual-split)"
+                }
                 strokeWidth={2}
                 dot={false}
                 activeDot={activeDot}

@@ -1808,6 +1808,8 @@ interface RawActivityDetail {
   raw: Record<string, unknown>;
   /** null when the activity could not be fingerprinted — nothing was cached. */
   fingerprint: string | null;
+  /** Served from the cached file: COROS was not asked. */
+  cached?: boolean;
 }
 
 /**
@@ -1829,7 +1831,7 @@ async function loadActivityDetailRaw(
   if (fingerprint !== null && options.fresh !== true) {
     const cached = readCachedActivityDetail(activityId, fingerprint);
     if (cached) {
-      return { raw: cached, fingerprint };
+      return { raw: cached, fingerprint, cached: true };
     }
   }
 
@@ -2138,6 +2140,8 @@ export async function syncActivityDetailSummaries(
   let attempted = 0;
   const written: ActivityDetailSummary[] = [];
   let failed = 0;
+  // The reads COROS was asked for: one served from the cached file costs it nothing.
+  let fetched = 0;
   let remaining = 0;
   let consecutiveFailures = 0;
 
@@ -2174,11 +2178,12 @@ export async function syncActivityDetailSummaries(
     attempted += 1;
     summaryBackfillInFlight.add(activityId);
     try {
-      const { raw, fingerprint } = await loadActivityDetailRaw(
+      const { raw, fingerprint, cached } = await loadActivityDetailRaw(
         activityId,
         activity.sportType,
         { listActivity: activity, persist: false }
       );
+      if (!cached) fetched += 1;
       const summary = cacheActivityDetailSummary(
         activityId,
         fingerprint,
@@ -2204,15 +2209,17 @@ export async function syncActivityDetailSummaries(
         consecutiveFailures += 1;
       }
     } catch {
+      // The cached file never throws: this was a request COROS refused or never got.
       summaryBackfillFailedIds.add(activityId);
       failed += 1;
+      fetched += 1;
       consecutiveFailures += 1;
     } finally {
       summaryBackfillInFlight.delete(activityId);
     }
   }
 
-  return { computed: written.length, remaining, failed, summaries: written };
+  return { computed: written.length, remaining, failed, fetched, summaries: written };
 }
 
 export async function getTrainingHubActivityFileUrl(

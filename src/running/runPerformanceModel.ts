@@ -10,7 +10,7 @@ import {
   median,
   performanceBaseline,
   performanceRun,
-  sessionPerformance,
+  runFigure,
   sportHasRunPerformance,
   type PerformanceBaseline,
   type PerformanceProfile,
@@ -196,7 +196,7 @@ export function performanceSessions(
     const at = startedAtMs(activity);
     const run = storedRun(activity, summaries, profile);
     if (at === undefined || !run) continue;
-    const raw = sessionPerformance(run.points, context.baseline?.shape);
+    const raw = runFigure(run.points, context.baseline?.shape);
     if (raw === undefined) continue;
     const pace = paceSecondsPerKm(activity);
     sessions.push({

@@ -41,15 +41,21 @@ Swain's share of HR reserve. Road and track runs only (100, 103).
   maximum is its own reason, `readingGapReason`). No profile figure is in the curve.
 - **Each minute is read against the athlete's usual at that minute** (median of six weeks of
   runs, each levelled over minutes 10–40). Heat is not taken out.
-- **The usual and the scale read steady readings only, 55–80% of the reserve**
-  (`STEADY_SHARE_*`; every reading when fewer than three runs have enough): above it the figure
-  still leans up, and a tempo block moved the usual. A run is still read and drawn whole.
+- **The usual, the scale and a run's one figure read steady readings only, 55–80% of the
+  reserve** (`STEADY_SHARE_*`): above it the figure still leans up, so a tempo block moved the
+  usual and a tempo run read above it for being one. A run with too few steady readings is read
+  whole (`runFigure`), and when fewer than three runs have enough the usual takes every run by
+  that figure. A run is still drawn whole, minute by minute.
 - **One scale onto COROS's VO2max per athlete, over the year before now** (`athleteScale`,
-  `performanceScaleRuns`), the same on the Running screen and every run's page. A six-week scale
+  `performanceScaleRuns`), the same on the Running screen and every run's page. **The fall over
+  a long run is not one**: the screen levels every run by the six weeks before now, a page by
+  the six before its run, so a run longer than 40 minutes can read a few tenths apart on the two. A six-week scale
   pinned the usual to COROS's figure (a 5% fall read as none) and re-valued every run as the
   window rolled. Until the year is read, the screen's own six weeks (and a page's run) stand in
   for it, never no scale. The year's read sweeps on its own allowance (`SCALE_YEAR_BUDGET`, newest
-  run first), so a first sweep of a year cannot spend the one the screens share.
+  run first), so a first sweep of a year cannot spend the one the screens share. An allowance
+  is charged for what COROS was asked (`fetched`), never for a summary worked out again from
+  the cached file.
 - **Read on demand, bounded**: Running sweeps with `requirePerformance` for the runs shown and
   the six weeks before; a run's page for the six weeks before it; never under Trail. **The
   scale's year is a read of its own** (a second `useActivityDetailSummaries`, keyed by the year's

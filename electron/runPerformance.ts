@@ -543,8 +543,9 @@ export interface PerformanceBaseline {
  * figure still leans up with effort — on the Málaga tests ACSM's line read
  * 1.7% high at 75–80% of the reserve, 3.6% at 80–85% and 6% at 85–90%, against
  * flat from 55% to 75% — so a usual read across every effort moved with a block
- * of tempo or of nothing but easy running. A run is still read and drawn
- * whole; only the usual and the scale are read from this band.
+ * of tempo or of nothing but easy running, and a tempo run read above the usual
+ * for being a tempo run. A run is still read and drawn whole, minute by minute;
+ * its one figure, the usual and the scale are read from this band.
  */
 export const STEADY_SHARE_MIN = 0.55;
 export const STEADY_SHARE_MAX = 0.8;
@@ -554,9 +555,24 @@ function steadyPoints(points: readonly PerformancePoint[]): PerformancePoint[] {
 }
 
 /**
- * Each run's figure for the usual and the scale: its steady readings, or all of
- * them when too few runs have enough in the band — someone whose every run sits
- * above it still has a usual, and a lone run still anchors a scale.
+ * A run's one figure, set against the usual: its steady readings where it has
+ * enough of them, so the figure and the usual are read at the same effort, and
+ * every reading where it has not — a session run above the band throughout
+ * still has a figure, one that leans up with its effort.
+ */
+export function runFigure(
+  points: readonly PerformancePoint[],
+  shape: PerformanceShape | undefined
+): number | undefined {
+  return sessionPerformance(steadyPoints(points), shape) ?? sessionPerformance(points, shape);
+}
+
+/**
+ * Each run's figure for the usual and the scale: the runs with enough steady
+ * readings, or — when too few have — every run by its own figure (`runFigure`),
+ * so someone whose every run sits above the band still has a usual, and a lone
+ * run still anchors a scale. The runs read steady keep their figure across
+ * that line: only the others come and go with it.
  */
 function comparableSessions(
   runs: readonly PerformanceRun[],
@@ -569,7 +585,11 @@ function comparableSessions(
     });
   const steady = read(steadyPoints);
   const enough = Math.min(MIN_BASELINE_RUNS, runs.length);
-  return steady.length > 0 && steady.length >= enough ? steady : read((points) => points);
+  if (steady.length > 0 && steady.length >= enough) return steady;
+  return runs.flatMap((run) => {
+    const value = runFigure(run.points, shape);
+    return value === undefined ? [] : [{ value, run }];
+  });
 }
 
 /** The usual from a set of past runs, or nothing when there are too few. */

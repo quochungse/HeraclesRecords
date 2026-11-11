@@ -219,6 +219,29 @@ close(
 const hardBlock = [tempoRun(54), tempoRun(55), tempoRun(56)];
 close(perf.performanceBaseline(hardBlock).value, 55, 0.3, "with too few steady runs, every reading counts");
 
+// A run's one figure is read in the band too, so a session with a steady half
+// and a tempo half is set against the usual at the usual's own effort.
+const mixed = { points: [...runs[0].points, ...tempo.points] };
+close(
+  perf.runFigure(mixed.points, undefined),
+  perf.sessionPerformance(runs[0].points, undefined),
+  1e-9,
+  "a run's figure is its steady readings"
+);
+close(
+  perf.runFigure(tempo.points, undefined),
+  perf.sessionPerformance(tempo.points, undefined),
+  1e-9,
+  "and every reading when it has too few of them"
+);
+// Short of steady runs, the ones read steady keep their figure.
+const steadyFigure = perf.runFigure(runs[0].points, undefined);
+const thin = perf.performanceBaseline([runs[0], tempoRun(54), tempoRun(56)]);
+assert.ok(
+  [steadyFigure, 54, 56].some((value) => Math.abs(thin.value - value) < 0.5),
+  "the usual of a thin history is one of its runs' own figures"
+);
+
 assert.equal(perf.performanceVerdict(49.5, 48), "better");
 assert.equal(perf.performanceVerdict(47, 48), "usual", "within 3% is as usual");
 assert.equal(perf.performanceVerdict(46.5, 48), "worse");

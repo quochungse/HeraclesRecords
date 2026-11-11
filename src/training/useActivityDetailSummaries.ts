@@ -150,10 +150,12 @@ export function useActivityDetailSummariesState({
           // Charged before anything else: the fetches happened whether or not
           // this effect is still around to see them, and a period change tears
           // it down mid-pass often enough that charging afterwards left the cap
-          // bounding nothing.
+          // bounding nothing. Only what COROS was asked for is charged: a
+          // summary worked out again from the cached file, after a version
+          // bump, would otherwise spend the allowance on no request at all.
           fetchedThisSession.set(
             budgetName,
-            (fetchedThisSession.get(budgetName) ?? 0) + pass.computed + pass.failed
+            (fetchedThisSession.get(budgetName) ?? 0) + (pass.fetched ?? pass.computed + pass.failed)
           );
           if (cancelled) {
             return;
