@@ -805,9 +805,11 @@ function createDefaultDeps(): CoachAnalysisRunnerDeps {
     },
     listSimilarSessions: async (activity) =>
       activity.start_time
-        ? similarSessions(
-            activity,
-            listCoachActivityRowsBetween(activity.start_time - SIMILAR_SESSION_DAYS * 86_400, activity.start_time)
+        ? withPrecedingHeraclesLoads(
+            similarSessions(
+              activity,
+              listCoachActivityRowsBetween(activity.start_time - SIMILAR_SESSION_DAYS * 86_400, activity.start_time)
+            )
           )
         : [],
     listScheduledOn: (day) => listScheduledWorkoutEntries(day, day),
@@ -1532,7 +1534,8 @@ export function formatSimilarSessions(rows: CoachPrecedingTraining[]): string | 
         row.distance ? `${(row.distance / 1000).toFixed(2)} km` : undefined,
         row.duration ? `${Math.round(row.duration / 60)} min` : undefined,
         row.avg_hr ? `avg HR ${row.avg_hr}` : undefined,
-        row.training_load ? `load ${row.training_load}` : undefined
+        row.training_load ? `load ${row.training_load}` : undefined,
+        row.heracles_load !== undefined ? `Heracles load ${row.heracles_load}` : undefined
       ].filter(Boolean);
       const name = asText(row.name);
       return `- ${isoDate(new Date((row.start_time ?? 0) * 1000))}${name ? ` "${name}"` : ""} (id ${row.activity_id}): ${figures.join(", ")}.`;

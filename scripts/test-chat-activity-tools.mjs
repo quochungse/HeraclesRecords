@@ -1132,6 +1132,33 @@ assert.match(weekText, /- Swim: 1 · 40:00 · 2,?000 m · load 50\n/);
 assert.match(weekText, /- All: 4 · 3:55:00 · load 320 · \+640 m\n/);
 assert.doesNotMatch(weekText, /- All: .* km/);
 
+// The same period by its weeks: each week's totals and the period's, no rows.
+const byWeekText = formatActivityListForChat(listFixture, "metric", {
+  window: { startDay: "20260901", endDay: "20260907" },
+  limit: 50,
+  byWeek: true
+});
+assert.match(byWeekText, /^Activities by week \(2026-09-01 → 2026-09-07\): 4\. Weeks run Monday to Sunday/);
+assert.match(byWeekText, /Week of 2026-08-31:\n- Run: 1 · 1:40:00 · 15[.0]* km · load 150 · \+600 m\n/, "Tuesday to Saturday fall in the week their Monday opens");
+assert.match(byWeekText, /Week of 2026-09-07:\n- Run: 1 · 50:00 · 10[.0]* km · load 80 · \+40 m\n/);
+assert.ok(byWeekText.indexOf("Week of 2026-08-31") < byWeekText.indexOf("Week of 2026-09-07"), "oldest week first");
+assert.match(byWeekText, /Whole period:\n- Run: 2 · 2:30:00 · 25[.0]* km · load 230 · \+640 m\n/);
+assert.doesNotMatch(byWeekText, /activity_id|Hills|narrow the dates/, "no rows, and no warning for a period read whole");
+assert.match(
+  formatActivityListForChat(listFixture, "metric", {
+    window: { startDay: "20260901", endDay: "20260907" },
+    limit: 50,
+    byWeek: true,
+    truncatedAtSource: true
+  }),
+  /the oldest weeks may be short — narrow the dates/
+);
+
+// How a session felt is the athlete's own word for it, on its line; unrated says nothing.
+assert.match(formatActivityListLine({ ...listFixture[0], feelType: 4 }, "metric"), / · felt hard$/);
+assert.doesNotMatch(formatActivityListLine({ ...listFixture[0], feelType: 0 }, "metric"), /felt/);
+assert.doesNotMatch(formatActivityListLine(listFixture[0], "metric"), /felt/);
+
 const runsText = formatActivityListForChat(listFixture, "metric", { sport: "run", limit: 10 });
 assert.match(runsText, /^Activities \(most recent, Run only\): 2\n/, "trail counts as a run");
 assert.doesNotMatch(runsText, /Strength|Swim|- All:/);

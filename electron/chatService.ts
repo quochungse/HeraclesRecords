@@ -912,6 +912,7 @@ export function deleteChatSessionById(id: string): void {
   deleteChatScheduleChangesOf(id);
   deleteChatAnswerDigestsOf(id);
   deleteChatHiddenTurnsOf(id);
+  forgetLastReads(id);
   // Section 2.4: the analyses inside this conversation go with it. An analysis
   // lives in exactly one conversation and cannot be moved, so there is nothing
   // to re-point and nothing left for one to be about.
@@ -1911,7 +1912,9 @@ export async function streamChat(
  * them again, and looked the activity up from scratch or answered from memory.
  * The calls ride on the next question (`withLastReads`), the results do not:
  * they are the size of a read. Held in memory only; after a restart a turn
- * simply starts without the note.
+ * simply starts without the note. A conversation whose turns were deleted,
+ * edited or hidden forgets its note (`forgetLastReads`): the answer it speaks
+ * of may be the one that went.
  */
 const turnReads = new Map<string, string[]>();
 const lastReads = new Map<string, string[]>();
@@ -1935,7 +1938,10 @@ function isNotedRead(name: string): boolean {
 function noteRead(requestId: string, name: string, args: Record<string, unknown>): void {
   if (!isNotedRead(name)) return;
   const reads = turnReads.get(requestId) ?? [];
-  const call = `${name} ${JSON.stringify(args)}`;
+  // Without `chart`: the note asks for the same call again, and a follow-up
+  // about one figure would draw the chart a second time.
+  const { chart: _chart, ...asked } = args;
+  const call = `${name} ${JSON.stringify(asked)}`;
   if (reads.includes(call) || reads.length >= MAX_READS_NOTED) return;
   turnReads.set(requestId, [...reads, call]);
 }
@@ -1951,6 +1957,11 @@ export function withLastReads(messages: ChatMessage[], options: StreamChatOption
     reads.join("; ") +
     ". For a figure that answer did not write down, call again with the same arguments.]";
   return [...messages.slice(0, -1), { ...last, content: `${last.content}\n\n${note}` }];
+}
+
+/** Drops what a conversation's last reading turn read: its turns changed, or it is gone. */
+export function forgetLastReads(sessionId: string): void {
+  lastReads.delete(sessionId);
 }
 
 /** For suites: what a conversation's next question would be told. */

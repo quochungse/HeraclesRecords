@@ -14,7 +14,7 @@ import {
 } from "./chatContextService";
 import { resolveCompressionRuntime, transcriptDigests } from "./chatCompression";
 import { providerModelOptions } from "./chatModels";
-import { getChatSettings, getConversationSettings, setConversationSettings } from "./chatService";
+import { forgetLastReads, getChatSettings, getConversationSettings, setConversationSettings } from "./chatService";
 import { coachTranscript } from "./chatHiddenTurns";
 import {
   shiftBoundary,
@@ -358,6 +358,7 @@ export async function deleteTurn(
   const entries = getChatSession(sessionId);
   const range = resolveTurn(entries, ref);
   const cut = turnCut(entries, range, { deleteCreations: options.deleteCreations });
+  forgetLastReads(sessionId);
   const summarised = summarises(sessionId, range);
 
   const remaining = removeEntries(sessionId, cut.entries, cut.removed);
@@ -387,6 +388,7 @@ export function editTurn(sessionId: string, ref: TurnRef, text: string): TurnCha
   const range = resolveTurn(entries, ref);
   if (turnRanges(entries).at(-1)?.question !== range.question) throw new ScreenError("main.coach.turnNotLast");
   const cut = turnCut(entries, range, { deleteCreations: true, answerOnly: true });
+  forgetLastReads(sessionId);
   const edited = cut.entries.map((entry, index) =>
     index === range.question && entry.kind === "message" ? { ...entry, content } : entry
   );
@@ -434,6 +436,7 @@ export async function setTurnHidden(
   const mid = entries[range.question]!.mid;
   if (!mid) throw new ScreenError("main.coach.turnChanged");
   setChatHiddenTurn(sessionId, mid, options.hidden);
+  forgetLastReads(sessionId);
   const rewritten =
     options.rewriteSummary && summarises(sessionId, range)
       ? await rewriteSummary(sessionId, entries, readSessionSummary(sessionId).through, deps)

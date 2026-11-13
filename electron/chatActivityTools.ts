@@ -570,7 +570,9 @@ function formatActivityWeeks(
   for (const activity of activities) {
     if (!activity.startTime) continue;
     const week = weekStartKey(activity.startTime);
-    weeks.set(week, [...(weeks.get(week) ?? []), activity]);
+    const held = weeks.get(week);
+    if (held) held.push(activity);
+    else weeks.set(week, [activity]);
   }
   const lines = [`Activities by week (${scope}): ${activities.length}. Weeks run Monday to Sunday; a week with no activity is not listed.`];
   for (const week of [...weeks.keys()].sort()) {
