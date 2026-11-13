@@ -51,7 +51,7 @@
 | **macOS** · Intel | [HeraclesRecords-1.5.0-x64.dmg](https://github.com/quochungse/HeraclesRecords/releases/download/v1.5.0/HeraclesRecords-1.5.0-x64.dmg) | 181 MB |
 | **Windows** 10 / 11 · 64-bit | [HeraclesRecords-Setup-1.5.0.exe](https://github.com/quochungse/HeraclesRecords/releases/download/v1.5.0/HeraclesRecords-Setup-1.5.0.exe) | 167 MB |
 | **Linux** · AppImage, any distribution | [HeraclesRecords-1.5.0.AppImage](https://github.com/quochungse/HeraclesRecords/releases/download/v1.5.0/HeraclesRecords-1.5.0.AppImage) | 183 MB |
-| **Linux** · Debian / Ubuntu (.deb) | [HeraclesRecords-1.5.0.deb](https://github.com/quochungse/HeraclesRecords/releases/download/v1.5.0/HeraclesRecords-1.5.0.deb) | 140 MB |
+| **Linux** · Debian / Ubuntu (.deb) | [HeraclesRecords-1.5.0.deb](https://github.com/quochungse/HeraclesRecords/releases/download/v1.5.0/HeraclesRecords-1.5.0.deb) | 141 MB |
 
 Version 1.5.0 · [What's new](https://github.com/quochungse/HeraclesRecords/releases/tag/v1.5.0) · [All releases](https://github.com/quochungse/HeraclesRecords/releases). The app tells you when a new version is out.
 <!-- release:downloads:end -->
