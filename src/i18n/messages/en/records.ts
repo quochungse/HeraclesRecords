@@ -8,17 +8,14 @@ import type { Translation } from "../../types.ts";
  * there to name a milestone without it.
  */
 const records = {
-  "records.title": "Hall of Records",
-  "records.subtitle": "Every milestone of your training, and the Twelve Labours.",
+  "records.sub.timeline": "Every milestone of your training, newest first.",
+  "records.sub.records": "Your best time at each distance, and every time it fell.",
+  "records.sub.labours": "Twelve kinds of achievement, three stages each.",
   "records.connectBody": "Your milestones are worked out from your COROS activity history.",
   "records.since_one": "{count} milestone since {day}",
   "records.since_other": "{count} milestones since {day}",
   "records.stagesOf": "{n} of {total} labour stages",
   "records.reading": "Reading your history…",
-  "records.sections": "Hall of Records sections",
-  "records.tab.timeline": "Timeline",
-  "records.tab.labours": "The Twelve Labours",
-  "records.tab.records": "Personal Records",
   "records.pr.running": "Running · best time per distance",
   "records.pr.period": "Record period",
   "records.pr.distances": "Running distances",

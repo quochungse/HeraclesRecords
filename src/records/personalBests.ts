@@ -234,15 +234,6 @@ export function daysFrom(from: string, to: string): number {
   return Math.round((at(to) - at(from)) / 86_400_000);
 }
 
-/** How many records a board holds: a distance with an all-time best, and the two farthest. */
-export function recordCount(board: RecordBoard): number {
-  return (
-    board.distances.filter((row) => row.best.all).length +
-    (board.longestRun ? 1 : 0) +
-    (board.mostClimb ? 1 : 0)
-  );
-}
-
 function localDay(epochSeconds: number): string {
   const date = new Date(epochSeconds * 1000);
   return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;

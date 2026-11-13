@@ -64,11 +64,6 @@ export interface OptionGroupOption<T extends string> {
   disabled?: boolean;
   /** Native tooltip. Use it for a qualifier, never for the only copy of a fact. */
   title?: string;
-  /**
-   * A figure after the label — how much the option holds ("73", "22/36"). Only
-   * in the `tabs` appearance, where each option is a page of its own.
-   */
-  count?: string;
 }
 
 export interface OptionGroupProps<T extends string> {
@@ -126,15 +121,6 @@ export interface OptionGroupProps<T extends string> {
    * changes figures nobody is watching move.
    */
   motion?: FigureMotionKind;
-  /**
-   * `chips` (the default) is the pill track every other choice is. `tabs` is
-   * for the sections of one screen — the Hall of Records' Timeline, Personal
-   * Records and Labours: a row of labels under the screen's title on a
-   * hairline, the chosen one underlined by an ink that slides to it, each with
-   * its icon and its `count`. Expanded only: the sections of a screen are never
-   * folded away.
-   */
-  appearance?: "chips" | "tabs";
   className?: string;
   disabled?: boolean;
 }
@@ -157,11 +143,9 @@ export function OptionGroup<T extends string>({
   fill = false,
   minMenuWidth,
   motion,
-  appearance = "chips",
   className,
   disabled = false
 }: OptionGroupProps<T>) {
-  const tabs = appearance === "tabs" && mode === "expanded";
   const choose = (next: T, from?: HTMLButtonElement) => {
     if (motion && next !== value) {
       markFigureMotion(motion, optionDirection(options.map((option) => option.value), value, next));
@@ -243,21 +227,6 @@ export function OptionGroup<T extends string>({
       "--og-shift",
       `${chosen.offsetLeft - first.offsetLeft}px`
     );
-  });
-
-  /*
-   * The tabs' ink sits under the chosen label. Its place is the chosen chip's
-   * own offset and width, written onto the node after every render for the
-   * reason the fold's lengths are: callers rebuild `options` each render, and
-   * a count arriving or a language switching moves the labels under it.
-   */
-  useLayoutEffect(() => {
-    if (!tabs) return;
-    const track = trackRef.current;
-    const chosen = track?.querySelector<HTMLElement>('[aria-checked="true"]');
-    if (!track || !chosen) return;
-    track.style.setProperty("--og-ink-x", `${chosen.offsetLeft}px`);
-    track.style.setProperty("--og-ink-w", `${chosen.offsetWidth}px`);
   });
 
   // Focus follows the fold: opening puts the keyboard on the row that just
@@ -382,9 +351,6 @@ export function OptionGroup<T extends string>({
         <span className={iconOnly ? "sr-only" : "option-group-label"}>
           {option.label}
         </span>
-        {tabs && option.count ? (
-          <span className="option-group-count">{option.count}</span>
-        ) : null}
       </button>
     );
   };
@@ -396,7 +362,6 @@ export function OptionGroup<T extends string>({
     tone === "quiet" ? "option-group--quiet" : "",
     iconOnly ? "option-group--icon" : "",
     fill ? "option-group--fill" : "",
-    tabs ? "option-group--tabs" : "",
     disabled ? "is-disabled" : "",
     className
   ]
@@ -459,7 +424,6 @@ export function OptionGroup<T extends string>({
       onKeyDown={onKeyDown}
     >
       {options.map((option) => renderOption(option, false))}
-      {tabs ? <span className="option-group-ink" aria-hidden="true" /> : null}
     </div>
   );
 }

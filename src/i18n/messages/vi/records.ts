@@ -1,17 +1,14 @@
 import type { RecordsMessages } from "../en/records.ts";
 
 const records: RecordsMessages = {
-  "records.title": "Đại sảnh Kỷ lục",
-  "records.subtitle": "Mọi cột mốc trong hành trình tập luyện của bạn, cùng Mười hai kỳ công.",
+  "records.sub.timeline": "Mọi cột mốc trong quá trình tập luyện, mới nhất trước.",
+  "records.sub.records": "Thành tích tốt nhất của bạn ở mỗi cự ly, và mỗi lần nó bị phá.",
+  "records.sub.labours": "Mười hai loại thành tựu, mỗi loại ba chặng.",
   "records.connectBody": "Các cột mốc được tính từ lịch sử hoạt động COROS của bạn.",
   "records.since_one": "{count} cột mốc kể từ {day}",
   "records.since_other": "{count} cột mốc kể từ {day}",
   "records.stagesOf": "{n}/{total} chặng kỳ công",
   "records.reading": "Đang đọc lịch sử của bạn…",
-  "records.sections": "Các mục của Đại sảnh Kỷ lục",
-  "records.tab.timeline": "Dòng thời gian",
-  "records.tab.labours": "Mười hai kỳ công",
-  "records.tab.records": "Kỷ lục cá nhân",
   "records.pr.running": "Chạy bộ · thành tích tốt nhất theo cự ly",
   "records.pr.period": "Khoảng thời gian kỷ lục",
   "records.pr.distances": "Các cự ly chạy",

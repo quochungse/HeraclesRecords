@@ -1,17 +1,14 @@
 import type { RecordsMessages } from "../en/records.ts";
 
 const records: RecordsMessages = {
-  "records.title": "Galeria de recordes",
-  "records.subtitle": "Cada marco do seu treino, e os Doze Trabalhos.",
+  "records.sub.timeline": "Cada marco do seu treino, o mais recente primeiro.",
+  "records.sub.records": "O seu melhor tempo em cada distância, e cada vez que caiu.",
+  "records.sub.labours": "Doze tipos de conquista, três etapas cada.",
   "records.connectBody": "Seus marcos são calculados a partir do seu histórico de atividades no COROS.",
   "records.since_one": "{count} marco desde {day}",
   "records.since_other": "{count} marcos desde {day}",
   "records.stagesOf": "{n} de {total} etapas dos trabalhos",
   "records.reading": "Lendo seu histórico…",
-  "records.sections": "Seções da Galeria de recordes",
-  "records.tab.timeline": "Linha do tempo",
-  "records.tab.labours": "Os Doze Trabalhos",
-  "records.tab.records": "Recordes pessoais",
   "records.pr.running": "Corrida · melhor tempo por distância",
   "records.pr.period": "Período dos recordes",
   "records.pr.distances": "Distâncias de corrida",

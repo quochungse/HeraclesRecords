@@ -6,7 +6,9 @@ import {
   Dumbbell,
   Globe,
   LayoutGrid,
+  Medal,
   MessageCircle,
+  Milestone,
   Moon,
   Mountain,
   Settings,
@@ -33,6 +35,8 @@ export type PrimaryView =
   | "coach"
   | "places"
   | "records"
+  | "personalRecords"
+  | "labours"
   | "settings";
 
 export type PrimaryNavSectionId = "today" | "plan" | "history" | "journey";
@@ -81,7 +85,7 @@ function navItem(
 }
 
 /**
- * The rail reads as an index: four standing headings, twelve destinations,
+ * The rail reads as an index: four standing headings, fourteen destinations,
  * nothing to open first.
  *
  * The sections answer *when the athlete reaches for a screen*, not where the
@@ -144,10 +148,16 @@ export const PRIMARY_NAV_SECTIONS: PrimaryNavSection[] = [
       return t("nav.section.journey");
     },
     // The same history seen from above: not a session or a week but every
-    // milestone the training has reached, and every place it has taken the
-    // athlete — reached for at a different moment from the log above it.
+    // milestone the training has reached, the best it has run, the labours
+    // it is working through, and every place it has taken the athlete —
+    // reached for at a different moment from the log above it. The first
+    // three are the Hall of Records; "records" is the Timeline's id from
+    // when it was the hall's one screen, kept so a stored startup view
+    // still opens it.
     items: [
-      navItem("records", "nav.records", LaurelIcon),
+      navItem("records", "nav.timeline", Milestone),
+      navItem("personalRecords", "nav.personalRecords", Medal),
+      navItem("labours", "nav.labours", LaurelIcon),
       navItem("places", "nav.places", Globe),
     ],
   },
@@ -157,7 +167,7 @@ export const PRIMARY_NAV_SECTIONS: PrimaryNavSection[] = [
  * The two destinations that are about the person rather than the training.
  * They sit in the identity row at the foot of the rail, which is where an
  * account and its settings are looked for — and keeping them out of the index
- * is what brings it down to twelve rows that fit without folding.
+ * is what brings it down to fourteen rows that fit without folding.
  */
 export const PRIMARY_NAV_ACCOUNT_ITEMS: PrimaryNavItem[] = [
   navItem("profile", "nav.profile", User),

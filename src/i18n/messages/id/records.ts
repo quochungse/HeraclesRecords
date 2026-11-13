@@ -1,17 +1,14 @@
 import type { RecordsMessages } from "../en/records.ts";
 
 const records: RecordsMessages = {
-  "records.title": "Galeri rekor",
-  "records.subtitle": "Setiap pencapaian dalam latihan Anda, dan Dua Belas Tugas.",
+  "records.sub.timeline": "Setiap pencapaian latihanmu, yang terbaru lebih dulu.",
+  "records.sub.records": "Waktu terbaikmu di setiap jarak, dan setiap kali dipecahkan.",
+  "records.sub.labours": "Dua belas jenis pencapaian, masing-masing tiga tahap.",
   "records.connectBody": "Pencapaian Anda dihitung dari riwayat aktivitas COROS.",
   "records.since_one": "{count} pencapaian sejak {day}",
   "records.since_other": "{count} pencapaian sejak {day}",
   "records.stagesOf": "{n} dari {total} tahap tugas",
   "records.reading": "Membaca riwayat Anda…",
-  "records.sections": "Bagian Galeri rekor",
-  "records.tab.timeline": "Linimasa",
-  "records.tab.labours": "Dua Belas Tugas",
-  "records.tab.records": "Rekor pribadi",
   "records.pr.running": "Lari · waktu terbaik per jarak",
   "records.pr.period": "Periode rekor",
   "records.pr.distances": "Jarak lari",

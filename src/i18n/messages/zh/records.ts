@@ -1,17 +1,14 @@
 import type { RecordsMessages } from "../en/records.ts";
 
 const records: RecordsMessages = {
-  "records.title": "纪录殿堂",
-  "records.subtitle": "你训练中的每一个里程碑，以及十二功业。",
+  "records.sub.timeline": "你训练中的每一个里程碑,最新的在前。",
+  "records.sub.records": "每个距离的最佳成绩,以及每一次被打破。",
+  "records.sub.labours": "十二种成就,每种三个阶段。",
   "records.connectBody": "里程碑由你的 COROS 活动记录计算得出。",
   "records.since_one": "自 {day} 以来 {count} 个里程碑",
   "records.since_other": "自 {day} 以来 {count} 个里程碑",
   "records.stagesOf": "功业阶段 {n}/{total}",
   "records.reading": "正在读取你的历史…",
-  "records.sections": "纪录殿堂分区",
-  "records.tab.timeline": "时间线",
-  "records.tab.labours": "十二功业",
-  "records.tab.records": "个人纪录",
   "records.pr.running": "跑步 · 各距离最佳成绩",
   "records.pr.period": "纪录时段",
   "records.pr.distances": "跑步距离",

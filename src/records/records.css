@@ -26,11 +26,6 @@
   font-size: 32px;
 }
 
-/* The hall's sections sit under its title, as its table of contents. */
-.records-tabs {
-  margin-top: -8px;
-}
-
 .records-page-header p {
   margin: 8px 0 0;
   color: var(--text-secondary);

@@ -1,17 +1,14 @@
 import type { RecordsMessages } from "../en/records.ts";
 
 const records: RecordsMessages = {
-  "records.title": "Salón de los récords",
-  "records.subtitle": "Cada hito de tu entrenamiento, y los doce trabajos.",
+  "records.sub.timeline": "Cada hito de tu entrenamiento, el más reciente primero.",
+  "records.sub.records": "Tu mejor tiempo en cada distancia y cada vez que cayó.",
+  "records.sub.labours": "Doce tipos de logro, tres etapas cada uno.",
   "records.connectBody": "Tus hitos se calculan a partir de tu historial de actividades de COROS.",
   "records.since_one": "{count} hito desde el {day}",
   "records.since_other": "{count} hitos desde el {day}",
   "records.stagesOf": "{n} de {total} etapas de los trabajos",
   "records.reading": "Leyendo tu historial…",
-  "records.sections": "Secciones del Salón de los récords",
-  "records.tab.timeline": "Cronología",
-  "records.tab.labours": "Los doce trabajos",
-  "records.tab.records": "Récords personales",
   "records.pr.running": "Carrera · mejor tiempo por distancia",
   "records.pr.period": "Periodo de récords",
   "records.pr.distances": "Distancias de carrera",

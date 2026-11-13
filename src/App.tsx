@@ -64,6 +64,7 @@ import {
   type UpdateScenario,
 } from "./components/updateSimulation";
 import { PRIMARY_NAV_ITEMS, type PrimaryView } from "./navigation/primaryNav";
+import type { HallSection } from "./records/HallOfRecordsView";
 import {
   getPrimaryViewLabel,
   readStartupView,
@@ -207,6 +208,18 @@ const LazyHallOfRecordsView = lazy(() =>
     default: HallOfRecordsView,
   })),
 );
+
+/** The Hall of Records' three destinations, and the screen each draws. */
+type HallView = Extract<PrimaryView, "records" | "personalRecords" | "labours">;
+const HALL_SECTION: Readonly<Record<HallView, HallSection>> = {
+  records: "timeline",
+  personalRecords: "records",
+  labours: "labours",
+};
+
+function isHallView(view: PrimaryView): view is HallView {
+  return Object.hasOwn(HALL_SECTION, view);
+}
 
 function DeferredSurfaceFallback({ label }: { label: string }) {
   return (
@@ -1675,7 +1688,7 @@ export default function App() {
     snapshot: trainingHubSnapshot,
     snapshotStatus: trainingHubSnapshotStatus,
     connected: Boolean(trainingHubStatus?.authenticated),
-    visible: activeView === "records",
+    visible: isHallView(activeView),
     unitSystem,
     athlete: recordsAthlete,
     sample: recordsSample,
@@ -1684,11 +1697,9 @@ export default function App() {
     records: hallOfRecords,
     onRecordsScreen: activeView === "records",
   });
-  /* The tab the hall opens on when something sent the athlete to a part of
-     it — the celebration's "See the Twelve Labours". Taken once, on mount. */
-  const [recordsTabRequest, setRecordsTabRequest] = useState<
-    "timeline" | "labours" | null
-  >(null);
+  /* The milestone the Timeline opens on when the Labours screen sent the
+     athlete to it — a stage's date. Taken once, on mount. */
+  const [timelineFocus, setTimelineFocus] = useState<string | null>(null);
 
   // Kick the RPE backfill and poll until the window is fully fetched, merging
   // freshly-cached sRPE into the daily metrics so the trend chart's RPE series
@@ -2178,33 +2189,38 @@ export default function App() {
                         )
                       : undefined
                   }
-                  onOpenLabours={() => {
-                    setRecordsTabRequest("labours");
-                    setActiveView("records");
-                  }}
+                  onOpenLabours={() => setActiveView("labours")}
                   onOpenOverview={() => setActiveView("overview")}
                   railReselect={railReselect}
                 />
               </Suspense>
             ) : null}
-            {activeView === "records" ? (
+            {isHallView(activeView) ? (
               <Suspense
-                fallback={<DeferredSurfaceFallback label={t("nav.records")} />}
+                fallback={<DeferredSurfaceFallback label={getPrimaryViewLabel(activeView)} />}
               >
                 <LazyHallOfRecordsView
+                  // One module draws the three screens; each is its own
+                  // mount, so a filter or a chosen record is the screen's.
+                  key={activeView}
+                  section={HALL_SECTION[activeView]}
                   api={api}
                   records={hallOfRecords}
                   activities={trainingHubActivities}
                   connected={Boolean(trainingHubStatus?.authenticated)}
                   newIds={recordsNotices.visitNew}
-                  requestedTab={recordsTabRequest}
-                  onTabRequestHandled={() => setRecordsTabRequest(null)}
+                  onShowMilestone={(id) => {
+                    setTimelineFocus(id);
+                    setActiveView("records");
+                  }}
+                  focusRequest={timelineFocus}
+                  onFocusHandled={() => setTimelineFocus(null)}
                   onOpenActivity={(activity) =>
                     isSampleRecordsActivity(activity.activityId)
                       ? setMessage(
                           "A sample milestone: its activity exists only in the sample, so there is no page to open.", // i18n-ignore: development samples only
                         )
-                      : openActivityFrom(activity.activityId, "records")
+                      : openActivityFrom(activity.activityId, activeView)
                   }
                   onOpenOverview={() => setActiveView("overview")}
                   retrying={busy === "training-refresh"}
@@ -2326,7 +2342,7 @@ export default function App() {
               labour={labour}
               onOpen={() => {
                 recordsNotices.dismissToast(announcement.key);
-                setActiveView("records");
+                setActiveView("labours");
               }}
               onDismiss={() => recordsNotices.dismissToast(announcement.key)}
             />
@@ -2339,8 +2355,7 @@ export default function App() {
           completed={recordsNotices.celebration.completed}
           onSeeLabours={() => {
             recordsNotices.closeCelebration();
-            setRecordsTabRequest("labours");
-            setActiveView("records");
+            setActiveView("labours");
           }}
           onClose={recordsNotices.closeCelebration}
         />

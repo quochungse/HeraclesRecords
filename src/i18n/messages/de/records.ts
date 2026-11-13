@@ -1,17 +1,14 @@
 import type { RecordsMessages } from "../en/records.ts";
 
 const records: RecordsMessages = {
-  "records.title": "Ruhmeshalle",
-  "records.subtitle": "Jeder Meilenstein deines Trainings, und die zwölf Arbeiten.",
+  "records.sub.timeline": "Jeder Meilenstein deines Trainings, der neueste zuerst.",
+  "records.sub.records": "Deine Bestzeit auf jeder Distanz und jedes Mal, als sie fiel.",
+  "records.sub.labours": "Zwölf Arten von Leistung, je drei Stufen.",
   "records.connectBody": "Deine Meilensteine werden aus deinem COROS-Aktivitätsverlauf berechnet.",
   "records.since_one": "{count} Meilenstein seit {day}",
   "records.since_other": "{count} Meilensteine seit {day}",
   "records.stagesOf": "{n} von {total} Stufen der Arbeiten",
   "records.reading": "Dein Verlauf wird gelesen…",
-  "records.sections": "Bereiche der Ruhmeshalle",
-  "records.tab.timeline": "Zeitleiste",
-  "records.tab.labours": "Die zwölf Arbeiten",
-  "records.tab.records": "Persönliche Rekorde",
   "records.pr.running": "Laufen · Bestzeit je Distanz",
   "records.pr.period": "Rekordzeitraum",
   "records.pr.distances": "Laufdistanzen",

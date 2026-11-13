@@ -1,17 +1,14 @@
 import type { RecordsMessages } from "../en/records.ts";
 
 const records: RecordsMessages = {
-  "records.title": "Albo dei record",
-  "records.subtitle": "Ogni traguardo del tuo allenamento, e le dodici fatiche.",
+  "records.sub.timeline": "Ogni traguardo del tuo allenamento, dal più recente.",
+  "records.sub.records": "Il tuo miglior tempo su ogni distanza, e ogni volta che è caduto.",
+  "records.sub.labours": "Dodici tipi di impresa, tre livelli ciascuno.",
   "records.connectBody": "I tuoi traguardi sono calcolati dalla tua cronologia attività COROS.",
   "records.since_one": "{count} traguardo dal {day}",
   "records.since_other": "{count} traguardi dal {day}",
   "records.stagesOf": "{n} di {total} livelli delle fatiche",
   "records.reading": "Lettura della tua cronologia…",
-  "records.sections": "Sezioni dell’Albo dei record",
-  "records.tab.timeline": "Cronologia",
-  "records.tab.labours": "Le dodici fatiche",
-  "records.tab.records": "Record personali",
   "records.pr.running": "Corsa · miglior tempo per distanza",
   "records.pr.period": "Periodo dei record",
   "records.pr.distances": "Distanze di corsa",

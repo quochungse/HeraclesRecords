@@ -8,11 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### What's new
-- **Personal Records in the Hall of Records** - a page of its own beside Timeline and The Twelve Labours: your best time at 1K, 5K, 10K, half and full marathon for all time, 6 months, 12 weeks or 4 weeks (a distance with no record in that period stays in the list but does not open). Beside the list, the chosen record: the day and the run it was set in (press it to open the run), how long it has stood or how far it is off your all-time record, what it took off the record before it, and a chart of every time it did (point at a record, or step through them with the arrow keys, for its time, pace, run and what it took off the one before). Below, your longest run, most elevation gain, and the farthest you have ridden, swum and hiked.
-- **The Hall of Records' sections are tabs under its title**, each with its icon and what it holds: milestones, records, and labour stages reached.
+- **Personal Records** - a screen of its own under Your journey: your best time at 1K, 5K, 10K, half and full marathon for all time, 6 months, 12 weeks or 4 weeks (a distance with no record in that period stays in the list but does not open). Beside the list, the chosen record: the day and the run it was set in (press it to open the run), how long it has stood or how far it is off your all-time record, what it took off the record before it, and a chart of every time it did (point at a record, or step through them with the arrow keys, for its time, pace, run and what it took off the one before). Below, your longest run, most elevation gain, and the farthest you have ridden, swum and hiked.
+- **The Hall of Records is three screens on the rail** - Timeline, Personal Records and The Twelve Labours, each under Your journey, instead of one screen with a switch. A labour's toast and celebration open The Twelve Labours; a stage's date there opens its milestone on the Timeline.
 
 ### Changed
-- **Personal Records left the Personal screen** for the Hall of Records.
+- **Personal Records left the Personal screen** for a screen of their own.
 
 ## [1.4.8] - 2026-11-11
 

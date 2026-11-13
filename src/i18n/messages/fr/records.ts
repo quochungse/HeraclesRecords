@@ -1,17 +1,14 @@
 import type { RecordsMessages } from "../en/records.ts";
 
 const records: RecordsMessages = {
-  "records.title": "Panthéon des records",
-  "records.subtitle": "Chaque étape marquante de votre entraînement, et les douze travaux.",
+  "records.sub.timeline": "Chaque étape de votre entraînement, la plus récente d’abord.",
+  "records.sub.records": "Votre meilleur temps sur chaque distance, et chaque fois qu’il est tombé.",
+  "records.sub.labours": "Douze types d’exploits, trois paliers chacun.",
   "records.connectBody": "Vos étapes sont calculées à partir de votre historique d’activités COROS.",
   "records.since_one": "{count} étape depuis le {day}",
   "records.since_other": "{count} étapes depuis le {day}",
   "records.stagesOf": "{n} paliers sur {total}",
   "records.reading": "Lecture de votre historique…",
-  "records.sections": "Sections du Panthéon des records",
-  "records.tab.timeline": "Chronologie",
-  "records.tab.labours": "Les douze travaux",
-  "records.tab.records": "Records personnels",
   "records.pr.running": "Course · meilleur temps par distance",
   "records.pr.period": "Période des records",
   "records.pr.distances": "Distances de course",

@@ -1,17 +1,14 @@
 import type { RecordsMessages } from "../en/records.ts";
 
 const records: RecordsMessages = {
-  "records.title": "記録の殿堂",
-  "records.subtitle": "トレーニングのすべてのマイルストーンと、十二の功業。",
+  "records.sub.timeline": "トレーニングのすべてのマイルストーン(新しい順)。",
+  "records.sub.records": "距離ごとのベストタイムと、その更新の記録。",
+  "records.sub.labours": "12種類の功業、それぞれ3つのステージ。",
   "records.connectBody": "マイルストーンは COROS のアクティビティ履歴から算出されます。",
   "records.since_one": "{day} から {count} 個のマイルストーン",
   "records.since_other": "{day} から {count} 個のマイルストーン",
   "records.stagesOf": "功業ステージ {n}/{total}",
   "records.reading": "履歴を読み込み中…",
-  "records.sections": "記録の殿堂のセクション",
-  "records.tab.timeline": "タイムライン",
-  "records.tab.labours": "十二の功業",
-  "records.tab.records": "自己ベスト",
   "records.pr.running": "ランニング · 距離別ベストタイム",
   "records.pr.period": "記録の期間",
   "records.pr.distances": "ランニングの距離",

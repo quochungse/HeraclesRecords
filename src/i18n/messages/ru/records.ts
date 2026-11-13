@@ -1,8 +1,9 @@
 import type { RecordsMessages } from "../en/records.ts";
 
 const records: RecordsMessages = {
-  "records.title": "Зал рекордов",
-  "records.subtitle": "Все вехи ваших тренировок и двенадцать подвигов.",
+  "records.sub.timeline": "Каждая веха ваших тренировок, сначала новые.",
+  "records.sub.records": "Ваше лучшее время на каждой дистанции и каждый раз, когда оно падало.",
+  "records.sub.labours": "Двенадцать видов достижений, по три этапа в каждом.",
   "records.connectBody": "Вехи рассчитываются по вашей истории активностей COROS.",
   "records.since_one": "{count} веха с {day}",
   "records.since_few": "{count} вехи с {day}",
@@ -10,10 +11,6 @@ const records: RecordsMessages = {
   "records.since_other": "{count} вехи с {day}",
   "records.stagesOf": "Этапов подвигов: {n} из {total}",
   "records.reading": "Чтение истории…",
-  "records.sections": "Разделы Зала рекордов",
-  "records.tab.timeline": "Хроника",
-  "records.tab.labours": "Двенадцать подвигов",
-  "records.tab.records": "Личные рекорды",
   "records.pr.running": "Бег · лучшее время на каждой дистанции",
   "records.pr.period": "Период рекордов",
   "records.pr.distances": "Беговые дистанции",

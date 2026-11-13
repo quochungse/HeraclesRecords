@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, CloudOff, LockKeyhole, Medal, Milestone as MilestoneIcon, RefreshCw } from "lucide-react";
+import { ChevronDown, CloudOff, LockKeyhole, RefreshCw } from "lucide-react";
 import type { TrainingHubActivity } from "../../electron/types";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { OptionGroup } from "../components/OptionGroup";
@@ -14,9 +14,8 @@ import {
   type Milestone,
   type WithinReach
 } from "./milestones";
-import { LabourEmblem, LaurelIcon, LaurelWreath } from "./recordsIcons";
+import { LabourEmblem, LaurelWreath } from "./recordsIcons";
 import { PersonalRecordsBoard } from "./PersonalRecordsBoard";
-import { recordCount } from "./personalBests";
 import { useTodayKey } from "../training/useTodayKey";
 import {
   FILTER_LABELS,
@@ -33,13 +32,14 @@ import {
   useRecordsBackfill,
   type HallOfRecordsState
 } from "./useHallOfRecords";
-import { formatCount, plural, t, weekdayNames } from "../i18n/core";
+import { plural, t, weekdayNames } from "../i18n/core";
 import { useI18n } from "../i18n/useI18n";
 import { labourCategory, labourMyth, labourName, labourShort, labourStage } from "./labourWords";
 import type { LabourId } from "./labours";
 import "./records.css";
 
-export type RecordsTab = "timeline" | "records" | "labours";
+/** The hall's three screens, each its own destination on the rail. */
+export type HallSection = "timeline" | "records" | "labours";
 
 export type MilestoneActivity = NonNullable<Milestone["activity"]>;
 
@@ -55,10 +55,22 @@ interface HallOfRecordsViewProps {
   /** The activity list is being asked for again. */
   retrying?: boolean;
   onRetryActivities?: () => void;
-  /** A tab something sent the athlete to — the celebration's "See the Twelve Labours". */
-  requestedTab?: RecordsTab | null;
-  onTabRequestHandled?: () => void;
+  section: HallSection;
+  /**
+   * The Labours screen's stage dates open the milestone that reached it on
+   * the Timeline; App takes the athlete there.
+   */
+  onShowMilestone?: (id: string) => void;
+  /** A milestone something sent the athlete to, on the Timeline. Taken once. */
+  focusRequest?: string | null;
+  onFocusHandled?: () => void;
 }
+
+const SECTION_TITLE: Readonly<Record<HallSection, () => string>> = {
+  timeline: () => t("nav.timeline"),
+  records: () => t("nav.personalRecords"),
+  labours: () => t("nav.labours")
+};
 
 /** Short weekday names Sunday first, as `Date.getDay` counts. */
 function weekdayOf(date: Date): string {
@@ -68,13 +80,14 @@ function weekdayOf(date: Date): string {
 const TOTAL_STAGES = 36;
 
 /**
- * The Hall of Records: every milestone the athlete has reached, newest first,
- * and the Twelve Labours read off them.
+ * The Hall of Records' three screens — the Timeline of every milestone, newest
+ * first; Personal Records; and the Twelve Labours read off the milestones —
+ * each a destination on the rail, drawn by this one module (`section`).
  *
- * Everything on it is worked out in App (`useHallOfRecords`) so the rail and
+ * Everything on them is worked out in App (`useHallOfRecords`) so the rail and
  * the notifications know it on any screen; what costs a request — reading the
  * older activities for their best efforts and start, and naming the places —
- * happens only while this screen is open.
+ * happens only while one of them is open.
  */
 export function HallOfRecordsView({
   api,
@@ -86,18 +99,14 @@ export function HallOfRecordsView({
   onOpenOverview,
   retrying = false,
   onRetryActivities,
-  requestedTab,
-  onTabRequestHandled
+  section,
+  onShowMilestone,
+  focusRequest,
+  onFocusHandled
 }: HallOfRecordsViewProps) {
   const { locale } = useI18n();
   // How long a record has stood turns over at midnight with the screen open.
   const today = useTodayKey();
-  const [tab, setTab] = useState<RecordsTab>(requestedTab ?? "timeline");
-  useEffect(() => {
-    if (!requestedTab) return;
-    setTab(requestedTab);
-    onTabRequestHandled?.();
-  }, [requestedTab, onTabRequestHandled]);
   const [filter, setFilter] = useState<TimelineFilter>("all");
   const [openGaps, setOpenGaps] = useState<Set<string>>(() => new Set());
   const [openMonths, setOpenMonths] = useState<Set<string>>(() => new Set());
@@ -131,9 +140,9 @@ export function HallOfRecordsView({
     [shown, openGaps, openMonths, locale]
   );
 
-  // A stage's date on the Labours tab jumps to the milestone that reached it.
+  // A stage's date on the Labours screen opens the milestone that reached it.
   useEffect(() => {
-    if (!focus || tab !== "timeline") return;
+    if (!focus || section !== "timeline") return;
     const frame = window.requestAnimationFrame(() => {
       const element = document.getElementById(`milestone-${focus}`);
       element?.scrollIntoView({ block: "center", behavior: "smooth" });
@@ -141,7 +150,7 @@ export function HallOfRecordsView({
       setFocus(null);
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [focus, tab, timeline]);
+  }, [focus, section, timeline]);
 
   const labourOf = useMemo(
     () => new Map(labours.map((labour) => [labour.definition.id, labour])),
@@ -154,21 +163,22 @@ export function HallOfRecordsView({
 
   // The month is opened for good, not for the jump: held open only while
   // `focus` was set, it folded back into its gap a frame after the scroll began.
-  const showMilestone = (id: string) => {
-    const month = result.milestones.find((milestone) => milestone.id === id)?.day.slice(0, 6);
+  useEffect(() => {
+    if (!focusRequest || section !== "timeline") return;
+    const month = result.milestones.find((milestone) => milestone.id === focusRequest)?.day.slice(0, 6);
     if (month) setOpenMonths((current) => new Set(current).add(month));
     setFilter("all");
-    setTab("timeline");
-    setFocus(id);
-  };
+    setFocus(focusRequest);
+    onFocusHandled?.();
+  }, [focusRequest, section, result.milestones, onFocusHandled]);
 
   if (!connected && !records.sample) {
     return (
       <section className="records-view">
         <header className="records-page-header">
           <div>
-            <h1>{t("records.title")}</h1>
-            <p>{t("records.subtitle")}</p>
+            <h1>{SECTION_TITLE[section]()}</h1>
+            <p>{t(`records.sub.${section}`)}</p>
           </div>
         </header>
         <section className="panel data-connect-panel">
@@ -189,43 +199,18 @@ export function HallOfRecordsView({
     <section className="records-view">
       <header className="records-page-header">
         <div>
-          <h1>{t("records.title")}</h1>
+          <h1>{SECTION_TITLE[section]()}</h1>
           <p>
-            {ready && first
-              ? `${plural("records.since", result.milestones.length, { day: formatDayShort(first.day) })} · ${t("records.stagesOf", { n: reachedStages, total: TOTAL_STAGES })}`
-              : ready || records.failed
-                ? t("records.subtitle")
-                : t("records.reading")}
+            {!ready && !records.failed
+              ? t("records.reading")
+              : section === "timeline" && ready && first
+                ? plural("records.since", result.milestones.length, { day: formatDayShort(first.day) })
+                : section === "labours" && ready
+                  ? t("records.stagesOf", { n: reachedStages, total: TOTAL_STAGES })
+                  : t(`records.sub.${section}`)}
           </p>
         </div>
       </header>
-      <OptionGroup<RecordsTab>
-        appearance="tabs"
-        className="records-tabs"
-        label={t("records.sections")}
-        value={tab}
-        onChange={setTab}
-        options={[
-          {
-            value: "timeline",
-            label: t("records.tab.timeline"),
-            icon: <MilestoneIcon size={16} aria-hidden="true" />,
-            ...(ready ? { count: formatCount(result.milestones.length) } : {})
-          },
-          {
-            value: "records",
-            label: t("records.tab.records"),
-            icon: <Medal size={16} aria-hidden="true" />,
-            ...(ready ? { count: formatCount(recordCount(result.board)) } : {})
-          },
-          {
-            value: "labours",
-            label: t("records.tab.labours"),
-            icon: <LaurelIcon size={16} aria-hidden="true" />,
-            ...(ready ? { count: `${reachedStages}/${TOTAL_STAGES}` } : {})
-          }
-        ]}
-      />
 
       {/* A sample says so on the toolbar's trigger ("Sample · 1"), as the
           Strength screen's does, and not here: the realistic preset is for
@@ -264,7 +249,7 @@ export function HallOfRecordsView({
           <h2>{t("records.empty.title")}</h2>
           <p>{t("records.empty.body")}</p>
         </section>
-      ) : tab === "timeline" ? (
+      ) : section === "timeline" ? (
         <>
           {result.withinReach.length > 0 ? (
             <WithinReachRow items={result.withinReach} labourOf={labourOf} />
@@ -321,7 +306,7 @@ export function HallOfRecordsView({
             </section>
           ))}
         </>
-      ) : tab === "records" ? (
+      ) : section === "records" ? (
         <PersonalRecordsBoard
           board={result.board}
           today={today}
@@ -332,7 +317,7 @@ export function HallOfRecordsView({
           labours={labours}
           reachedStages={reachedStages}
           completeLabours={completeLabours}
-          onShowMilestone={showMilestone}
+          onShowMilestone={(id) => onShowMilestone?.(id)}
         />
       )}
     </section>

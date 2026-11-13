@@ -1,17 +1,14 @@
 import type { RecordsMessages } from "../en/records.ts";
 
 const records: RecordsMessages = {
-  "records.title": "기록의 전당",
-  "records.subtitle": "훈련의 모든 이정표와 열두 과업.",
+  "records.sub.timeline": "훈련의 모든 이정표, 최신순.",
+  "records.sub.records": "거리별 최고 기록과 그 기록이 깨진 모든 순간.",
+  "records.sub.labours": "열두 가지 과업, 각각 세 단계.",
   "records.connectBody": "이정표는 COROS 활동 기록에서 계산됩니다.",
   "records.since_one": "{day} 이후 이정표 {count}개",
   "records.since_other": "{day} 이후 이정표 {count}개",
   "records.stagesOf": "과업 단계 {n}/{total}",
   "records.reading": "기록을 읽는 중…",
-  "records.sections": "기록의 전당 섹션",
-  "records.tab.timeline": "타임라인",
-  "records.tab.labours": "열두 과업",
-  "records.tab.records": "개인 기록",
   "records.pr.running": "러닝 · 거리별 최고 기록",
   "records.pr.period": "기록 기간",
   "records.pr.distances": "러닝 거리",

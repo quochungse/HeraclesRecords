@@ -1,7 +1,13 @@
 # Hall of Records
 
-Every milestone the athlete has reached, newest first, and **the Twelve Labours** — twelve
-kinds of achievement (`labours.ts`), three stages each, all twelve being Apotheosis.
+Three screens on the rail under Your journey, drawn by one lazy module (`HallOfRecordsView`,
+`section`): the **Timeline** of every milestone the athlete has reached, newest first (its
+view id is still `records`, so a stored startup view opens it); **Personal Records**
+(`personalRecords`); and **the Twelve Labours** (`labours`) — twelve kinds of achievement
+(`labours.ts`), three stages each, all twelve being Apotheosis. A labour's toast and
+celebration open the Labours; a stage's date there opens its milestone on the Timeline
+(`timelineFocus` in App). Only the Timeline marks milestones seen, and carries the rail's
+"new" count.
 
 ## Rules for stages
 

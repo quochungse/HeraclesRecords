@@ -1,17 +1,14 @@
 import type { RecordsMessages } from "../en/records.ts";
 
 const records: RecordsMessages = {
-  "records.title": "หอเกียรติยศ",
-  "records.subtitle": "ทุกหมุดหมายในการฝึกของคุณ และสิบสองภารกิจ",
+  "records.sub.timeline": "ทุกหมุดหมายของการฝึกซ้อม ล่าสุดก่อน",
+  "records.sub.records": "เวลาดีที่สุดในแต่ละระยะ และทุกครั้งที่ถูกทำลาย",
+  "records.sub.labours": "ความสำเร็จสิบสองแบบ แบบละสามขั้น",
   "records.connectBody": "หมุดหมายคำนวณจากประวัติกิจกรรม COROS ของคุณ",
   "records.since_one": "{count} หมุดหมายตั้งแต่ {day}",
   "records.since_other": "{count} หมุดหมายตั้งแต่ {day}",
   "records.stagesOf": "ขั้นภารกิจ {n}/{total}",
   "records.reading": "กำลังอ่านประวัติของคุณ…",
-  "records.sections": "ส่วนต่าง ๆ ของหอเกียรติยศ",
-  "records.tab.timeline": "ไทม์ไลน์",
-  "records.tab.labours": "สิบสองภารกิจ",
-  "records.tab.records": "สถิติส่วนตัว",
   "records.pr.running": "วิ่ง · เวลาดีที่สุดตามระยะ",
   "records.pr.period": "ช่วงเวลาของสถิติ",
   "records.pr.distances": "ระยะวิ่ง",
