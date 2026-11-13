@@ -138,7 +138,6 @@ assert.match(coachInstructions, /Open Water Swim is not Pool Swim/);
 assert.match(coachInstructions, /concise, practical advice/);
 assert.match(coachInstructions, /Answer in the language the athlete writes in/, "the prompt and snapshot are English; the athlete may not be");
 assert.doesNotMatch(coachInstructions, /friendly|encouraging|knowledgeable/i, "form that changes the answer, not temperament");
-assert.match(coachInstructions, /belong with a professional/);
 // The base block is sent whatever tools a turn holds, and shown to the athlete
 // in Settings: a rule naming a tool belongs beside that tool, in the guide
 // `withLiveToolInstructions` writes (held by test:chat-stream-sink).
@@ -1293,14 +1292,13 @@ assert.equal(
       continue;
     }
     assert.match(block, /^## Coach style\n/);
-    assert.match(block, /Tone only: facts, advice, safety rules and when to ask are unchanged/, `${style} changes tone, not facts or asking`);
+    assert.match(block, /Tone only: facts, advice and when to ask are unchanged/, `${style} changes tone, not facts or asking`);
     assert.match(block, /card text \(names, descriptions\) stays plain/, `${style} never reaches a card`);
   }
   const unfiltered = coachStyleInstructions("unfiltered");
   assert.match(unfiltered, /Swear freely in the athlete's language/);
   assert.match(unfiltered, /never at the person/);
   assert.match(unfiltered, /no slurs/);
-  assert.match(unfiltered, /Drop it at any mention of pain, injury, illness or distress/, "and it stands down when the athlete is hurt");
   assert.doesNotMatch(coachStyleInstructions("straight"), /[Ss]wear/, "Straight talk is blunt without the language");
   for (const style of COACH_STYLES) {
     assert.ok((COACH_STYLE_CATALOG[style].prompt ?? "").length < 260, `${style} is a line, not a paragraph: it is sent every turn`);

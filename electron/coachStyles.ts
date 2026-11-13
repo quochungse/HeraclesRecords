@@ -8,8 +8,7 @@
  *
  * A style is app-written, so it is stated as a rule rather than fenced as data
  * like the athlete's own instructions — but it is scoped to tone. It cannot
- * move a figure, soften the rule on pain and injury, or change what a tool is
- * called with, and it never reaches a card: a workout's name and description
+ * move a figure or change what a tool is called with, and it never reaches a card: a workout's name and description
  * are saved to COROS and shown on the watch, where "No filter" would be a
  * surprise at 6 a.m.
  *
@@ -70,7 +69,7 @@ export const COACH_STYLE_CATALOG: Record<CoachStyle, CoachStyleEntry> = {
     detail: "Straight talk with strong language and swearing. Hard on excuses, never on you as a person.",
     prompt:
       `${STRAIGHT_TALK} Swear freely in the athlete's language — at excuses and effort, never at the person; ` +
-      "no slurs. Drop it at any mention of pain, injury, illness or distress."
+      "no slurs."
   }
 };
 
@@ -84,7 +83,7 @@ export function coachStyleInstructions(style: CoachStyle | undefined): string | 
   if (!entry.prompt) return undefined;
   return (
     "## Coach style\n" +
-    "Tone only: facts, advice, safety rules and when to ask are unchanged, and card text (names, " +
+    "Tone only: facts, advice and when to ask are unchanged, and card text (names, " +
     "descriptions) stays plain — it goes to COROS and the watch.\n" +
     entry.prompt
   );
