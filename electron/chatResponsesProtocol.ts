@@ -8,7 +8,8 @@ export function buildResponsesRequest(
   input: Record<string, unknown>[],
   tools: Record<string, unknown>[],
   includeReasoningSummary = true,
-  effort?: string
+  effort?: string,
+  answerOnly = false
 ): Record<string, unknown> {
   const request: Record<string, unknown> = {
     model,
@@ -25,7 +26,7 @@ export function buildResponsesRequest(
   }
   if (tools.length > 0) {
     request.tools = tools;
-    request.tool_choice = "auto";
+    request.tool_choice = answerOnly ? "none" : "auto";
   }
   return request;
 }

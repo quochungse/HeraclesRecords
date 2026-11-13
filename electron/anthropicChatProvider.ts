@@ -348,8 +348,12 @@ export async function streamAnthropicChatCompletion(
   let usage: ChatTokenUsage | undefined;
 
   try {
-    for (let round = 0; round < options.maxToolRounds; round++) {
+    // One round past the limit, with the tools still listed (the cached prefix
+    // holds them) but none allowed: a turn that spent every round reading
+    // otherwise ended with no answer at all.
+    for (let round = 0; round <= options.maxToolRounds; round++) {
       const tools: Anthropic.Beta.BetaToolUnion[] = [...localTools, ...webTools];
+      const answerOnly = round === options.maxToolRounds && tools.length > 0;
       const stream = client.beta.messages.stream(
         {
           model,
@@ -359,6 +363,7 @@ export async function streamAnthropicChatCompletion(
           cache_control: { type: "ephemeral" },
           messages: conversation,
           ...(tools.length > 0 ? { tools } : {}),
+          ...(answerOnly ? { tool_choice: { type: "none" as const } } : {}),
           ...tuning
         },
         { signal: options.signal }

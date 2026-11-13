@@ -119,6 +119,11 @@ const SUMMARY_MAX = 140;
  * a line is *for* places it correctly in cases nobody enumerated; a model given
  * "no heading, no bullet, no table" only learns about the three cases someone
  * thought of.
+ *
+ * Rule 1 is the playbook's to use, not a test every run must pass: worded as
+ * "nothing materially different → say nothing", it silenced a review of a week
+ * that went to plan and a plan that was asked for every Monday, and a silent
+ * run keeps nothing the model made, cards included.
  */
 export const AUTOMATION_OUTPUT_CONTRACT = [
   "---",
@@ -126,7 +131,7 @@ export const AUTOMATION_OUTPUT_CONTRACT = [
   "not replace it — the playbook decides what to look at, how long to be, and",
   "how the answer is laid out.",
   "",
-  `1. If nothing is materially different from recent history, reply with exactly ${NOTHING_TO_REPORT} and nothing else.`,
+  `1. Staying silent is for a playbook that asks only for what stands out: when it does and nothing stands out, reply with exactly ${NOTHING_TO_REPORT} and nothing else — no draft, no proposal. A playbook that asks for something every run (a review, a briefing, a plan) gets it every run, however ordinary the answer.`,
   `2. Otherwise make the very first line one plain sentence saying what you found, under ${SUMMARY_MAX} characters. The app shows that line on its own, away from the rest of the answer, so it has to make sense with no context around it. Everything after that line belongs to the playbook — length, structure, tables, whatever it asked for.`
 ].join("\n");
 

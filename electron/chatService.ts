@@ -2499,7 +2499,9 @@ async function streamChatTurn(
     // and our tool results.
     const input: Record<string, unknown>[] = messages.map(toInputMessageItem);
 
-    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    // One round past the limit, with no tool allowed: a turn that spent every
+    // round reading otherwise ended with no answer at all.
+    for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
       const opened = await resolveModelAndOpenStream(
         token,
         requestId,
@@ -2508,7 +2510,8 @@ async function streamChatTurn(
         tools,
         controller.signal,
         runtime.model ?? settings.chatgpt.model,
-        runtime.effort ?? settings.chatgpt.effort
+        runtime.effort ?? settings.chatgpt.effort,
+        round === MAX_TOOL_ROUNDS
       );
       if ("error" in opened) {
         sendStreamError({ message: opened.error, authError: opened.authError });
@@ -3626,7 +3629,8 @@ async function resolveModelAndOpenStream(
   tools: Record<string, unknown>[],
   signal: AbortSignal,
   selectedModel?: string,
-  selectedEffort?: string
+  selectedEffort?: string,
+  answerOnly = false
 ): Promise<
   | { response: Response; model: string; tools: Record<string, unknown>[] }
   | { error: string; authError: boolean }
@@ -3672,7 +3676,8 @@ async function resolveModelAndOpenStream(
             input,
             requestTools,
             includeReasoningSummary,
-            effort
+            effort,
+            answerOnly
           )
         )
       });
@@ -3805,8 +3810,10 @@ export function withLiveToolInstructions(
   if (readsData) {
     sections.push(
       "Read before you fetch. The training snapshot at the end of these instructions, when present, " +
-        "already holds the latest activities, the athlete's thresholds, fitness and recovery status and " +
-        "the next 14 days of schedule — answer from it when it covers the question. Across every tool: ask " +
+        "already holds the latest activities, the athlete's thresholds, today's recovery, race predictions " +
+        "and records, last night's sleeping heart rate and the next 14 days of schedule — answer from it " +
+        "when it covers the question. It holds no load or fitness trend, HRV, sleep duration or VO2max: a " +
+        "question that turns on those is read with a tool. Across every tool: ask " +
         "for only the period, sport and sections the question is about, never fetch the same data twice in " +
         "one answer, read the totals and averages a tool has already computed rather than recomputing them, " +
         "and say when a value is missing instead of estimating it."

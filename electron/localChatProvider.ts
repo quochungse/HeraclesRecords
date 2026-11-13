@@ -393,7 +393,9 @@ export async function streamOpenAiCompatibleChatCompletion(
     : [];
   let serverTools = options.serverTools ?? [];
 
-  for (let round = 0; round < options.maxToolRounds; round++) {
+  // One round past the limit, with no tool allowed: a turn that spent every
+  // round reading otherwise ended with no answer at all.
+  for (let round = 0; round <= options.maxToolRounds; round++) {
     const opened = await openLocalChatStream(
       baseUrl,
       model,
@@ -401,7 +403,8 @@ export async function streamOpenAiCompatibleChatCompletion(
       [...tools, ...serverTools],
       transport,
       options.signal,
-      serverTools.length > 0
+      serverTools.length > 0,
+      round === options.maxToolRounds
     );
 
     if ("serverToolsUnsupported" in opened) {
@@ -569,7 +572,8 @@ async function openLocalChatStream(
   tools: Record<string, unknown>[],
   transport: OpenAiCompatibleChatTransport,
   signal: AbortSignal,
-  hasServerTools = false
+  hasServerTools = false,
+  answerOnly = false
 ): Promise<{ response: Response } | { toolsUnsupported: true } | { serverToolsUnsupported: true }> {
   const request: Record<string, unknown> = {
     model,
@@ -582,7 +586,7 @@ async function openLocalChatStream(
   };
   if (tools.length > 0) {
     request.tools = tools;
-    request.tool_choice = "auto";
+    request.tool_choice = answerOnly ? "none" : "auto";
   }
 
   const response = await fetch(joinLocalEndpoint(baseUrl, "chat/completions"), {
