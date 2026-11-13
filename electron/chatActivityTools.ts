@@ -228,7 +228,7 @@ export function getChatActivityTools(): CorosMcpTool[] {
             type: "boolean",
             description:
               "true to also show the athlete this activity's chart — when the answer is about this activity " +
-              "itself (a review, a debrief, how one session went). Leave it out when the activity is only " +
+              "itself (a review, a debrief, how one session went). false when the activity is only " +
               "evidence for something else, such as setting a target or writing a workout."
           },
           window: {
@@ -242,7 +242,9 @@ export function getChatActivityTools(): CorosMcpTool[] {
             description: "A stretch on activity time (pauses out) or distance, e.g. the last 5 km."
           }
         },
-        required: ["activity_id"]
+        // `chart` is asked of every call: left optional, a review of one
+        // session was read without it and answered with no chart.
+        required: ["activity_id", "chart"]
       }
     }
   ];
