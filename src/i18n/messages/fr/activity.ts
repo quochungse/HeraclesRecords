@@ -50,7 +50,7 @@ const activity: ActivityMessages = {
   "activity.pane.feltLike": "Ressenti {temp}",
   "activity.pane.humidity": " · {percent} % d’humidité",
   "activity.raw.show": "Afficher le JSON brut",
-  "activity.askCoach": "Demander à Coach",
+  "activity.askCoach": "Demander à Mentor",
   "activity.openIn": "Ouvrir dans {screen}",
   "activity.pane.pickLap": "Choisissez un tour pour centrer le graphique dessus.",
   "activity.raw.title": "JSON brut",

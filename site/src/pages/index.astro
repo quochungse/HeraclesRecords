@@ -105,7 +105,7 @@ const sports = [
 const steps = [
   { title: "Download", text: "Install Heracles Records on macOS, Windows or Linux." },
   { title: "Sign in with COROS", text: "Your activities, sleep, workouts and plans arrive from your COROS account." },
-  { title: "Pick an AI for Coach", text: "Optional. Your ChatGPT account, a Claude subscription, an API key or a model on your own computer." },
+  { title: "Pick an AI for Mentor", text: "Optional. Your ChatGPT account, a Claude subscription, an API key or a model on your own computer." },
 ];
 
 const faq = [
@@ -115,11 +115,11 @@ const faq = [
   },
   {
     q: "Does it cost anything?",
-    a: "The app is free. Coach runs on an AI you choose: your own ChatGPT or Claude plan, a pay-as-you-go API key, or a free model on your own computer.",
+    a: "The app is free. Mentor runs on an AI you choose: your own ChatGPT or Claude plan, a pay-as-you-go API key, or a free model on your own computer.",
   },
   {
-    q: "Can I use it without the AI coach?",
-    a: "Yes. Every screen but Coach works without one.",
+    q: "Can I use it without Mentor?",
+    a: "Yes. Every screen but Mentor works without one.",
   },
   {
     q: "Where is my data?",
@@ -128,13 +128,13 @@ const faq = [
 ];
 ---
 
-<Base jsonLd={softwareApplication(release, Astro.site)} description="Heracles Records is a free desktop app for COROS athletes: every session read in depth, an AI coach that has read all of it, and a hall for every record you set.">
+<Base jsonLd={softwareApplication(release, Astro.site)} description="Heracles Records is a free desktop app for COROS athletes: every session read in depth, an AI mentor that has read all of it, and a hall for every record you set.">
   <section class="hero wrap">
     <Image class="hero-icon" src={icon} alt="" width={88} height={88} densities={[1, 2]} format="webp" loading="eager" />
     <h1>Your COROS training, read in depth.</h1>
     <p class="hero-tagline">Every session a record. Every record a labour.</p>
     <p class="hero-lede">
-      A free desktop app for COROS athletes: every session read in depth, an AI coach that
+      A free desktop app for COROS athletes: every session read in depth, an AI mentor that
       has read all of it, and a hall for every record you set along the way.
     </p>
     <div class="hero-download">
@@ -250,29 +250,29 @@ const faq = [
 
   <section class="wrap section">
     <div class="section-head">
-      <p class="eyebrow">Coach</p>
-      <h2 class="section-title">A coach that has read your training.</h2>
+      <p class="eyebrow">Mentor</p>
+      <h2 class="section-title">A mentor that has read your training.</h2>
       <p class="lede">
-        Ask about a session, a week or how well you are recovering. Coach reads your COROS
+        Ask about a session, a week or how well you are recovering. Mentor reads your COROS
         data and answers with the numbers and the charts behind them.
       </p>
     </div>
     <div class="grid-2">
-      <Shot name="11-coach" alt="Coach: an interval session analysed, with heart-rate and pace charts" sizes={SIZES_HALF} />
-      <Shot name="12-coach-plan" alt="Coach: a marathon plan in the Workbench beside the conversation" sizes={SIZES_HALF} />
+      <Shot name="11-coach" alt="Mentor: an interval session analysed, with heart-rate and pace charts" sizes={SIZES_HALF} />
+      <Shot name="12-coach-plan" alt="Mentor: a marathon plan in the Workbench beside the conversation" sizes={SIZES_HALF} />
     </div>
     <ul class="ticks columns">
       <li><strong>Plans with you.</strong> The brief, the outline, then every session, saved to COROS and your calendar when you are happy with it.</li>
       <li><strong>Proposes, never decides.</strong> Changes to your week arrive as a list you apply one line at a time.</li>
       <li><strong>Your AI, your choice.</strong> ChatGPT, Claude, OpenRouter or a model on your own computer.</li>
-      <li><strong>Reads only what you allow.</strong> Each conversation has its own sources, and Coach sees nothing it is not given.</li>
+      <li><strong>Reads only what you allow.</strong> Each conversation has its own sources, and Mentor sees nothing it is not given.</li>
     </ul>
 
     <div class="auto">
       <div class="auto-intro">
-        <h3>Auto analysis: Coach checks in on its own.</h3>
+        <h3>Auto analysis: Mentor checks in on its own.</h3>
         <p>
-          Give a conversation a standing job and Coach does it without being asked: after a new
+          Give a conversation a standing job and Mentor does it without being asked: after a new
           activity, on a schedule, or when something in your data turns. The answer lands in the
           same conversation, ready when you open it.
         </p>
@@ -293,7 +293,7 @@ const faq = [
         waits for you, and a monthly budget caps what it may spend.
       </p>
     </div>
-    <a class="more" href="/coach">How Coach works</a>
+    <a class="more" href="/mentor">How Mentor works</a>
   </section>
 
   <section class="wrap section">
@@ -339,8 +339,8 @@ const faq = [
       <h2 class="section-title">In your language, on every screen.</h2>
       <p class="lede">
         Heracles Records speaks {languages.length} languages. Pick one under Settings, Appearance,
-        Language and every screen, Coach included, switches at once. Dates and numbers follow it.
-        Coach answers in whatever language you write to it.
+        Language and every screen, Mentor included, switches at once. Dates and numbers follow it.
+        Mentor answers in whatever language you write to it.
       </p>
     </div>
     <ul class="languages">

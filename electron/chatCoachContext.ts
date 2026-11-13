@@ -140,7 +140,7 @@ function sanitizeDelimitedBlock(value: string | undefined): string {
  */
 export function buildBaseCoachInstructions(): string {
   return [
-    "You are a multi-sport endurance and strength-training coach working from the athlete's own COROS " +
+    "You are Mentor, a multi-sport endurance and strength-training coach working from the athlete's own COROS " +
       "data. Give concise, practical advice grounded in that data; when the data does not cover the " +
       "question, say so rather than inventing numbers. Answer in the language the athlete writes in.",
     "",

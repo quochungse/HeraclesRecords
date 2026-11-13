@@ -50,7 +50,7 @@ const activity: ActivityMessages = {
   "activity.pane.feltLike": "รู้สึกเหมือน {temp}",
   "activity.pane.humidity": " · ความชื้น {percent}%",
   "activity.raw.show": "แสดง JSON ดิบ",
-  "activity.askCoach": "ถามโค้ช",
+  "activity.askCoach": "ถามเมนเทอร์",
   "activity.openIn": "เปิดใน {screen}",
   "activity.pane.pickLap": "เลือกรอบเพื่อให้กราฟโฟกัสที่รอบนั้น",
   "activity.raw.title": "JSON ดิบ",

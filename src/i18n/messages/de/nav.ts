@@ -8,7 +8,7 @@ const nav: NavMessages = {
 
   "nav.overview": "Übersicht",
   "nav.sleep": "Schlaf",
-  "nav.coach": "Coach",
+  "nav.coach": "Mentor",
   "nav.calendar": "Kalender",
   "nav.library": "Trainingsbibliothek",
   "nav.training": "Aktivitäten",
@@ -25,7 +25,7 @@ const nav: NavMessages = {
   "nav.settings": "Einstellungen",
 
   "nav.primary": "Hauptnavigation",
-  "nav.coachResponding": "Der Coach antwortet gerade",
+  "nav.coachResponding": "Der Mentor antwortet gerade",
   "nav.collapse": "Seitenleiste einklappen",
   "nav.expand": "Seitenleiste ausklappen",
   "nav.closeNavigation": "Navigation schließen",

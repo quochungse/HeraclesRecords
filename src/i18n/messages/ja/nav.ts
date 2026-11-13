@@ -8,7 +8,7 @@ const nav: NavMessages = {
 
   "nav.overview": "概要",
   "nav.sleep": "睡眠",
-  "nav.coach": "コーチ",
+  "nav.coach": "メンター",
   "nav.calendar": "カレンダー",
   "nav.library": "トレーニングライブラリ",
   "nav.training": "アクティビティ",
@@ -25,7 +25,7 @@ const nav: NavMessages = {
   "nav.settings": "設定",
 
   "nav.primary": "メインナビゲーション",
-  "nav.coachResponding": "コーチが回答中",
+  "nav.coachResponding": "メンターが回答中",
   "nav.collapse": "サイドバーを折りたたむ",
   "nav.expand": "サイドバーを展開",
   "nav.closeNavigation": "ナビゲーションを閉じる",

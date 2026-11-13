@@ -590,7 +590,7 @@ async function main() {
       "an answer that streamed in full must survive an error that lands after it"
     );
     assert.match(onScreen, /Tiếp theo muốn xem gì\?/, "and so must the card it asked");
-    assert.match(onScreen, /Coach stopped before finishing/, "with the cut-off said out loud");
+    assert.match(onScreen, /Mentor stopped before finishing/, "with the cut-off said out loud");
     // An answered card is not drawn at all, so "stays answered" reads on screen
     // as "is gone". The first card coming back is precisely what the athlete
     // saw: the reset card reappearing looked like the coach's next question.
@@ -652,7 +652,7 @@ async function main() {
     assert.equal(await harness("exists", ".chat-coach-prompt-choice"), true);
     assert.doesNotMatch(
       (await harness("text", ".chat-transcript")) ?? "",
-      /Coach stopped before finishing/,
+      /Mentor stopped before finishing/,
       "and there is no truncated answer to put a notice under"
     );
   }
@@ -754,7 +754,7 @@ async function main() {
     );
     await harness("keyDown", ".chat-composer textarea", "Enter");
     await waitFor(async () => (await harness("callCount", "prop:onMessage")) > 0, "Enter says why, as a toast");
-    assert.match((await harness("calls", "prop:onMessage")).at(-1).args[0], /Coach is still answering in "Tuần này"/, "names the conversation that is answering");
+    assert.match((await harness("calls", "prop:onMessage")).at(-1).args[0], /Mentor is still answering in "Tuần này"/, "names the conversation that is answering");
     assert.equal(await harness("callCount", "sendChat"), 1, "and nothing is sent");
     assert.equal(await harness("value", ".chat-composer textarea"), "Ngủ thế nào?", "the words stay");
 

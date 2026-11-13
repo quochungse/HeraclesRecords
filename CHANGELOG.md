@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Personal Records left the Personal screen** for a screen of their own.
+- **Coach is now Mentor** - named for the counsellor of the Odyssey, with a bearded head for its icon on the rail, on every "Ask Mentor" button and beside its answers. Nothing else about it changes: your conversations, plans and settings carry over.
 
 ## [1.4.8] - 2026-11-11
 

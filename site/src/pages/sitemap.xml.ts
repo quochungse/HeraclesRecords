@@ -1,5 +1,5 @@
 // /sitemap.xml: every page a search engine should find, at the address GitHub
-// Pages serves it from (/coach, not /coach.html). The 404 page is left out.
+// Pages serves it from (/mentor, not /mentor.html). The 404 page is left out.
 // test:site checks that each address here is a page in the build.
 import type { APIRoute } from "astro";
 import { getCollection } from "astro:content";
@@ -12,7 +12,7 @@ const PAGES = [
   TRAINING_LOAD_PAGE,
   "/plan/",
   ...PLAN_PAGES.map((page) => page.href),
-  "/coach",
+  "/mentor",
   "/labours",
   "/guide/",
   "/changelog/",

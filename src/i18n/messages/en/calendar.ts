@@ -67,7 +67,7 @@ const calendar = {
   "calendar.week.targetRangeTitle": "COROS’s recommended weekly load for your current fitness.",
   "calendar.week.targetRangeTitleHeracles": "The weekly load recommended for your current fitness, by COROS's formula on Heracles TL. COROS's own: {min}–{max} TL.",
   "calendar.week.elevGain": "Elev. Gain",
-  "calendar.week.askTitle": "Ask Coach about this week",
+  "calendar.week.askTitle": "Ask Mentor about this week",
   "calendar.card.plan": "Plan",
   "calendar.card.missed": "Missed",
   "calendar.day.more": "+{count} more",

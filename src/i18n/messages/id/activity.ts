@@ -50,7 +50,7 @@ const activity: ActivityMessages = {
   "activity.pane.feltLike": "Terasa seperti {temp}",
   "activity.pane.humidity": " · kelembapan {percent}%",
   "activity.raw.show": "Tampilkan JSON mentah",
-  "activity.askCoach": "Tanya pelatih",
+  "activity.askCoach": "Tanya Mentor",
   "activity.openIn": "Buka di {screen}",
   "activity.pane.pickLap": "Pilih putaran untuk memfokuskan grafik ke sana.",
   "activity.raw.title": "JSON mentah",

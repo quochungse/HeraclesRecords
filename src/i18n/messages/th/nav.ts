@@ -8,7 +8,7 @@ const nav: NavMessages = {
 
   "nav.overview": "ภาพรวม",
   "nav.sleep": "การนอน",
-  "nav.coach": "โค้ช",
+  "nav.coach": "เมนเทอร์",
   "nav.calendar": "ปฏิทิน",
   "nav.library": "คลังการฝึก",
   "nav.training": "กิจกรรม",
@@ -25,7 +25,7 @@ const nav: NavMessages = {
   "nav.settings": "การตั้งค่า",
 
   "nav.primary": "เมนูหลัก",
-  "nav.coachResponding": "โค้ชกำลังตอบ",
+  "nav.coachResponding": "เมนเทอร์กำลังตอบ",
   "nav.collapse": "ยุบแถบด้านข้าง",
   "nav.expand": "ขยายแถบด้านข้าง",
   "nav.closeNavigation": "ปิดเมนู",

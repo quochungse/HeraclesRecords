@@ -12,6 +12,12 @@ suite CI runs ([docs/coach-checks.md](../../docs/coach-checks.md)).
 Names that leave the machine: the Agent SDK client app is `heracles-records-coach`, its MCP
 server `heracles` (tools `mcp__heracles__*`).
 
+**On screen it is Mentor** (the Odyssey's counsellor), in every language, with `MentorIcon`
+(`src/chat/mentorIcon.ts`); the code, channels, keys and stored kinds keep `coach`. "Coach"
+stays only where it is the generic word — an analysis role ("endurance coach"), "coaching".
+English stored before the rename says "Coach": `storedNotice.ts` and `screenKeyForEnglish`
+still read it, and the Canvas still hides the old placeholder overview.
+
 ## Tools
 
 - Read tools fetch only what a question is about (date windows, sport family, `sections`,
@@ -177,7 +183,7 @@ Coach never writes to COROS directly; it writes drafts and change sets the athle
   and Restore. Under `WORKBENCH_FOLD_WIDTH` the conversation list folds (the athlete's own
   collapse setting is untouched); under `WORKBENCH_SHEET_WIDTH` it becomes a sheet over the
   whole conversation. Its buttons and the card's come from `artifactActions`.
-- **A question can point at what it is about**: Ask Coach puts a chip by the composer and
+- **A question can point at what it is about**: Ask Mentor puts a chip by the composer and
   sending writes a `planRefs` (a Coach creation) or `scheduleRefs` (calendar, activity) anchor
   folded into the question by `toWireMessages`. A `PlanRef` chip only goes to its own
   conversation. From the Calendar and Library, `CoachAskPicker` asks which conversation.

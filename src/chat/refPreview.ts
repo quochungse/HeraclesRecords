@@ -59,7 +59,7 @@ export function planRefPreview(
 ): RefPreview {
   const bare: RefPreview = {
     kind: ref.scope === "plan" ? "plan" : ref.scope,
-    context: ref.scope === "plan" ? "Coach plan" : ref.name,
+    context: ref.scope === "plan" ? "Mentor plan" : ref.name,
     title: ref.scope === "plan" ? ref.name : ref.label,
     chip: ref.scope === "plan" ? ref.name : ref.label
   };

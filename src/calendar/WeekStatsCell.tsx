@@ -1,4 +1,4 @@
-import { MessageCircle } from "lucide-react";
+import { MentorIcon } from "../chat/mentorIcon";
 import type { CSSProperties } from "react";
 import type { StrengthLoadSource } from "../../electron/types";
 import { formatDurationSpan } from "../training/formatters";
@@ -180,7 +180,7 @@ export function WeekStatsCell({
           title={t("calendar.week.askTitle")}
           aria-label={t("calendar.week.askTitle")}
         >
-          <MessageCircle size={15} aria-hidden="true" />
+          <MentorIcon size={15} aria-hidden="true" />
         </button>
       </div>
       <div

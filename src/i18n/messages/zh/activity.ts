@@ -50,7 +50,7 @@ const activity: ActivityMessages = {
   "activity.pane.feltLike": "体感 {temp}",
   "activity.pane.humidity": " · 湿度 {percent}%",
   "activity.raw.show": "查看原始 JSON",
-  "activity.askCoach": "问教练",
+  "activity.askCoach": "问导师",
   "activity.openIn": "在{screen}中打开",
   "activity.pane.pickLap": "选择一个分段，图表会聚焦到它。",
   "activity.raw.title": "原始 JSON",

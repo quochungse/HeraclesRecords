@@ -30,7 +30,6 @@ import {
   KeyRound,
   Loader2,
   LogOut,
-  MessageCircle,
   Network,
   Plug,
   RefreshCw,
@@ -41,6 +40,7 @@ import {
   User,
   Zap
 } from "lucide-react";
+import { MentorIcon } from "./mentorIcon";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
@@ -4746,7 +4746,7 @@ export function ChatView({
   );
   const turnElsewhere = streaming && turnSessionId !== activeSessionId;
   /** Why a send waits while Coach answers in another conversation (UAT). */
-  const answeringElsewhere = `Coach is still answering in "${
+  const answeringElsewhere = `Mentor is still answering in "${
     sessions.find((session) => session.id === turnSessionId)?.title ?? "another conversation"
   }". Send this when it has finished.`;
   // Words typed answer a single waiting question; next to a card of several
@@ -5387,7 +5387,7 @@ export function ChatView({
           <ChatSidebar {...sidebarProps} />
           <div className="chat-main chat-main-login">
             <div className="panel chat-login-panel">
-              <MessageCircle size={32} aria-hidden="true" />
+              <MentorIcon size={32} aria-hidden="true" />
               <h2>{t("chat.gate.chatgpt.title")}</h2>
               <p>{t("chat.gate.chatgpt.body")}</p>
               <button
@@ -5569,7 +5569,7 @@ export function ChatView({
   const failureRow = failure ? (
     <ChatRow key="turn-failure" settled className="chat-row chat-row-assistant">
       <div className="chat-avatar chat-avatar-assistant">
-        <Sparkles size={16} aria-hidden="true" />
+        <MentorIcon size={16} aria-hidden="true" />
       </div>
       <div className="chat-bubble chat-bubble-plan">
         <TurnFailureRow
@@ -5607,7 +5607,7 @@ export function ChatView({
   const assistantRow = (key: string, children: ReactNode, withCharts = false) => (
     <div key={key} className="chat-row chat-row-assistant">
       <div className="chat-avatar chat-avatar-assistant">
-        <Sparkles size={16} aria-hidden="true" />
+        <MentorIcon size={16} aria-hidden="true" />
       </div>
       <div className={`chat-bubble chat-bubble-streaming${withCharts ? " chat-bubble-with-charts" : ""}`}>
         {children}
@@ -5740,7 +5740,7 @@ export function ChatView({
           {nothingDrawn && !turnHere ? (
             <div className="chat-empty">
               <div className="chat-empty-icon">
-                <Sparkles size={28} aria-hidden="true" />
+                <MentorIcon size={36} aria-hidden="true" />
               </div>
               <h3>{t("chat.empty.title")}</h3>
               {/* Three things a conversation is for (R3), in place of eight
@@ -5806,7 +5806,7 @@ export function ChatView({
                   className="chat-row chat-row-assistant"
                 >
                   <div className="chat-avatar chat-avatar-assistant">
-                    <Sparkles size={16} aria-hidden="true" />
+                    <MentorIcon size={16} aria-hidden="true" />
                   </div>
                   <div className="chat-bubble chat-bubble-tool-notice">
                     {displayStoredNotice(entry.message)}
@@ -5852,7 +5852,7 @@ export function ChatView({
                     data-chat-entry-index={index}
                   >
                     <div className="chat-avatar chat-avatar-assistant">
-                      <MessageCircle size={16} aria-hidden="true" />
+                      <MentorIcon size={16} aria-hidden="true" />
                     </div>
                     <div className="chat-bubble chat-bubble-coach-prompt">
                       <CoachQuestionsCard
@@ -5874,7 +5874,7 @@ export function ChatView({
                   data-chat-entry-index={index}
                 >
                   <div className="chat-avatar chat-avatar-assistant">
-                    <MessageCircle size={16} aria-hidden="true" />
+                    <MentorIcon size={16} aria-hidden="true" />
                   </div>
                   <div className="chat-bubble chat-bubble-coach-prompt">
                     <CoachQuestionCard
@@ -5943,7 +5943,7 @@ export function ChatView({
                   data-chat-entry-index={index}
                 >
                   <div className="chat-avatar chat-avatar-assistant">
-                    <Sparkles size={16} aria-hidden="true" />
+                    <MentorIcon size={16} aria-hidden="true" />
                   </div>
                   <div className="chat-bubble chat-bubble-plan">
                     <CoachBriefCard
@@ -6001,7 +6001,7 @@ export function ChatView({
                   data-chat-entry-index={index}
                 >
                   <div className="chat-avatar chat-avatar-assistant">
-                    <Sparkles size={16} aria-hidden="true" />
+                    <MentorIcon size={16} aria-hidden="true" />
                   </div>
                   <div className="chat-bubble chat-bubble-plan">
                     <CoachOutlineCard
@@ -6144,7 +6144,7 @@ export function ChatView({
                   data-chat-entry-index={index}
                 >
                   <div className="chat-avatar chat-avatar-assistant">
-                    <Sparkles size={16} aria-hidden="true" />
+                    <MentorIcon size={16} aria-hidden="true" />
                   </div>
                   <div className="chat-bubble chat-bubble-plan">
                     <CoachCreationCard
@@ -6192,7 +6192,7 @@ export function ChatView({
                   className="chat-row chat-row-assistant"
                 >
                   <div className="chat-avatar chat-avatar-assistant">
-                    <Sparkles size={16} aria-hidden="true" />
+                    <MentorIcon size={16} aria-hidden="true" />
                   </div>
                   <div className="chat-bubble chat-bubble-plan">
                     <DeletePreviewCard preview={entry.preview} />
@@ -6214,7 +6214,7 @@ export function ChatView({
                   data-chat-entry-index={index}
                 >
                   <div className="chat-avatar chat-avatar-assistant">
-                    <Sparkles size={16} aria-hidden="true" />
+                    <MentorIcon size={16} aria-hidden="true" />
                   </div>
                   <div className="chat-bubble chat-bubble-plan">
                     <CoachScheduleChangeCard
@@ -6255,7 +6255,7 @@ export function ChatView({
                   className="chat-row chat-row-assistant"
                 >
                   <div className="chat-avatar chat-avatar-assistant">
-                    <Sparkles size={16} aria-hidden="true" />
+                    <MentorIcon size={16} aria-hidden="true" />
                   </div>
                   <div className="chat-bubble chat-bubble-plan">
                     <ChartCard entry={entry} />
@@ -6368,7 +6368,7 @@ export function ChatView({
               >
                 <div className={`chat-avatar chat-avatar-${entry.role}`}>
                   {entry.role === "assistant" ? (
-                    <Sparkles size={16} aria-hidden="true" />
+                    <MentorIcon size={16} aria-hidden="true" />
                   ) : (
                     <User size={16} aria-hidden="true" />
                   )}
@@ -6471,7 +6471,7 @@ export function ChatView({
           {liveAnalysis ? (
             <div className="chat-row chat-row-assistant">
               <div className="chat-avatar chat-avatar-assistant">
-                <Sparkles size={16} aria-hidden="true" />
+                <MentorIcon size={16} aria-hidden="true" />
               </div>
               <div className="chat-bubble chat-bubble-streaming">
                 <span className="chat-analysis-attribution">

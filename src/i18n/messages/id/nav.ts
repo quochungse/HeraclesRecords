@@ -8,7 +8,7 @@ const nav: NavMessages = {
 
   "nav.overview": "Ringkasan",
   "nav.sleep": "Tidur",
-  "nav.coach": "Pelatih",
+  "nav.coach": "Mentor",
   "nav.calendar": "Kalender",
   "nav.library": "Pustaka latihan",
   "nav.training": "Aktivitas",
@@ -25,7 +25,7 @@ const nav: NavMessages = {
   "nav.settings": "Pengaturan",
 
   "nav.primary": "Navigasi utama",
-  "nav.coachResponding": "Pelatih sedang menjawab",
+  "nav.coachResponding": "Mentor sedang menjawab",
   "nav.collapse": "Ciutkan bilah samping",
   "nav.expand": "Bentangkan bilah samping",
   "nav.closeNavigation": "Tutup navigasi",

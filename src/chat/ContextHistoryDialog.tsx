@@ -216,7 +216,7 @@ function MessageList({ messages }: { messages: ChatMessage[] }) {
       {messages.map((message, index) => (
         <li key={index} className={`is-${message.role}`}>
           <span className="chat-context-message-role">
-            {message.role === "user" ? "Athlete" : "Coach"}
+            {message.role === "user" ? "Athlete" : "Mentor"}
           </span>
           <pre>{message.content}</pre>
         </li>

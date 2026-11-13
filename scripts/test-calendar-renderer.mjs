@@ -425,7 +425,7 @@ async function main() {
     assert.ok(await harness("exists", ".calendar-day-overview"), "a day with two things opens as a whole");
     assert.equal(await harness("count", ".calendar-day-overview-item"), 2, "a row for each");
 
-    assert.equal(await harness("clickText", ".calendar-detail-action", "Ask Coach"), true);
+    assert.equal(await harness("clickText", ".calendar-detail-action", "Ask Mentor"), true);
     const asked = (await harness("calls", "prop:onOpenCoach")).at(-1)?.args[0];
     assert.equal(asked?.scheduleRefs?.[0]?.scope, "day", "Ask Coach asks about the day");
     assert.equal(asked?.scheduleRefs?.[0]?.day, todayKey);

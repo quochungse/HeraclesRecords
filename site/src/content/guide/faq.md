@@ -14,17 +14,17 @@ Any COROS watch that syncs to your COROS account: PACE, APEX, VERTIX, NOMAD and 
 
 ## What does it cost?
 
-The app is free and open source, under the MIT license. Coach runs on an AI you choose: your ChatGPT or Claude plan, a pay-as-you-go API key, or a free model on your own computer.
+The app is free and open source, under the MIT license. Mentor runs on an AI you choose: your ChatGPT or Claude plan, a pay-as-you-go API key, or a free model on your own computer.
 
-## Can I use it without Coach?
+## Can I use it without Mentor?
 
-Yes. Every screen but Coach works without an AI.
+Yes. Every screen but Mentor works without an AI.
 
 ## Where is my data?
 
-On your computer. The app has no account of its own and its developer runs no servers, so nothing reaches the developer. What Coach needs to answer a question goes to the AI you picked. If you sync two computers, your data goes through your own Google Drive. The [privacy policy](/privacy.html) has the details.
+On your computer. The app has no account of its own and its developer runs no servers, so nothing reaches the developer. What Mentor needs to answer a question goes to the AI you picked. If you sync two computers, your data goes through your own Google Drive. The [privacy policy](/privacy.html) has the details.
 
-## Does Coach change my calendar or plans on its own?
+## Does Mentor change my calendar or plans on its own?
 
 No. Workouts, plans and calendar changes it proposes wait on a button you press. Automatic analyses can only read.
 
@@ -34,7 +34,7 @@ COROS scores a strength session by heart rate, which counts lifting two to three
 
 ## Does it work offline?
 
-Partly. What the app has already read stays readable, and sessions you have opened open again without a network. New activities, plans and Coach need the internet.
+Partly. What the app has already read stays readable, and sessions you have opened open again without a network. New activities, plans and Mentor need the internet.
 
 ## Do I need a phone?
 

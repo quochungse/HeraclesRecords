@@ -8,7 +8,7 @@ export function softwareApplication(release, site) {
     "@type": "SoftwareApplication",
     name: "Heracles Records",
     description:
-      "A free desktop app for COROS athletes: every session read in depth, an AI coach that has read all of it, and a hall for every record you set.",
+      "A free desktop app for COROS athletes: every session read in depth, an AI mentor that has read all of it, and a hall for every record you set.",
     applicationCategory: "SportsApplication",
     operatingSystem: "macOS, Windows, Linux",
     url: new URL("/", site).href,

@@ -50,7 +50,7 @@ const activity: ActivityMessages = {
   "activity.pane.feltLike": "Cảm giác như {temp}",
   "activity.pane.humidity": " · độ ẩm {percent}%",
   "activity.raw.show": "Xem JSON gốc",
-  "activity.askCoach": "Hỏi huấn luyện viên",
+  "activity.askCoach": "Hỏi Mentor",
   "activity.openIn": "Mở trong {screen}",
   "activity.pane.pickLap": "Chọn một vòng để biểu đồ tập trung vào đó.",
   "activity.raw.title": "JSON gốc",

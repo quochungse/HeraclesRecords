@@ -240,7 +240,7 @@ test("two versions of one number, made apart, are both kept", () => {
   assert.equal(versions.isLatestVersion(index, "plan-v2-elsewhere"), true, "the later written counts");
   assert.equal(versions.isLatestVersion(index, "plan-v2"), false);
   assert.equal(index.get("plan-v2").siblings.length, 3, "and neither is lost");
-  assert.equal(versions.supersededLine(index.get("plan-v2")), "v2 · replaced by a later v2 from Coach");
+  assert.equal(versions.supersededLine(index.get("plan-v2")), "v2 · replaced by a later v2 from Mentor");
 });
 
 test("a card's steps come back from its document by key", () => {
@@ -448,7 +448,7 @@ test("a rewrite through draft_training_plan's revises is a version too", async (
   assert.equal(response.ok, true, JSON.stringify(response));
   assert.equal(response.version, 3);
   assert.equal(database.getChatPlanDraft(card.draftId).artifactId, block.draftId);
-  assert.equal(database.getChatPlanDraft(card.draftId).changeSummary, "Rewritten by Coach.");
+  assert.equal(database.getChatPlanDraft(card.draftId).changeSummary, "Rewritten by Mentor.");
 });
 
 test("a saved plan is revised into a new version, which is not saved (P1.6)", async () => {
@@ -475,7 +475,7 @@ test("get_plan_draft reads the newest version, whichever id it is given (P1.3)",
   assert.equal(newest.version, 3, "asked by version 1's id, it answers with the newest");
   assert.equal(newest.newest, undefined);
   assert.equal(newest.made_by, "you");
-  assert.equal(newest.change, "Rewritten by Coach.");
+  assert.equal(newest.change, "Rewritten by Mentor.");
   assert.deepEqual(newest.sessions.map((line) => line.split(" — ")[0]), ["only-run · week 1 wed · run · Only run"]);
   assert.equal(newest.workouts, undefined, "whole workouts only when asked");
 

@@ -21,6 +21,9 @@ import {
   type WorkoutFigures
 } from "./workoutFigures";
 
+/** The overview a plan Mentor wrote goes to COROS with when Mentor wrote none. */
+export const PLACEHOLDER_PLAN_DESCRIPTION = "Created with Mentor.";
+
 export interface TrainingPlanValidationIssue {
   path: string;
   message: string;
@@ -250,11 +253,11 @@ export function trainingPlanFromCoachDraftPreview(
     layout?: Record<string, { weekIndex: number; dayIndex: number }>;
   } = {}
 ): TrainingPlanDocument {
-  if (!preview.name.trim()) throw new Error("Training Coach returned a plan without a name.");
+  if (!preview.name.trim()) throw new Error("Mentor returned a plan without a name.");
   const document = createTrainingPlan(preview.name);
   /* Not the card's summary or its warnings: this becomes the plan's overview
      on COROS, and "3 workouts · none scheduled" describes the card. */
-  document.description = extras.description?.trim() || "Created in Training Coach.";
+  document.description = extras.description?.trim() || PLACEHOLDER_PLAN_DESCRIPTION;
   document.origin = "coach";
   document.coach = { draftId: preview.draftId };
   document.entries = placeDatedWorkouts(

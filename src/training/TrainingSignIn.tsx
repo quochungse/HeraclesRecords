@@ -10,12 +10,12 @@ import {
   Loader2,
   LockKeyhole,
   Mail,
-  MessageCircle,
   RefreshCw,
   ShieldCheck,
   Trophy,
   UserRound
 } from "lucide-react";
+import { MentorIcon } from "../chat/mentorIcon";
 import appLogo from "../../build/icons/128x128.png";
 import contoursArt from "../assets/signin/contours.webp";
 import type { TrainingHubStatus } from "../../electron/types";
@@ -44,7 +44,7 @@ export type TrainingSignInProps = {
 
 const FEATURES: ReadonlyArray<{ icon: typeof Trophy; key: MessageKey }> = [
   { icon: ChartNoAxesColumnIncreasing, key: "overview.signin.featureSessions" },
-  { icon: MessageCircle, key: "overview.signin.featureCoach" },
+  { icon: MentorIcon, key: "overview.signin.featureCoach" },
   { icon: Trophy, key: "overview.signin.featureRecords" }
 ];
 

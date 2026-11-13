@@ -50,7 +50,7 @@ const activity: ActivityMessages = {
   "activity.pane.feltLike": "体感 {temp}",
   "activity.pane.humidity": " · 湿度 {percent}%",
   "activity.raw.show": "生の JSON を表示",
-  "activity.askCoach": "コーチに聞く",
+  "activity.askCoach": "メンターに聞く",
   "activity.openIn": "{screen}で開く",
   "activity.pane.pickLap": "ラップを選ぶとグラフがそこに絞り込まれます。",
   "activity.raw.title": "生の JSON",

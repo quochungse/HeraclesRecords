@@ -9,7 +9,7 @@ const nav = {
 
   "nav.overview": "Overview",
   "nav.sleep": "Sleep",
-  "nav.coach": "Coach",
+  "nav.coach": "Mentor",
   "nav.calendar": "Calendar",
   "nav.library": "Training Library",
   "nav.training": "Activities",
@@ -26,7 +26,7 @@ const nav = {
   "nav.settings": "Settings",
 
   "nav.primary": "Primary",
-  "nav.coachResponding": "Coach is responding",
+  "nav.coachResponding": "Mentor is responding",
   "nav.collapse": "Collapse sidebar",
   "nav.expand": "Expand sidebar",
   "nav.closeNavigation": "Close navigation",

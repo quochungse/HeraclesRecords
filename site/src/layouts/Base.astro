@@ -26,7 +26,7 @@ interface Props {
 const { title, description, og = "home", jsonLd } = Astro.props;
 const ogImage = new URL(`/og/${og}.jpg`, Astro.site);
 const fullTitle = title ? `${title} · Heracles Records` : "Heracles Records";
-// GitHub Pages serves coach.html at /coach, so that is the address to share.
+// GitHub Pages serves mentor.html at /mentor, so that is the address to share.
 const path = Astro.url.pathname.replace(/\.html$/, "").replace(/\/index$/, "/");
 const canonical = new URL(path, Astro.site);
 const release = await latestRelease();
@@ -34,7 +34,7 @@ const release = await latestRelease();
 const nav = [
   { href: "/activities/", label: "Activities" },
   { href: "/plan/", label: "Plan & Library" },
-  { href: "/coach", label: "Coach" },
+  { href: "/mentor", label: "Mentor" },
   { href: "/labours", label: "Labours" },
   { href: "/guide/", label: "Guide" },
   { href: "/changelog/", label: "Changelog" },
@@ -103,7 +103,7 @@ const current = (href: string) =>
           <a href="/activities/">Activities</a>
           <a href="/activities/strength/">Strength</a>
           <a href="/plan/">Plan &amp; Library</a>
-          <a href="/coach">Coach</a>
+          <a href="/mentor">Mentor</a>
           <a href="/labours">Labours</a>
           <a href="/guide/">Guide</a>
           <a href="/guide/faq">FAQ</a>

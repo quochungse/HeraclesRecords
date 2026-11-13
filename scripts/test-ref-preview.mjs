@@ -98,7 +98,7 @@ const ref = (overrides) => ({
 {
   const whole = planRefPreview(ref({}), document, "metric");
   assert.equal(whole.title, "Base to 10k");
-  assert.equal(whole.context, "Coach plan");
+  assert.equal(whole.context, "Mentor plan");
   assert.equal(whole.detail, "3 weeks · 5 sessions");
   assert.equal(whole.bars.current, undefined, "no week stands out");
 }

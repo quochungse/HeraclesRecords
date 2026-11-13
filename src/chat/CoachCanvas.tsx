@@ -275,6 +275,9 @@ function CreationIndex({
 
 type Tab = "plan" | "versions";
 
+/** The overview a plan gets on COROS when Mentor wrote none (`PLACEHOLDER_PLAN_DESCRIPTION`), and what plans saved before the rename say: not worth a paragraph. */
+const PLACEHOLDER_DESCRIPTIONS: ReadonlySet<string> = new Set(["Created with Mentor.", "Created in Training Coach."]); // i18n-ignore: stored text compared, never shown
+
 const AUTHOR_WORDS = messageRecord<PlanArtifactVersion["author"]>({
   coach: "chat.canvas.author.coach",
   athlete: "chat.canvas.author.athlete",
@@ -603,7 +606,7 @@ function ArtifactView({
                     }
                   />
                 ) : null}
-                {drawn?.description && drawn.description !== "Created in Training Coach." ? (
+                {drawn?.description && !PLACEHOLDER_DESCRIPTIONS.has(drawn.description) ? (
                   <p className="chat-canvas-overview">{drawn.description}</p>
                 ) : null}
                 <ol className="plan-reader-weeks" ref={weeksRef}>

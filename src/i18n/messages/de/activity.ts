@@ -50,7 +50,7 @@ const activity: ActivityMessages = {
   "activity.pane.feltLike": "Gefühlt {temp}",
   "activity.pane.humidity": " · {percent} % Luftfeuchte",
   "activity.raw.show": "Rohes JSON anzeigen",
-  "activity.askCoach": "Coach fragen",
+  "activity.askCoach": "Mentor fragen",
   "activity.openIn": "In {screen} öffnen",
   "activity.pane.pickLap": "Wähl eine Runde, um das Diagramm darauf zu fokussieren.",
   "activity.raw.title": "Rohes JSON",

@@ -7,7 +7,6 @@ import {
   Globe,
   LayoutGrid,
   Medal,
-  MessageCircle,
   Milestone,
   Moon,
   Mountain,
@@ -16,6 +15,7 @@ import {
   Waves,
   type LucideIcon,
 } from "lucide-react";
+import { MentorIcon } from "../chat/mentorIcon";
 import { t, type MessageKey } from "../i18n/core.ts";
 import { LaurelIcon } from "../records/recordsIcons";
 import { RunnerIcon } from "../running/runnerIcon";
@@ -120,7 +120,7 @@ export const PRIMARY_NAV_SECTIONS: PrimaryNavSection[] = [
     // is reached for while filling that calendar — a peer of it rather than a
     // drawer inside it.
     items: [
-      navItem("coach", "nav.coach", MessageCircle, { showActivity: true }),
+      navItem("coach", "nav.coach", MentorIcon, { showActivity: true }),
       navItem("calendar", "nav.calendar", CalendarDays),
       navItem("library", "nav.library", BookOpen),
     ],

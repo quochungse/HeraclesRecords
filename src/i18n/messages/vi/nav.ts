@@ -8,7 +8,7 @@ const nav: NavMessages = {
 
   "nav.overview": "Tổng quan",
   "nav.sleep": "Giấc ngủ",
-  "nav.coach": "Huấn luyện viên",
+  "nav.coach": "Mentor",
   "nav.calendar": "Lịch tập",
   "nav.library": "Thư viện bài tập",
   "nav.training": "Hoạt động",
@@ -25,7 +25,7 @@ const nav: NavMessages = {
   "nav.settings": "Cài đặt",
 
   "nav.primary": "Điều hướng chính",
-  "nav.coachResponding": "Huấn luyện viên đang trả lời",
+  "nav.coachResponding": "Mentor đang trả lời",
   "nav.collapse": "Thu gọn thanh bên",
   "nav.expand": "Mở rộng thanh bên",
   "nav.closeNavigation": "Đóng thanh điều hướng",

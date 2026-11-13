@@ -51,7 +51,7 @@ const activity = {
   "activity.pane.feltLike": "Felt like {temp}",
   "activity.pane.humidity": " · {percent}% humidity",
   "activity.raw.show": "Show raw JSON",
-  "activity.askCoach": "Ask Coach",
+  "activity.askCoach": "Ask Mentor",
   "activity.openIn": "Open in {screen}",
   "activity.pane.pickLap": "Pick a lap to focus the chart on it.",
   "activity.raw.title": "Raw JSON",

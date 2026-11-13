@@ -66,7 +66,7 @@ const calendar: CalendarMessages = {
   "calendar.week.targetRangeTitle": "Mức tải tuần COROS đề xuất cho thể lực hiện tại của bạn.",
   "calendar.week.targetRangeTitleHeracles": "Mức tải tuần đề xuất cho thể lực hiện tại, theo công thức của COROS trên Heracles TL. Mức của COROS: {min}–{max}.",
   "calendar.week.elevGain": "Leo dốc",
-  "calendar.week.askTitle": "Hỏi huấn luyện viên về tuần này",
+  "calendar.week.askTitle": "Hỏi Mentor về tuần này",
   "calendar.card.plan": "Kế hoạch",
   "calendar.card.missed": "Bỏ lỡ",
   "calendar.day.more": "+{count} buổi nữa",

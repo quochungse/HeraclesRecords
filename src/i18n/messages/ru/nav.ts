@@ -8,7 +8,7 @@ const nav: NavMessages = {
 
   "nav.overview": "Обзор",
   "nav.sleep": "Сон",
-  "nav.coach": "Тренер",
+  "nav.coach": "Ментор",
   "nav.calendar": "Календарь",
   "nav.library": "Библиотека тренировок",
   "nav.training": "Активности",
@@ -25,7 +25,7 @@ const nav: NavMessages = {
   "nav.settings": "Настройки",
 
   "nav.primary": "Главное меню",
-  "nav.coachResponding": "Тренер отвечает",
+  "nav.coachResponding": "Ментор отвечает",
   "nav.collapse": "Свернуть боковую панель",
   "nav.expand": "Развернуть боковую панель",
   "nav.closeNavigation": "Закрыть меню",

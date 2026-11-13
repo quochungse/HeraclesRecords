@@ -50,7 +50,7 @@ const activity: ActivityMessages = {
   "activity.pane.feltLike": "체감 {temp}",
   "activity.pane.humidity": " · 습도 {percent}%",
   "activity.raw.show": "원본 JSON 보기",
-  "activity.askCoach": "코치에게 묻기",
+  "activity.askCoach": "멘토에게 묻기",
   "activity.openIn": "{screen}에서 열기",
   "activity.pane.pickLap": "랩을 선택하면 그래프가 그 구간에 맞춰집니다.",
   "activity.raw.title": "원본 JSON",

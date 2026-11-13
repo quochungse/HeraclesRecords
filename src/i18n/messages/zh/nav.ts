@@ -8,7 +8,7 @@ const nav: NavMessages = {
 
   "nav.overview": "概览",
   "nav.sleep": "睡眠",
-  "nav.coach": "教练",
+  "nav.coach": "导师",
   "nav.calendar": "日历",
   "nav.library": "训练库",
   "nav.training": "活动",
@@ -25,7 +25,7 @@ const nav: NavMessages = {
   "nav.settings": "设置",
 
   "nav.primary": "主导航",
-  "nav.coachResponding": "教练正在回复",
+  "nav.coachResponding": "导师正在回复",
   "nav.collapse": "收起侧边栏",
   "nav.expand": "展开侧边栏",
   "nav.closeNavigation": "关闭导航",

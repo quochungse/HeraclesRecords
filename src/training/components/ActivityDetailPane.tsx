@@ -6,10 +6,10 @@ import {
   Braces,
   CloudOff,
   Loader2,
-  MessageCircle,
   RefreshCw,
   X
 } from "lucide-react";
+import { MentorIcon } from "../../chat/mentorIcon";
 import type {
   CoachOpenRequest,
   TrainingHubActivity,
@@ -586,7 +586,7 @@ export function ActivityDetailPane({
                 onAskCoach(activityCoachRequest({ ...listActivity, ...(sportName ? { sportName } : {}) }, unitSystem))
               }
             >
-              <MessageCircle size={15} aria-hidden="true" />
+              <MentorIcon size={15} aria-hidden="true" />
               {t("activity.askCoach")}
             </button>
           ) : null}

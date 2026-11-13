@@ -66,7 +66,7 @@ const calendar: CalendarMessages = {
   "calendar.week.targetRangeTitle": "현재 체력에 맞춰 COROS가 권장하는 주간 부하.",
   "calendar.week.targetRangeTitleHeracles": "Heracles TL에 COROS 공식을 적용해 현재 체력에 맞춰 권장하는 주간 부하. COROS 값: {min}–{max}.",
   "calendar.week.elevGain": "상승 고도",
-  "calendar.week.askTitle": "이번 주에 대해 코치에게 묻기",
+  "calendar.week.askTitle": "이번 주에 대해 멘토에게 묻기",
   "calendar.card.plan": "계획",
   "calendar.card.missed": "놓침",
   "calendar.day.more": "+{count}개 더",

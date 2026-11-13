@@ -188,14 +188,14 @@ await test("the week reads back as the band the draft tool checks", () => {
   assert.deepEqual(model.weekSummary(flex), { sessions: "5–6", time: "up to 6.5 h", longDay: "Saturday" });
   const free = form({ days: model.DEFAULT_GENERATOR_FORM.days.map((day, index) => (index === 0 ? { kind: "flex", minutes: null } : day)) });
   assert.equal(model.weekSummary(free).time, "No limit", "a Free day leaves the week without a most");
-  assert.deepEqual(model.weekSummary(form({ weekMode: "coach", hoursChoice: "5-8" })), { sessions: "Coach decides", time: "5–8 h", longDay: "Coach decides" });
+  assert.deepEqual(model.weekSummary(form({ weekMode: "coach", hoursChoice: "5-8" })), { sessions: "Mentor decides", time: "5–8 h", longDay: "Mentor decides" });
 });
 
 await test("the dates read as one sentence, whatever decides the length", () => {
   const race = model.requestFromForm(form({ raceDate: "2026-09-26", raceDistance: "Half" }), MONDAY);
   assert.match(model.spanSentence(race), /^8 weeks from .+, ending on race day, /);
   assert.match(model.spanSentence(model.requestFromForm(form(), MONDAY)), /Pick race day/);
-  assert.match(model.spanSentence(model.requestFromForm(form({ goalKind: "base" }), MONDAY)), /Coach chooses how many weeks/);
+  assert.match(model.spanSentence(model.requestFromForm(form({ goalKind: "base" }), MONDAY)), /Mentor chooses how many weeks/);
   const snapshot = model.planSnapshot(form({ raceDate: "2026-09-26", raceDistance: "Half" }), race);
   assert.deepEqual(snapshot.map((row) => row.label), ["Goal", "Length", "Dates", "Week", "Sports", "Level"]);
   assert.equal(snapshot[0].value, "Half");

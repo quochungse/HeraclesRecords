@@ -16,6 +16,11 @@ export default defineConfig({
   // Compression drops the line break before an inline element ("the<code>…"),
   // which runs words together in prose wrapped across lines.
   compressHTML: false,
+  // Coach was renamed Mentor; links already shared to the old pages land on the new ones.
+  redirects: {
+    "/coach": "/mentor",
+    "/guide/set-up-coach": "/guide/set-up-mentor",
+  },
   vite: {
     // Fonts, icons, screenshots and labour emblems are read straight from the
     // app (../src, ../build, ../docs) so the site cannot drift from it.

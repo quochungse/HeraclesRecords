@@ -1152,7 +1152,7 @@ async function handleDraftTrainingPlan(
   if (!prepared.ok) return prepared.response;
 
   if (target?.ok) {
-    return storeRevision(target.latest, prepared, unitSystem, "Rewritten by Coach.", onPlanDraft);
+    return storeRevision(target.latest, prepared, unitSystem, "Rewritten by Mentor.", onPlanDraft);
   }
 
   const draftId = crypto.randomUUID();
@@ -2369,7 +2369,7 @@ export async function uploadPlanDraftById(
   const stored = loadStoredPlanDraft(draftId);
   if (!stored) {
     throw new Error(
-      "Training plan draft not found or expired. Ask the coach to regenerate this plan."
+      "Training plan draft not found or expired. Ask Mentor to regenerate this plan."
     );
   }
   if (stored.uploadedAt) {
@@ -2486,7 +2486,7 @@ function markDraftSaved(stored: StoredPlanDraft, result: UploadPlanResult): void
 function requirePlanDraft(draftId: string): StoredPlanDraft {
   const stored = loadStoredPlanDraft(draftId);
   if (!stored) {
-    throw new Error("Training plan draft not found. Ask the coach to write the plan again.");
+    throw new Error("Training plan draft not found. Ask Mentor to write the plan again.");
   }
   if (stored.preview.artifactType === "workout") {
     throw new Error("This is a single workout, not a plan.");
@@ -2746,7 +2746,7 @@ export function chatSessionForDraft(draftId: string): string | undefined {
 export function planDraftDocument(draftId: string): TrainingPlanDocument {
   const stored = loadStoredPlanDraft(draftId);
   if (!stored) {
-    throw new Error("Training plan draft not found. Ask the coach to write the plan again.");
+    throw new Error("Training plan draft not found. Ask Mentor to write the plan again.");
   }
   return draftDocument(stored);
 }
@@ -2865,13 +2865,13 @@ export function saveWorkoutDraftEdit(
 ): PlanVersionSave {
   const stored = loadStoredPlanDraft(draftId);
   if (!stored) {
-    throw new Error("Workout draft not found. Ask the coach to write it again.");
+    throw new Error("Workout draft not found. Ask Mentor to write it again.");
   }
   if (stored.preview.artifactType !== "workout") {
     throw new Error("This is a plan, not a single workout.");
   }
   if (versionsOf(stored.artifactId).some((version) => version.uploadedAt) || stored.uploadedAt) {
-    throw new Error("This workout has already been saved, so the Coach card can no longer be edited.");
+    throw new Error("This workout has already been saved, so the Mentor card can no longer be edited.");
   }
   const newer = newerVersion(stored, replaceNewer);
   if (newer) return newer;
@@ -2980,7 +2980,7 @@ function writeVersion(
   const versions = versionsOf(base.artifactId);
   const latest = versions[versions.length - 1] ?? base;
   if ((base.preview.artifactType ?? "plan") === "workout" && versions.some((version) => version.uploadedAt)) {
-    throw new Error("This workout is already saved to COROS, so the Coach card can no longer be changed from here.");
+    throw new Error("This workout is already saved to COROS, so the Mentor card can no longer be changed from here.");
   }
   const artifactType = base.preview.artifactType ?? "plan";
   const draftId = crypto.randomUUID();
