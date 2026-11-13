@@ -3887,8 +3887,7 @@ export function withLiveToolInstructions(
   }
   if (activityTools.length + analyticsTools.length > 0) {
     sections.push(
-      "Charts are drawn from these tools automatically, and a result that drew one names it: chart c1, c2… " +
-        "in the order drawn. They appear above your answer. To show one where it makes your point instead, " +
+      "A result that drew a chart names it: chart c1, c2… in the order drawn. They appear above your answer. To show one where it makes your point instead, " +
         "write [[chart:c1]] on a line of its own at that place — each chart once, and only charts this answer " +
         "drew. A chart you do not place stays above."
     );

@@ -224,6 +224,13 @@ export function getChatActivityTools(): CorosMcpTool[] {
             description:
               "Sections to include besides the summary. Omit for all but series."
           },
+          chart: {
+            type: "boolean",
+            description:
+              "true to also show the athlete this activity's chart — when the answer is about this activity " +
+              "itself (a review, a debrief, how one session went). Leave it out when the activity is only " +
+              "evidence for something else, such as setting a target or writing a workout."
+          },
           window: {
             type: "object",
             properties: {
@@ -717,7 +724,9 @@ async function handleGetActivityDetail(
       );
     }
 
-    if (callbacks?.onActivityVisual && callbacks.requestId) {
+    // Only when asked for: an activity read as evidence — a test run behind a
+    // prescribed pace — stood as a chart above an answer about something else.
+    if (args.chart === true && callbacks?.onActivityVisual && callbacks.requestId) {
       const preview = buildActivityVisualPreview(detail, callbacks.requestId, lastKnownCorosHrZoneType());
       if (preview) {
         callbacks.onActivityVisual(preview);
