@@ -1836,17 +1836,7 @@ async function loadActivityDetailRaw(
   }
 
   const auth = getStoredAuth();
-  const raw = await trainingHubRequest<Record<string, unknown>>(
-    "/activity/detail/query",
-    {
-      method: "POST",
-      params: {
-        labelId: activityId,
-        sportType,
-        ...(auth?.userId ? { userId: auth.userId } : {})
-      }
-    }
-  );
+  const raw = await requestActivityDetail(activityId, sportType, auth?.userId);
 
   if (
     fingerprint !== null &&
@@ -1857,6 +1847,39 @@ async function loadActivityDetailRaw(
   }
 
   return { raw, fingerprint };
+}
+
+// COROS refuses a share of detail reads with `1001 Service exceptions` and
+// serves the same read moments later (measured: about a third of reads, on runs
+// and strength alike, while its other endpoints answered every time). A gone
+// activity answers `1001` too, so the retries are few and quick.
+const ACTIVITY_DETAIL_ATTEMPTS = 3;
+const ACTIVITY_DETAIL_RETRY_DELAY_MS = 400;
+
+async function requestActivityDetail(
+  activityId: string,
+  sportType: number,
+  userId: string | undefined
+): Promise<Record<string, unknown>> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await trainingHubRequest<Record<string, unknown>>(
+        "/activity/detail/query",
+        {
+          method: "POST",
+          params: {
+            labelId: activityId,
+            sportType,
+            ...(userId ? { userId } : {})
+          }
+        }
+      );
+    } catch (error) {
+      const refused = error instanceof TrainingHubResultError && error.result === "1001";
+      if (!refused || attempt >= ACTIVITY_DETAIL_ATTEMPTS) throw error;
+      await delay(ACTIVITY_DETAIL_RETRY_DELAY_MS * attempt);
+    }
+  }
 }
 
 /**
@@ -8801,6 +8824,13 @@ class InvalidTrainingHubTokenError extends Error {
   }
 }
 
+/** A failure COROS stated, with the code it stated ("" when it stated none). */
+class TrainingHubResultError extends Error {
+  constructor(message: string, readonly result: string) {
+    super(message);
+  }
+}
+
 function isInvalidTokenMessage(message: string): boolean {
   const normalized = message.toLowerCase();
   return (
@@ -8874,7 +8904,7 @@ export function parseTrainingHubApiResponse<T>(
     if (isInvalidTokenMessage(message)) {
       throw new InvalidTrainingHubTokenError(message);
     }
-    throw new Error(message);
+    throw new TrainingHubResultError(message, result);
   }
 
   if (!hasData) {
