@@ -25,4 +25,4 @@ Under **Settings → Navigation**:
 Open **Personal**, your name at the foot of the sidebar:
 
 - **Units**: metric (km, kg) or imperial (mi, lb), and the temperature scale.
-- **Thresholds and zones**: your heart-rate, pace and power zones as COROS holds them, which every screen and Mentor read.
+- **Thresholds and zones**: your heart-rate, pace and power zones as COROS holds them, which every screen and Mentor read. With Lactate threshold as the zone model, the Training card edits your lactate threshold heart rate (LTHR) in place of max and resting heart rate, and COROS rebuilds the zones on it.
