@@ -10673,6 +10673,8 @@ label.chat-settings-toggle-row {
 /* Tables: rounded, glassy, zebra rows */
 .chat-markdown table {
   width: 100%;
+  /* Cancels the global `table { min-width: 720px }`, wider than a narrow bubble. */
+  min-width: 0;
   border-collapse: separate;
   border-spacing: 0;
   margin: 0 0 12px;
