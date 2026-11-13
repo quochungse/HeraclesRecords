@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### What's new
+- **Personal Records** - a screen of its own under Your journey.
+- **The Hall of Records is three screens on the rail** - Timeline, Personal Records and The Twelve Labours, each under Your journey, instead of one screen with a switch.
+
+### Changed
+- **Personal Records left the Personal screen** for a screen of their own.
+- **Coach is now Mentor** - named for the counsellor of the Odysse.
+- **Mentor shows a chart only when the answer is about it** - a session read to set a pace, or your zones read to write a workout, no longer puts a chart above an answer about something else.
+- Mentor reads how you rated a session on the watch, a training block by its weeks, and what it read for its last answer, so a follow-up question does not start from scratch.
+- An activity analysis is handed the earlier sessions like it and what the calendar held that day.
+- An analysis whose playbook asks for something every run (a review, a briefing, a plan) answers every run; it stays silent only when the playbook asks for what stands out and nothing does.
+
+### Fixed
+- Mentor: a turn that spent all its reads on data ends with an answer instead of nothing.
+
 ## [1.4.8] - 2026-11-11
 
 A session's chart, route and laps point at one stretch, figures move when you change what they show, and running efficiency reads steadier.

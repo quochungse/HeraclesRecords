@@ -252,6 +252,8 @@ export interface TrainingHubActivity {
   sportType: number;
   sportName?: string;
   startTime?: number;
+  /** The athlete's end-of-session rating (COROS feelType, 1..5), set only where Coach reads a list. */
+  feelType?: number;
   endTime?: number;
   /**
    * Seconds actually recorded, pauses taken out — COROS `workoutTime`, which the

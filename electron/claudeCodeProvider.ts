@@ -904,6 +904,18 @@ export async function testClaudeCodeConnection(
  */
 const CLAUDE_MCP_SERVER_NAME = "heracles";
 
+/**
+ * Rounds of the app's tools one turn may spend, as the other providers'. The
+ * CLI cannot be told to stop calling tools, and at its own `maxTurns` it ends
+ * the query with an error and no answer — so a call past this many rounds is
+ * answered with the text below instead of being run, and `maxTurns` leaves
+ * room after it for the answer.
+ */
+const CLAUDE_TOOL_ROUNDS = 10;
+const CLAUDE_MAX_TURNS = CLAUDE_TOOL_ROUNDS + 2;
+const TOOL_ROUNDS_SPENT =
+  "Not run: this turn has used all its tool calls. Answer now from what you have already read, and say what you could not check.";
+
 export async function streamClaudeCodeCompletion(
   options: StreamClaudeCodeOptions
 ): Promise<{ fullText: string; usage?: ChatTokenUsage }> {
@@ -941,6 +953,8 @@ export async function streamClaudeCodeCompletion(
 
   let fullText = "";
   let resultText = "";
+  // Responses the model has begun: every one that calls a tool is a round.
+  let rounds = 0;
 
   try {
     const definitions = options.tools.map((sourceTool) => {
@@ -951,6 +965,9 @@ export async function streamClaudeCodeCompletion(
         inputShape,
         async (args) => {
           const parsedArgs = args as Record<string, unknown>;
+          if (rounds > CLAUDE_TOOL_ROUNDS) {
+            return { content: [{ type: "text" as const, text: TOOL_ROUNDS_SPENT }] };
+          }
           options.onToolCallStart?.(sourceTool.name, parsedArgs);
           armIdleTimeout();
           try {
@@ -1007,7 +1024,7 @@ export async function streamClaudeCodeCompletion(
         strictMcpConfig: true,
         settingSources: [],
         includePartialMessages: true,
-        maxTurns: 10,
+        maxTurns: CLAUDE_MAX_TURNS,
         persistSession: false,
         cwd: claudeWorkingDirectory(options.configDir),
         env: createClaudeSubscriptionEnvironment(options.configDir)
@@ -1023,7 +1040,9 @@ export async function streamClaudeCodeCompletion(
       }
       if (message.type === "stream_event") {
         const event = message.event;
-        if (
+        if (event.type === "message_start") {
+          rounds += 1;
+        } else if (
           event.type === "content_block_delta" &&
           event.delta.type === "text_delta"
         ) {

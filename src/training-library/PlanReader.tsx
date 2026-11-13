@@ -32,11 +32,11 @@ import {
   FilePen,
   Heart,
   LoaderCircle,
-  MessageCircle,
   Pencil,
   Trash2,
   X
 } from "lucide-react";
+import { MentorIcon } from "../chat/mentorIcon";
 import {
   useLayoutEffect,
   useMemo,
@@ -425,7 +425,7 @@ export function PlanReader({
   const planItems: PlanMenuItem[] = [
     ...editItems,
     ...(onAskCoach
-      ? [{ label: t("library.reader.askPlan"), icon: MessageCircle, onSelect: () => onAskCoach(plan) }]
+      ? [{ label: t("library.reader.askPlan"), icon: MentorIcon, onSelect: () => onAskCoach(plan) }]
       : []),
     ...calendarItems,
     ...(onDuplicate

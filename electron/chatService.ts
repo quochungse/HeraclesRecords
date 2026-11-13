@@ -90,6 +90,7 @@ import {
   coachHeraclesLoadValue,
   formatActivityListLine,
   formatHeraclesLoadPart,
+  withCoachFeels,
   withCoachHeraclesLoads,
   withCoachPlannedHeraclesLoads,
   formatActivitySpan,
@@ -911,6 +912,7 @@ export function deleteChatSessionById(id: string): void {
   deleteChatScheduleChangesOf(id);
   deleteChatAnswerDigestsOf(id);
   deleteChatHiddenTurnsOf(id);
+  forgetLastReads(id);
   // Section 2.4: the analyses inside this conversation go with it. An analysis
   // lives in exactly one conversation and cannot be moved, so there is nothing
   // to re-point and nothing left for one to be about.
@@ -1890,14 +1892,82 @@ export async function streamChat(
   if (ownsReach && reach) runTools.set(requestId, { extra: [], ...reach });
   if (options.sessionId) turnSessions.set(requestId, options.sessionId);
   try {
-    await streamChatTurn(sink, requestId, messages, options);
+    await streamChatTurn(sink, requestId, withLastReads(messages, options), options);
   } finally {
+    const reads = turnReads.get(requestId);
+    if (reads?.length && options.sessionId) lastReads.set(options.sessionId, reads);
+    turnReads.delete(requestId);
     if (ownsReach) runTools.delete(requestId);
     turnSessions.delete(requestId);
     turnQuestions.delete(requestId);
     runCards.delete(requestId);
     turnCharts.delete(requestId);
   }
+}
+
+/**
+ * What each turn in flight has read, and what each conversation's last reading
+ * turn read. A tool's result is gone when its turn ends — only the answer's
+ * words are kept — so a follow-up had neither the figures nor the ids to read
+ * them again, and looked the activity up from scratch or answered from memory.
+ * The calls ride on the next question (`withLastReads`), the results do not:
+ * they are the size of a read. Held in memory only; after a restart a turn
+ * simply starts without the note. A conversation whose turns were deleted,
+ * edited or hidden forgets its note (`forgetLastReads`): the answer it speaks
+ * of may be the one that went.
+ */
+const turnReads = new Map<string, string[]>();
+const lastReads = new Map<string, string[]>();
+const MAX_READS_NOTED = 12;
+const READ_NOTE_TOOLS: ReadonlySet<string> = new Set([
+  "list_scheduled_workouts",
+  "list_training_plans",
+  "get_training_plan"
+]);
+
+function isNotedRead(name: string): boolean {
+  return (
+    isChatActivityTool(name) ||
+    isChatAnalyticsTool(name) ||
+    isChatSleepTool(name) ||
+    READ_NOTE_TOOLS.has(name) ||
+    isCorosMcpRead(name)
+  );
+}
+
+function noteRead(requestId: string, name: string, args: Record<string, unknown>): void {
+  if (!isNotedRead(name)) return;
+  const reads = turnReads.get(requestId) ?? [];
+  // Without `chart`: the note asks for the same call again, and a follow-up
+  // about one figure would draw the chart a second time.
+  const { chart: _chart, ...asked } = args;
+  const call = `${name} ${JSON.stringify(asked)}`;
+  if (reads.includes(call) || reads.length >= MAX_READS_NOTED) return;
+  turnReads.set(requestId, [...reads, call]);
+}
+
+/** A conversation's turn with the calls its last reading turn made, on the question being asked. */
+export function withLastReads(messages: ChatMessage[], options: StreamChatOptions): ChatMessage[] {
+  const reads = options.sessionId ? lastReads.get(options.sessionId) : undefined;
+  const last = messages[messages.length - 1];
+  const interactive = options.toolPolicy === undefined || options.toolPolicy === "interactive";
+  if (!reads?.length || !interactive || options.textJob || last?.role !== "user") return messages;
+  const note =
+    "[Read for an earlier answer, results not kept: " +
+    reads.join("; ") +
+    ". For a figure that answer did not write down, call again with the same arguments.]";
+  return [...messages.slice(0, -1), { ...last, content: `${last.content}\n\n${note}` }];
+}
+
+/** Drops what a conversation's last reading turn read: its turns changed, or it is gone. */
+export function forgetLastReads(sessionId: string): void {
+  lastReads.delete(sessionId);
+}
+
+/** For suites: what a conversation's next question would be told. */
+export function setLastReadsForTests(sessionId: string, reads: string[] | undefined): void {
+  if (reads) lastReads.set(sessionId, reads);
+  else lastReads.delete(sessionId);
 }
 
 /** The conversation each turn in flight belongs to, for the tools that file something under it. */
@@ -2499,7 +2569,9 @@ async function streamChatTurn(
     // and our tool results.
     const input: Record<string, unknown>[] = messages.map(toInputMessageItem);
 
-    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    // One round past the limit, with no tool allowed: a turn that spent every
+    // round reading otherwise ended with no answer at all.
+    for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
       const opened = await resolveModelAndOpenStream(
         token,
         requestId,
@@ -2508,7 +2580,8 @@ async function streamChatTurn(
         tools,
         controller.signal,
         runtime.model ?? settings.chatgpt.model,
-        runtime.effort ?? settings.chatgpt.effort
+        runtime.effort ?? settings.chatgpt.effort,
+        round === MAX_TOOL_ROUNDS
       );
       if ("error" in opened) {
         sendStreamError({ message: opened.error, authError: opened.authError });
@@ -3414,6 +3487,19 @@ async function executeChatTool(
   unitSystem: UnitSystem,
   toolPolicy: ChatToolPolicy = "interactive"
 ): Promise<string> {
+  const output = await runChatTool(name, args, send, requestId, unitSystem, toolPolicy);
+  noteRead(requestId, name, args);
+  return output;
+}
+
+async function runChatTool(
+  name: string,
+  args: Record<string, unknown>,
+  send: (channel: string, payload: unknown) => void,
+  requestId: string,
+  unitSystem: UnitSystem,
+  toolPolicy: ChatToolPolicy
+): Promise<string> {
   // A run's own tools, and the ones it withholds, are settled before the
   // policy: an extra tool is the run's to answer, not the policy's to allow.
   const run = runTools.get(requestId);
@@ -3626,7 +3712,8 @@ async function resolveModelAndOpenStream(
   tools: Record<string, unknown>[],
   signal: AbortSignal,
   selectedModel?: string,
-  selectedEffort?: string
+  selectedEffort?: string,
+  answerOnly = false
 ): Promise<
   | { response: Response; model: string; tools: Record<string, unknown>[] }
   | { error: string; authError: boolean }
@@ -3672,7 +3759,8 @@ async function resolveModelAndOpenStream(
             input,
             requestTools,
             includeReasoningSummary,
-            effort
+            effort,
+            answerOnly
           )
         )
       });
@@ -3804,43 +3892,25 @@ export function withLiveToolInstructions(
   // of them, naming tools a read-only run was never given.
   if (readsData) {
     sections.push(
-      "Read before you fetch. The training snapshot at the end of these instructions, when present, " +
-        "already holds the latest activities, the athlete's thresholds, fitness and recovery status and " +
-        "the next 14 days of schedule — answer from it when it covers the question. Across every tool: ask " +
-        "for only the period, sport and sections the question is about, never fetch the same data twice in " +
-        "one answer, read the totals and averages a tool has already computed rather than recomputing them, " +
-        "and say when a value is missing instead of estimating it."
-    );
-  }
-  if (activityTools.length > 0) {
-    sections.push(
-      "Which activity sections answer which question: pacing or intervals → laps, " +
-        "trend; intensity → zones; hills → elevation; gym → strength. One or two " +
-        "each is usually enough when comparing several activities, and series only " +
-        "when the lap table and trend cannot answer."
+      "The training snapshot at the end of these instructions, when present, is current: answer from it " +
+        "when it covers the question, and read with a tool only what it does not hold."
     );
   }
   if (activityTools.length + analyticsTools.length > 0) {
     sections.push(
-      "Charts are drawn from these tools automatically, and a result that drew one names it: chart c1, c2… " +
-        "in the order drawn. They appear above your answer. To show one where it makes your point instead, " +
+      "A result that drew a chart names it: chart c1, c2… in the order drawn. They appear above your answer. To show one where it makes your point instead, " +
         "write [[chart:c1]] on a line of its own at that place — each chart once, and only charts this answer " +
         "drew. A chart you do not place stays above."
     );
   }
   if (corosMcpTools.length > 0) {
     sections.push(
-      `COROS MCP tools: ${corosMcpTools.map((tool) => tool.name).join(", ")}. ` +
-        "Reach for these only for what the local tools do not cover."
+      "The COROS MCP server's tools are only for what the local tools do not cover."
     );
   }
   if (otherMcpTools.length > 0) {
     sections.push(
-      `Other connected MCP server tools: ${otherMcpTools
-        .map((tool) => tool.name)
-        .join(", ")}. ` +
-        "Use each tool according to its own name, description, and schema. " +
-        "Do not assume these tools return COROS data."
+      "Tools of the other connected MCP servers do not return COROS data unless they say so."
     );
   }
   if (planTools.length > 0) {
@@ -3868,9 +3938,7 @@ export function withLiveToolInstructions(
     sections.push(
       "",
       "## Athlete questions",
-      "Ask the athlete through request_coach_input — once per turn, with one to three concise questions in that " +
-        "call, only as many as are worth asking — each with 2–5 distinct choices, the recommended one first, each " +
-        "description stating the tradeoff that matters. Never ask a question only in prose. When your answer can " +
+      "Ask the athlete through request_coach_input, once per turn, never only in prose. When your answer can " +
         "stand without theirs, write it first and ask at the end; ask first only when you cannot answer without " +
         "it, and then before reading data the answer would change. After calling it, stop and wait for the " +
         "athlete's next message."
@@ -3924,7 +3992,10 @@ function workoutToolGuide(
         "(zero-based); replace only when steps are added, removed or swapped."
       : undefined,
     has("delete_workout")
-      ? "- Removing a workout → find it with list_scheduled_workouts, then delete_workout."
+      ? has("propose_schedule_changes")
+        ? "- Deleting a workout from the Workout Library → delete_workout. A session on the calendar is a " +
+          "removal in propose_schedule_changes."
+        : "- Deleting a workout from the Workout Library → delete_workout."
       : undefined,
     has("list_training_plans")
       ? "- The athlete's own COROS plans — those they made or saved from COROS, not only yours → " +
@@ -3957,10 +4028,7 @@ function workoutToolGuide(
     "Writing a workout:",
     "- Always set sport, sport=run included. Use distance_km only for a simple Run or Trail Run; anything " +
       "structured goes in steps.",
-    "- Pick each step's target deliberately: distance for easy, long and tempo blocks; time for duration-based " +
-      "reps and recovery jogs; load only when prescribing by training-load budget; open (run until lap) for " +
-      "by-feel warm-ups, cool-downs and fartlek surges. " +
-      buildCoachWorkoutDefaultsGuide(),
+    "- " + buildCoachWorkoutDefaultsGuide(),
     "- Put every prescribed HR, pace, effort pace, power, cadence, stroke, weight, RPE or grade in the step's " +
       "typed intensity field, never only in the name or the prose.",
     ...(has("search_coros_exercises")
@@ -3969,10 +4037,7 @@ function workoutToolGuide(
             "(or the target muscles, movement patterns and known equipment), and use the exact exercise IDs and " +
             "names it returns. A Strength exercise states its sets, target_reps or target_duration_seconds per " +
             "set, rest_type=1 with rest_value in seconds, and its weight intensity. A COROS naming mismatch alone " +
-            "is never a reason to question the athlete. If a draft tool answers exercise_resolution_required, " +
-            "take one of its candidates (or search again), fix those steps and call the same draft tool again in " +
-            "the same response; ask the athlete only when the alternatives change the movement, conflict with " +
-            "their equipment or need a real training decision."
+            "is never a reason to question the athlete."
         ]
       : []),
     ...(has("draft_training_plan")
@@ -4145,7 +4210,7 @@ async function buildTrainingContext(
   const includeSleep = scope?.sleep !== false;
   const [activities, dashboard, upcoming, profile, sleep] = await Promise.allSettled([
     includeActivities
-      ? listTrainingHubActivities(1, 25).then(withCoachHeraclesLoads)
+      ? listTrainingHubActivities(1, 25).then(withCoachHeraclesLoads).then(withCoachFeels)
       : Promise.resolve([] as TrainingHubActivity[]),
     includeActivities
       ? getTrainingDashboard()

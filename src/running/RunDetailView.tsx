@@ -1,6 +1,7 @@
 import { useI18n } from "../i18n/useI18n";
 import { Fragment, useMemo } from "react";
-import { ArrowLeft, CloudOff, MessageCircle, RefreshCw } from "lucide-react";
+import { ArrowLeft, CloudOff, RefreshCw } from "lucide-react";
+import { MentorIcon } from "../chat/mentorIcon";
 import type {
   ActivityDetailSummary,
   CoachOpenRequest,
@@ -358,7 +359,7 @@ export function RunDetailView({
                   className="ghost-button activity-ask-coach"
                   onClick={() => onAskCoach(activityCoachRequest({ ...activity, sportName: activity.sportName ?? t("run.run") }, unitSystem))}
                 >
-                  <MessageCircle size={15} aria-hidden="true" />
+                  <MentorIcon size={15} aria-hidden="true" />
                   {t("activity.askCoach")}
                 </button>
               ) : null}

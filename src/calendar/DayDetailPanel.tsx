@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowLeft, MessageCircle, Pencil, Trash2, X } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, X } from "lucide-react";
+import { MentorIcon } from "../chat/mentorIcon";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type {
@@ -229,7 +230,7 @@ export function DayDetailPanel({
                     onClick={() => onAskCoach(selection)}
                     title={t("activity.askCoach")}
                   >
-                    <MessageCircle size={15} aria-hidden="true" />
+                    <MentorIcon size={15} aria-hidden="true" />
                     {t("activity.askCoach")}
                   </button>
                   {selection.kind === "scheduled" && !selection.day.isPast ? (

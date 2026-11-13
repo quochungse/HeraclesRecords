@@ -26,9 +26,9 @@ import {
   CalendarCheck,
   ChevronLeft,
   ChevronRight,
-  ListChecks,
-  MessageCircle
+  ListChecks
 } from "lucide-react";
+import { MentorIcon } from "../chat/mentorIcon";
 import { useMemo } from "react";
 import type {
   TrainingPlanEntry,
@@ -203,7 +203,7 @@ export function PlanSessionView({
             title={t("library.session.askTitle")}
             onClick={onAskCoach}
           >
-            <MessageCircle size={14} aria-hidden="true" /> <span>{t("activity.askCoach")}</span>
+            <MentorIcon size={14} aria-hidden="true" /> <span>{t("activity.askCoach")}</span>
           </button>
         ) : null}
         <div className="plan-session-pager">

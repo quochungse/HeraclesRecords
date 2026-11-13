@@ -1,6 +1,6 @@
 # Share image
 
-Create image sits beside Ask Coach on every session page (Run, Ride, Hike, Swim, Strength)
+Create image sits beside Ask Mentor on every session page (Run, Ride, Hike, Swim, Strength)
 and opens `ShareDialog`: a scaled preview of `ShareCard` and its choices. Copy puts the image on
 the clipboard, Save writes a JPG (`share:copyImage`, `share:saveImage`).
 

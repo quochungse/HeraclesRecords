@@ -336,9 +336,7 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
       name: "search_coros_exercises",
       description:
         "Search the athlete's live COROS Strength/Hybrid Fitness exercise catalog and return exact exercise IDs and names. " +
-        "Call this before drafting strength or Hybrid Fitness workouts whenever exact COROS exercise IDs are not already known. " +
-        "Search several intended movements in one call with queries, or discover exercises by target muscles, movement patterns, and available equipment. " +
-        "Use returned exercise_id and exercise_name values in whichever draft tool matches the request. Catalog naming differences are not a reason to ask the athlete.",
+        "Search several intended movements in one call with queries, or discover exercises by target muscles, movement patterns, and available equipment.",
       inputSchema: {
         type: "object",
         properties: {
@@ -390,9 +388,7 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
       description:
         "Validate and store one standalone workout for athlete review. " +
         "Use this for one-off requests such as today's run, a single gym session, or one workout to reuse later; " +
-        "do not wrap a one-off workout in draft_training_plan. Set calendar_date only when the athlete names a date. " +
-        "Put prescribed HR, pace, power, cadence, stroke, weight, RPE, or grade in each step's typed intensity field. " +
-        "For Strength and Hybrid Fitness, call search_coros_exercises first and pass its exact exercise IDs and names. " +
+        "do not wrap a one-off workout in draft_training_plan. " +
         "Returns a workout card where the athlete can choose Workout Library or Calendar and confirm.",
       inputSchema: buildDraftWorkoutInputSchema()
     },
@@ -401,9 +397,7 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
       description:
         "Validate and store a multi-day or multi-week sport-aware training plan draft for athlete review. " +
         "Use draft_workout instead when the athlete asks for only one standalone workout. " +
-        "Put prescribed HR, pace, power, cadence, stroke, weight, RPE, or grade in each step's typed intensity field. " +
-        "Strength and Hybrid Fitness exercise names are checked against the COROS catalog; use search_coros_exercises first " +
-        "and pass its exact IDs and names. If candidates are returned, revise the affected steps and call this tool again. " +
+        "Strength and Hybrid Fitness exercise names are checked against the COROS catalog. " +
         "Nothing is saved to COROS by this or any tool: the athlete saves from the card. Returns a draftId and a short preview. " +
         "To change a plan you already drafted, use revise_training_plan; set revises only when rewriting most of it.",
       inputSchema: withRevises(buildDraftTrainingPlanInputSchema())
@@ -444,7 +438,6 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
       name: "list_scheduled_workouts",
       description:
         "List workouts on the COROS training calendar for a date range. " +
-        "Use before delete_workout to get plan_id and id_in_plan when needed. " +
         "Each session carries the revision a patch needs and its steps numbered for patch paths: [i] is /steps/i, [i.j] is /steps/i/steps/j. " +
         "A strength session may carry heracles_load, the estimate of its Heracles load.",
       inputSchema: {
@@ -468,38 +461,23 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
     {
       name: "delete_workout",
       description:
-        "Stage a workout deletion for the athlete to apply. " +
-        "Shows a card with a Remove or Delete button under your reply — never deletes directly. " +
-        "For calendar: provide schedule_date + workout_name, or plan_id + id_in_plan. " +
-        "For library: provide program_id or workout_name with target library/both.",
+        "Stage deleting a workout from the Workout Library for the athlete to apply: a card with a " +
+        "Delete button under your reply, never a deletion. A session on the calendar is removed with " +
+        "propose_schedule_changes instead.",
+      // The handler still takes the calendar arguments an older transcript
+      // carries; they are not offered, so the calendar has one way out.
       inputSchema: {
         type: "object",
         properties: {
-          target: {
-            type: "string",
-            enum: ["scheduled", "library", "both"],
-            description: "Where to delete from"
-          },
-          schedule_date: {
-            type: "string",
-            description: "YYYYMMDD for calendar delete"
-          },
-          workout_name: {
-            type: "string",
-            description: "Workout name to match"
-          },
           program_id: {
             type: "string",
             description: "Library program ID"
           },
-          plan_id: { type: "string", description: "Schedule plan ID" },
-          id_in_plan: { type: "string", description: "Schedule idInPlan" },
-          plan_program_id: {
+          workout_name: {
             type: "string",
-            description: "Optional schedule planProgramId"
+            description: "Workout name to match, when the ID is not known"
           }
-        },
-        required: ["target"]
+        }
       }
 
     },
@@ -1152,7 +1130,7 @@ async function handleDraftTrainingPlan(
   if (!prepared.ok) return prepared.response;
 
   if (target?.ok) {
-    return storeRevision(target.latest, prepared, unitSystem, "Rewritten by Coach.", onPlanDraft);
+    return storeRevision(target.latest, prepared, unitSystem, "Rewritten by Mentor.", onPlanDraft);
   }
 
   const draftId = crypto.randomUUID();
@@ -1954,7 +1932,7 @@ async function handleDeleteWorkout(
 function parseDeleteWorkoutParams(
   args: Record<string, unknown>
 ): DeleteWorkoutParams {
-  const target = String(args.target ?? "").trim() as DeleteWorkoutParams["target"];
+  const target = String(args.target ?? "library").trim() as DeleteWorkoutParams["target"];
   if (!["scheduled", "library", "both"].includes(target)) {
     throw new Error("target must be scheduled, library, or both.");
   }
@@ -2369,7 +2347,7 @@ export async function uploadPlanDraftById(
   const stored = loadStoredPlanDraft(draftId);
   if (!stored) {
     throw new Error(
-      "Training plan draft not found or expired. Ask the coach to regenerate this plan."
+      "Training plan draft not found or expired. Ask Mentor to regenerate this plan."
     );
   }
   if (stored.uploadedAt) {
@@ -2486,7 +2464,7 @@ function markDraftSaved(stored: StoredPlanDraft, result: UploadPlanResult): void
 function requirePlanDraft(draftId: string): StoredPlanDraft {
   const stored = loadStoredPlanDraft(draftId);
   if (!stored) {
-    throw new Error("Training plan draft not found. Ask the coach to write the plan again.");
+    throw new Error("Training plan draft not found. Ask Mentor to write the plan again.");
   }
   if (stored.preview.artifactType === "workout") {
     throw new Error("This is a single workout, not a plan.");
@@ -2746,7 +2724,7 @@ export function chatSessionForDraft(draftId: string): string | undefined {
 export function planDraftDocument(draftId: string): TrainingPlanDocument {
   const stored = loadStoredPlanDraft(draftId);
   if (!stored) {
-    throw new Error("Training plan draft not found. Ask the coach to write the plan again.");
+    throw new Error("Training plan draft not found. Ask Mentor to write the plan again.");
   }
   return draftDocument(stored);
 }
@@ -2865,13 +2843,13 @@ export function saveWorkoutDraftEdit(
 ): PlanVersionSave {
   const stored = loadStoredPlanDraft(draftId);
   if (!stored) {
-    throw new Error("Workout draft not found. Ask the coach to write it again.");
+    throw new Error("Workout draft not found. Ask Mentor to write it again.");
   }
   if (stored.preview.artifactType !== "workout") {
     throw new Error("This is a plan, not a single workout.");
   }
   if (versionsOf(stored.artifactId).some((version) => version.uploadedAt) || stored.uploadedAt) {
-    throw new Error("This workout has already been saved, so the Coach card can no longer be edited.");
+    throw new Error("This workout has already been saved, so the Mentor card can no longer be edited.");
   }
   const newer = newerVersion(stored, replaceNewer);
   if (newer) return newer;
@@ -2980,7 +2958,7 @@ function writeVersion(
   const versions = versionsOf(base.artifactId);
   const latest = versions[versions.length - 1] ?? base;
   if ((base.preview.artifactType ?? "plan") === "workout" && versions.some((version) => version.uploadedAt)) {
-    throw new Error("This workout is already saved to COROS, so the Coach card can no longer be changed from here.");
+    throw new Error("This workout is already saved to COROS, so the Mentor card can no longer be changed from here.");
   }
   const artifactType = base.preview.artifactType ?? "plan";
   const draftId = crypto.randomUUID();

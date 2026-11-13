@@ -5,7 +5,7 @@
 - `src/App.tsx` holds view routing and most cross-cutting state; `src/navigation/primaryNav.ts`
   defines `PrimaryView` (its `developmentOnly` and `beta` flags still work; nothing sets them).
 - Heavy screens are lazy (Training Hub, Library, Running, Cycling, Hiking, Swimming, Strength,
-  Calendar, Coach, Where you've been, Hall of Records); Overview and Settings are in the main
+  Calendar, Coach, Where you've been, the Hall of Records' three); Overview and Settings are in the main
   bundle. **Calendar and Training Library are `preloadableLazy`** — fetched once the first
   paint is idle, and before that their Suspense fallback is the screen's own skeleton
   (`CalendarSkeleton`, `TrainingLibrarySkeleton`), never the generic spinner. That is why
@@ -139,8 +139,7 @@ controls on white cards); a surface that must be white asks for `--glass-bg-elev
 from a flat `THEME_WINDOW_BACKGROUND`). Paper accents are measured for WCAG AA against
 `--bg-base` and mirrored in `src/theme/accentPalette.ts` for WebGL and charts — change both.
 **On paper the accent is a colour for words**: a chosen thing is lifted or edged, never
-washed (a wash reads as a beige stain); what is filled takes `--hall-gold*`; gold artwork
-drawn for black stands on a black plaque. Paper's rail is a white sheet whose title bar
+washed (a wash reads as a beige stain); what is filled takes `--hall-gold*`. Paper's rail is a white sheet whose title bar
 follows through `--app-rail-width` (written by `AppSidebar`); Coach on paper is a white
 frame with white cards on the canvas.
 

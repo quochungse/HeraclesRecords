@@ -112,12 +112,8 @@
  },
  {
   "out": "13-labours",
-  "view": "records",
+  "view": "labours",
   "wait": 4500,
-  "steps": [
-   "demoClick('The Twelve Labours')",
-   1500
-  ],
   "theme": "dark"
  },
  {

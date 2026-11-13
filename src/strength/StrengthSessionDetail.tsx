@@ -1,6 +1,7 @@
 import { exerciseLabel, heatLevel, metricValue } from "./strengthAnalytics";
 import { useMemo, useState } from "react";
-import { ArrowUpRight, ChevronLeft, ChevronRight, Info, MessageCircle, Trophy } from "lucide-react";
+import { ArrowUpRight, ChevronLeft, ChevronRight, Info, Trophy } from "lucide-react";
+import { MentorIcon } from "../chat/mentorIcon";
 import type {
   CoachOpenRequest,
   HeraclesSetLoad,
@@ -492,7 +493,7 @@ export function StrengthSessionHeader({ entry, showSource, onShowAll, onAskCoach
                 )
               }
             >
-              <MessageCircle size={15} aria-hidden="true" />
+              <MentorIcon size={15} aria-hidden="true" />
               {t("activity.askCoach")}
             </button>
           ) : null}

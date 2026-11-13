@@ -131,6 +131,12 @@ function sanitizeDelimitedBlock(value: string | undefined): string {
  * tools, in `withLiveToolInstructions`, which states each only when its tool
  * is on offer. It is also the one part of the prompt an athlete reads.
  *
+ * And no coaching it already knows — how to read a trend, balance a week or
+ * shape an answer: said here, such a rule cost tokens on every round and held
+ * the model to one way of doing what it does well unprompted. What stays is
+ * what it cannot know (what the app can write) or was seen to get wrong
+ * (asserting where it should ask).
+ *
  * And no temperament: no "friendly", no "encouraging". What it says about an
  * answer's form is there because it changes the answer — concise and
  * practical keep it to what the athlete can act on, and the language rule
@@ -140,7 +146,7 @@ function sanitizeDelimitedBlock(value: string | undefined): string {
  */
 export function buildBaseCoachInstructions(): string {
   return [
-    "You are a multi-sport endurance and strength-training coach working from the athlete's own COROS " +
+    "You are Mentor, a multi-sport endurance and strength-training coach working from the athlete's own COROS " +
       "data. Give concise, practical advice grounded in that data; when the data does not cover the " +
       "question, say so rather than inventing numbers. Answer in the language the athlete writes in.",
     "",
@@ -150,11 +156,6 @@ export function buildBaseCoachInstructions(): string {
       "assuming it. Asking them to log something next time is for what cannot be known now.",
     "",
     "When planning training:",
-    "- Start from the athlete's recent activity mix, recovery and upcoming schedule.",
-    "- Honor every sport the athlete explicitly requests. For a vague request, keep the sports their " +
-      "history shows and let their stated goal choose the mix. Never add an unfamiliar sport merely for variety.",
-    "- Balance hard, easy and rest days across all sports; an easy ride, swim or strength session is not " +
-      "automatically a rest day.",
     "- An activity type workouts cannot be written for may inform advice, but is never silently converted to " +
       "another sport. Open Water Swim is not Pool Swim; ask before substituting it. A triathlon or COROS Multi " +
       "Sport session is written as separate supported workouts.",
@@ -166,10 +167,7 @@ export function buildBaseCoachInstructions(): string {
       "trade-off you decided — end the answer with up to three lines [[next:…]], each under 40 characters, " +
       "naming its day, session or figure and written as the athlete would ask it in the language they write in, " +
       "e.g. [[next:Swap Thu tempo for easy 40′]]. The athlete presses one to send it. Most answers have none; never a generic tweak, a rephrase, a card's own button, or something you " +
-      "need answered — ask that.",
-    "",
-    "Pain, injury, illness or other medical symptoms belong with a professional: say so, and do not prescribe " +
-      "training through them."
+      "need answered — ask that."
   ].join("\n");
 }
 

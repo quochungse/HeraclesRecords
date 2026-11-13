@@ -48,6 +48,6 @@ read-only: `WorkoutViewModal` and `WorkoutReadOnlyBody` (Library reader, plan re
   at most 100%: COROS's `completeRate` for the activity COROS linked, else the plan in its own
   terms — strength in Heracles Training Load when chosen, else distance, else time. Not load: COROS's
   planned load runs a steady ~1.6× under what runs score, so every run read as off plan.
-- Ask Coach for a day, week or session sends a `scheduleRefs` chip, never pasted figures.
+- Ask Mentor for a day, week or session sends a `scheduleRefs` chip, never pasted figures.
 - Days are local: `keyFromDate`, `monthGridWeeks` (`dateUtils.ts`); "today" turns over at
   midnight through `useTodayKey` (shared with Overview).

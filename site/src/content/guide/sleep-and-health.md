@@ -4,7 +4,7 @@ description: Connect COROS MCP once to bring in nights, naps, HRV and stress, an
 order: 4
 ---
 
-COROS serves sleep, HRV, stress and daily health through a second door: its MCP server. Until it is connected, the Sleep screen says **Sleep needs MCP** and Coach cannot read your nights.
+COROS serves sleep, HRV, stress and daily health through a second door: its MCP server. Until it is connected, the Sleep screen says **Sleep needs MCP** and Mentor cannot read your nights.
 
 ## Connect it
 
@@ -12,13 +12,13 @@ COROS serves sleep, HRV, stress and daily health through a second door: its MCP 
 2. Find **COROS** in the list and press **Connect**.
 3. Your browser opens COROS's own sign-in page, on your account's region, with your email filled in. Type your password there once and allow access.
 
-That is all. The app reads your nights from then on, and Coach can read them too.
+That is all. The app reads your nights from then on, and Mentor can read them too.
 
 ## What you get
 
 - **Every night and nap**: stages, time asleep, the sleep window and wake-ups.
 - **Across the night**: heart rate, HRV and stress.
-- **By day**: steps, exercise minutes and stress by the hour, which Coach reads beside your training load.
+- **By day**: steps, exercise minutes and stress by the hour, which Mentor reads beside your training load.
 
 ## Kept past nine weeks
 
@@ -30,4 +30,4 @@ A server that is connected but does not answer shows as **COROS MCP unreachable*
 
 ## Other servers
 
-MCP Servers also offers **Strava** and **Freddy** under Quick connect, and lets you add a server of your own. Coach can use their tools in a conversation. A server other than COROS is withheld from any conversation that switches off one of its sources, since the app cannot tell what that server reads.
+MCP Servers also offers **Strava** and **Freddy** under Quick connect, and lets you add a server of your own. Mentor can use their tools in a conversation. A server other than COROS is withheld from any conversation that switches off one of its sources, since the app cannot tell what that server reads.

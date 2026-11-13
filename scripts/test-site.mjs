@@ -46,7 +46,12 @@ function walk(dir) {
   });
 }
 
-const pages = walk(dist).filter((file) => file.endsWith(".html"));
+// A page Astro writes for `redirects` (astro.config.mjs) is a bare meta refresh:
+// none of a page's assets, footer, card or copy, only where it points (held below).
+const isRedirect = (file) => readFileSync(file, "utf8").includes('http-equiv="refresh"');
+const htmlFiles = walk(dist).filter((file) => file.endsWith(".html"));
+const redirects = htmlFiles.filter(isRedirect);
+const pages = htmlFiles.filter((file) => !isRedirect(file));
 for (const page of pages) {
   const html = readFileSync(page, "utf8");
   const assets = [...html.matchAll(/(?:href|src)="\/(_astro\/[^"]+)"/g)].map((match) => match[1]);
@@ -102,6 +107,11 @@ for (const page of pages) {
   }
 }
 assert.ok(existsSync(join(dist, "changelog.xml")), "the release feed changelog.xml is missing");
+// An old address kept by a redirect still lands on a page in the build.
+for (const page of redirects) {
+  const target = readFileSync(page, "utf8").match(/http-equiv="refresh" content="0;url=([^"]+)"/)?.[1];
+  assert.ok(target && resolves(target), `${relative(dist, page)} redirects to ${target}, which is not in the build`);
+}
 
 // 8. Every page names a link-preview card that is in the build (site/public/og,
 //    rendered by `npm run site:og`).

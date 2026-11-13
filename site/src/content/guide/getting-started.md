@@ -21,15 +21,15 @@ More on what the app reads and keeps: [Connect your COROS account](/guide/connec
 The sidebar groups the screens by when you reach for them:
 
 - **Today**: Overview and Sleep.
-- **Plan**: Coach, Calendar and Training Library.
+- **Plan**: Mentor, Calendar and Training Library.
 - **History**: Activities, then a screen each for Running, Cycling, Hiking, Swimming and Strength.
-- **Your journey**: the Hall of Records and Where you've been.
+- **Your journey**: the Hall of Records (Timeline, Personal Records and The Twelve Labours) and Where you've been.
 
 Your name at the foot of the sidebar opens **Personal**: your profile, zones and units. The gear beside it opens **Settings**.
 
 ## 4. Optional extras
 
 - **Sleep and health data** need one more connection to COROS, made in a minute: [Sleep and health data](/guide/sleep-and-health).
-- **Coach** needs an AI to run on: [Set up Coach](/guide/set-up-coach).
+- **Mentor** needs an AI to run on: [Set up Mentor](/guide/set-up-mentor).
 - **Hevy** workouts can join your COROS strength sessions: [Strength and Hevy](/guide/hevy).
 - **A second computer** can share your conversations, plans and settings: [Sync two computers](/guide/sync).

@@ -55,6 +55,9 @@ const {
   runAnalysisNow,
   runAnalysisTrigger,
   formatPrecedingTraining,
+  formatScheduledForActivity,
+  formatSimilarSessions,
+  similarSessions,
   PRECEDING_TRAINING_HOURS,
   noteConversationsChangedBySync,
   ANALYSIS_STOPPED_BY_SYNC,
@@ -1708,6 +1711,67 @@ const analysedIds = (world) =>
     const content = other.streamCalls[0].messages.at(-1).content;
     assert.doesNotMatch(content, /h before it/, `${variant}: no context line`);
   }
+}
+
+// --- a debrief is handed the sessions like its activity, and the day's calendar ---
+{
+  const day = 86_400;
+  const start = RUNNER_NOW_EPOCH - day;
+  const row = (id, daysBefore, distance, extra = {}) => ({
+    activity_id: id,
+    sport_type: 100,
+    name: id,
+    start_time: start - daysBefore * day,
+    distance,
+    duration: 3_000,
+    avg_hr: 150,
+    training_load: 90,
+    ...extra
+  });
+  const run = row("run", 0, 10_000);
+  const rows = [
+    row("r7", 1, 10_500),
+    row("r1", 30, 9_000),
+    row("far", 2, 21_000),
+    row("ride", 3, 10_000, { sport_type: 200 }),
+    row("later", -1, 10_000),
+    run,
+    ...[4, 5, 6, 7, 8].map((before) => row(`d${before}`, before, 10_000))
+  ];
+  assert.deepEqual(
+    similarSessions(run, rows).map((similar) => similar.activity_id),
+    ["d7", "d6", "d5", "d4", "r7"],
+    "same sport, within 30% of its length, earlier, the newest five, oldest first"
+  );
+  // An activity with no distance is compared by time.
+  const gym = { ...row("gym", 0, null, { sport_type: 402 }), duration: 3_600 };
+  assert.deepEqual(
+    similarSessions(gym, [
+      { ...row("g1", 3, null, { sport_type: 402 }), duration: 3_300 },
+      { ...row("g2", 5, null, { sport_type: 402 }), duration: 1_200 }
+    ]).map((similar) => similar.activity_id),
+    ["g1"]
+  );
+  assert.equal(formatSimilarSessions([]), undefined, "none like it adds no line");
+  assert.match(
+    formatSimilarSessions([{ ...row("r7", 1, 10_500), heracles_load: 120 }]),
+    /last 42 days, oldest first:\n- \d{4}-\d{2}-\d{2} "r7" \(id r7\): 10\.50 km, 50 min, avg HR 150, load 90, Heracles load 120\.$/
+  );
+
+  assert.equal(formatScheduledForActivity(run, []), "Nothing was on the calendar that day.");
+  assert.equal(
+    formatScheduledForActivity(run, [
+      { idInPlan: "7", name: "Tempo", volume: "10 km", trainingLoad: 95, completedActivityId: "run" },
+      { idInPlan: "8", name: "Core", completedActivityId: "gym" },
+      { idInPlan: "9", name: "Stretch" }
+    ]),
+    [
+      "On the calendar that day:",
+      '- "Tempo" (10 km, planned load 95), id_in_plan 7. COROS counts this activity as that session.',
+      '- "Core", id_in_plan 8. COROS counts another activity as that session.',
+      '- "Stretch", id_in_plan 9.'
+    ].join("\n")
+  );
 }
 
 // --- a backlog past the cap keeps its *newest* entries -----------------------

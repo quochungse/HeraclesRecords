@@ -285,7 +285,7 @@ test("the card's rows are the generator's, marked with where Coach took them", (
   assert.deepEqual(model.briefOpenProblems(parsed.request, undefined, TODAY), []);
   assert.deepEqual(
     model.briefOpenProblems(parsed.request, { activities: false, sleep: true, zones: true }, TODAY),
-    ["Coach can't judge your level without your recent activities — share them, or pick a level."],
+    ["Mentor can't judge your level without your recent activities — share them, or pick a level."],
     "\"From my data\" needs the conversation's activities"
   );
 });

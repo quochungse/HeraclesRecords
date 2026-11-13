@@ -16,7 +16,7 @@ The first computer publishes everything it already has; the next one merges it w
 
 ## What syncs
 
-- **Yes**: Coach conversations, plan drafts, your app preferences and the rest of what you made in the app.
+- **Yes**: Mentor conversations, plan drafts, your app preferences and the rest of what you made in the app.
 - **No**: passwords, API keys and every sign-in, COROS and Google included. Each computer signs in for itself.
 - **Not needed**: your activities. They come from COROS on every computer.
 

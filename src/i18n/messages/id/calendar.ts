@@ -66,7 +66,7 @@ const calendar: CalendarMessages = {
   "calendar.week.targetRangeTitle": "Beban mingguan yang disarankan COROS untuk kebugaranmu saat ini.",
   "calendar.week.targetRangeTitleHeracles": "Beban mingguan yang disarankan untuk kebugaranmu saat ini, dengan rumus COROS pada Heracles TL. Milik COROS: {min}–{max}.",
   "calendar.week.elevGain": "Tanjakan",
-  "calendar.week.askTitle": "Tanya pelatih tentang minggu ini",
+  "calendar.week.askTitle": "Tanya Mentor tentang minggu ini",
   "calendar.card.plan": "Rencana",
   "calendar.card.missed": "Terlewat",
   "calendar.day.more": "+{count} lagi",

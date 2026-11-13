@@ -759,10 +759,10 @@ async function main() {
     await harness("setValue", ".chat-custom-instructions", "  I race in October.  ");
     // The styles are chips, warmest to harshest, Neutral in the middle.
     const chips = await win.webContents.executeJavaScript(
-      `Array.from(document.querySelectorAll('.chat-settings-modal [aria-label="How Coach sounds"] button')).map((chip) => chip.textContent.trim())`
+      `Array.from(document.querySelectorAll('.chat-settings-modal [aria-label="How Mentor sounds"] button')).map((chip) => chip.textContent.trim())`
     );
     assert.deepEqual(chips, ["Friendly", "Motivating", "Neutral", "Straight talk", "No filter"]);
-    await harness("clickText", '.chat-settings-modal [aria-label="How Coach sounds"] button', "No filter");
+    await harness("clickText", '.chat-settings-modal [aria-label="How Mentor sounds"] button', "No filter");
     await harness("clickText", ".chat-settings-modal-footer button", "Save");
     const [saved] = await waitFor(async () => {
       const made = await harness("calls", "prop:onSaveChatSettings");
@@ -774,7 +774,7 @@ async function main() {
     // A press outside with an edit held does nothing, and the footer stays as it is.
     await harness("mount", "ChatSettingsModal", {}, { getCoachAnalysisPause: null, getCoachAnalysisSpend: null });
     await waitFor(() => harness("exists", ".chat-settings-modal .chat-custom-instructions"), "the dialog opens again");
-    await harness("clickText", '.chat-settings-modal [aria-label="How Coach sounds"] button', "No filter");
+    await harness("clickText", '.chat-settings-modal [aria-label="How Mentor sounds"] button', "No filter");
     assert.match(await harness("text", ".chat-settings-panel"), /strong language and swearing/i, "the chosen style says what it does");
     await harness("setValue", ".chat-custom-instructions", "Something else");
     await harness("click", ".chat-settings-backdrop");

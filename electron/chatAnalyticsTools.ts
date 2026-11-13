@@ -102,15 +102,20 @@ export function getChatAnalyticsTools(): CorosMcpTool[] {
         "cycling power against FTP — plus how the last 4 weeks were spent " +
         "across the HR zones, by time, training load and distance. Use it " +
         "before prescribing any HR, pace or power target instead of inferring " +
-        "ranges from recent activities.",
+        "ranges from recent activities. It draws a chart only when asked to.",
       inputSchema: {
         type: "object",
         properties: {
+          chart: {
+            type: "boolean",
+            description:
+              "true to also show the athlete a chart of the last 4 weeks across the HR zones — when the question is about that spread. Leave it out when reading the tables to set a target."
+          },
           metric: {
             type: "string",
             enum: ["time", "distance", "trainingLoad"],
             description:
-              "Which measure the chart card shows (default trainingLoad). The text always carries all three."
+              "Which measure that chart shows (default trainingLoad). The text always carries all three."
           }
         }
       }
@@ -764,12 +769,17 @@ async function handleGetTrainingZones(
       model = accountHrZoneModel(profile, await getTrainingDashboard().catch(() => null));
     }
 
-    const preview = buildHrZonePreview(
-      analytics.zoneDistributions,
-      model?.zones ?? [],
-      metric,
-      callbacks?.requestId ?? "unknown"
-    );
+    // Only when asked for: the tables are read before every prescribed
+    // target, and a zone chart stood above every workout Coach wrote.
+    const preview =
+      args.chart === true
+        ? buildHrZonePreview(
+            analytics.zoneDistributions,
+            model?.zones ?? [],
+            metric,
+            callbacks?.requestId ?? "unknown"
+          )
+        : null;
 
     if (preview && callbacks?.onHrZoneSummary) {
       callbacks.onHrZoneSummary(preview);

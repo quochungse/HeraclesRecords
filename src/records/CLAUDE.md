@@ -1,7 +1,13 @@
 # Hall of Records
 
-Every milestone the athlete has reached, newest first, and **the Twelve Labours** — twelve
-kinds of achievement (`labours.ts`), three stages each, all twelve being Apotheosis.
+Three screens on the rail under Your journey, drawn by one lazy module (`HallOfRecordsView`,
+`section`): the **Timeline** of every milestone the athlete has reached, newest first (its
+view id is still `records`, so a stored startup view opens it); **Personal Records**
+(`personalRecords`); and **the Twelve Labours** (`labours`) — twelve kinds of achievement
+(`labours.ts`), three stages each, all twelve being Apotheosis. A labour's toast and
+celebration open the Labours; a stage's date there opens its milestone on the Timeline
+(`timelineFocus` in App). Only the Timeline marks milestones seen, and carries the rail's
+"new" count.
 
 ## Rules for stages
 
@@ -38,6 +44,13 @@ kinds of achievement (`labours.ts`), three stages each, all twelve being Apotheo
   `heraclesrecords.records.notices.v1` (`personal`). **The first reckoning announces nothing**
   and waits for `settled`; a milestone older than 30 days gets no badge, a stage older than 14
   days no toast.
+- **Personal Records** (`personalBests.ts`, `PersonalRecordsBoard.tsx`) is worked out in
+  `computeRecords` as `board`, so samples have it too. Each period's best is COROS's own
+  (`recordDetailList` groups 4/2/3/1 = all, 6 months, 12 weeks, 4 weeks — the figures the
+  watch shows); a record's history is every time the records walk's best effort fell, COROS's
+  figure in place of ours on the same run. Only the best-effort distances are on it: COROS's
+  3K is a figure with no history, and is left out. The page opens on the record that grades
+  highest for age and sex.
 - The developer toolbar's Sample menu has four presets (`sampleRecords.ts`), told against a
   notices record in memory, asking nothing of COROS.
 
@@ -45,5 +58,6 @@ kinds of achievement (`labours.ts`), three stages each, all twelve being Apotheo
 
 A labour's emblem is the athlete's gold artwork (`src/assets/labours/<LabourId>.webp`) in a CSS
 frame with four steps of light by stage; its golds are the artwork's, not `--accent`. On paper
-the hall is gold on white (`--hall-gold*`, derived from the accent in `recordsNotices.css`);
-each labour's head is a black plaque.
+the hall is gold on white (`--hall-gold*`, derived from the accent in `recordsNotices.css`)
+and the emblem's plate is ivory: an unreached stage fades the figure by `opacity`, never a
+lower `brightness`, which on a light ground turns the gold to mud.

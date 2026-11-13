@@ -33,10 +33,9 @@
 
 /*
  * The artwork's frame, drawn here rather than baked into the picture so it can
- * follow the size and the state. The plate is the relief's own black in both
- * themes — the gold was cast for it, and on a light ground its shadows read as
- * holes — and the rim is a metal gradient on the border box under the plate's
- * padding box. The golds are the artwork's, not the accent: a rim in the
+ * follow the size and the state. The plate is the relief's own black on dark
+ * and a warm ivory on paper (below), and the rim is a metal gradient on the
+ * border box under the plate's padding box. The golds are the artwork's, not the accent: a rim in the
  * athlete's blue would sit round a gold figure it does not match.
  */
 .labour-emblem {
@@ -84,11 +83,11 @@
 }
 
 .labour-emblem.is-stage-1 img {
-  filter: saturate(0.55) brightness(0.55);
+  filter: saturate(0.75) brightness(0.72);
 }
 
 .labour-emblem.is-stage-2 img {
-  filter: saturate(0.8) brightness(0.8);
+  filter: saturate(0.9) brightness(0.88);
 }
 
 .labour-emblem.is-stage-1 {
@@ -109,6 +108,39 @@
     radial-gradient(circle at 50% 30%, var(--emblem-plate-top), var(--emblem-plate) 72%) padding-box,
     linear-gradient(160deg, var(--emblem-gold-light), var(--emblem-gold) 45%, var(--emblem-gold-deep)) border-box;
   box-shadow: 0 0 calc(var(--emblem-size) / 4) var(--emblem-glow);
+}
+
+/*
+ * Paper: a black plate on a white card is a hole in the page, and a figure
+ * dimmed on it is lost altogether. The plate is ivory (grey while no stage
+ * is reached, so an unlit labour is told from a lit one), and a stage not yet
+ * reached fades the figure towards the plate — `opacity`, never a lower
+ * `brightness`, which on a light ground turns the gold to mud.
+ */
+:root[data-theme="paper"] .labour-emblem {
+  --emblem-plate-top: #fffaf0;
+  --emblem-plate: #f3e7cd;
+  --emblem-gold: #d9a53c;
+}
+
+:root[data-theme="paper"] .labour-emblem.is-stage-0 {
+  --emblem-plate-top: #f6f7f9;
+  --emblem-plate: #e8eaee;
+}
+
+:root[data-theme="paper"] .labour-emblem.is-stage-0 img {
+  filter: grayscale(1) brightness(1.1);
+  opacity: 0.3;
+}
+
+:root[data-theme="paper"] .labour-emblem.is-stage-1 img {
+  filter: saturate(0.75) brightness(1.08);
+  opacity: 0.7;
+}
+
+:root[data-theme="paper"] .labour-emblem.is-stage-2 img {
+  filter: saturate(0.9) brightness(1.04);
+  opacity: 0.88;
 }
 
 /* The timeline's inline badge: the figure alone, in the badge's own pill. */

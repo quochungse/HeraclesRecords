@@ -6,7 +6,7 @@
 //
 //   1. a change line's label names its plan once, in the label's own
 //      parentheses, and names none when the label has none;
-//   2. the "Coach stopped before finishing" notice is stored in English and
+//   2. the "Mentor stopped before finishing" notice is stored in English and
 //      drawn translated, with a fixed main-process sentence inside it;
 //   3. `screenSentence` says a fixed main-process sentence in the language on
 //      screen and leaves anything else as it came;
@@ -54,12 +54,18 @@ assert.ok(!said.includes("(("), `no doubled parentheses: ${said}`);
 
 // --- 2. The stopped-early notice ----------------------------------------------------
 
-const fixedReason = "Add an OpenRouter API key in Coach settings first.";
+const fixedReason = "Add an OpenRouter API key in Mentor settings first.";
 const stored = stoppedEarlyNotice(fixedReason);
-assert.equal(stored, `Coach stopped before finishing: ${fixedReason}`, "stored in English whatever the language");
+assert.equal(stored, `Mentor stopped before finishing: ${fixedReason}`, "stored in English whatever the language");
 const shown = displayStoredNotice(stored);
-assert.ok(!shown.startsWith("Coach stopped"), `drawn in the language on screen: ${shown}`);
+assert.ok(!shown.startsWith("Mentor stopped"), `drawn in the language on screen: ${shown}`);
 assert.ok(shown.includes(core.t("main.coach.openRouterKey")), `the fixed sentence inside is translated too: ${shown}`);
+// A notice stored while Mentor was called Coach is read the same way.
+assert.equal(
+  displayStoredNotice("Coach stopped before finishing: Add an OpenRouter API key in Coach settings first."),
+  shown,
+  "a notice stored before the rename"
+);
 // A provider's own words inside the notice are drawn as they came.
 assert.ok(displayStoredNotice(stoppedEarlyNotice("overloaded_error")).endsWith("overloaded_error"));
 // An ordinary answer is left alone.

@@ -611,16 +611,62 @@
   padding: 22px 24px;
 }
 
-.records-laurel {
+/* The medal's golds are the emblems' (recordsNotices.css), not the accent. */
+.records-medal {
+  --medal-gold-light: #f7d98c;
+  --medal-gold: #e3b049;
+  --medal-gold-deep: #a8741c;
+  --medal-plate-top: #1d1a14;
+  --medal-plate: #070706;
+  --medal-track: rgba(227, 176, 73, 0.16);
+  --medal-rim: rgba(227, 176, 73, 0.22);
   flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 64px;
-  height: 64px;
-  border-radius: var(--radius-pill);
-  background: var(--accent-soft);
-  color: var(--accent);
+  width: 76px;
+  height: 76px;
+  overflow: visible;
+}
+
+.records-medal.is-complete {
+  filter: drop-shadow(0 0 10px rgba(227, 176, 73, 0.35));
+}
+
+.records-medal-track,
+.records-medal-arc {
+  fill: none;
+  stroke-width: 2;
+}
+
+.records-medal-track {
+  stroke: var(--medal-track);
+}
+
+.records-medal-arc {
+  stroke-linecap: round;
+}
+
+.records-medal-plate {
+  stroke: var(--medal-rim);
+  stroke-width: 1;
+}
+
+.records-medal-stop-light {
+  stop-color: var(--medal-gold-light);
+}
+
+.records-medal-stop {
+  stop-color: var(--medal-gold);
+}
+
+.records-medal-stop-deep {
+  stop-color: var(--medal-gold-deep);
+}
+
+.records-medal-stop-plate-top {
+  stop-color: var(--medal-plate-top);
+}
+
+.records-medal-stop-plate {
+  stop-color: var(--medal-plate);
 }
 
 .records-apotheosis-copy {
@@ -902,9 +948,8 @@
  * on the grey canvas, every fill in the accent's muddy brown, and a completed
  * labour drawn exactly like an open one. Here the gold that fills is paper's
  * bright gold (recordsNotices.css), the year's timeline is one white sheet
- * with its big milestones lifted off it as cards, and each labour's head is a
- * black plaque: the emblems were cast for black, and on it their gold reads as
- * gold. Dark is untouched.
+ * with its big milestones lifted off it as cards, and each labour's emblem
+ * stands on a light plate. Dark is untouched.
  */
 
 /* Bars and pips are filled in the bright gold, on a warm track. */
@@ -953,63 +998,23 @@
   box-shadow: inset 0 0 0 1px var(--hall-gold-edge);
 }
 
-/* The apotheosis stays a white card; its laurel is a gold coin. */
-:root[data-theme="paper"] .records-laurel {
-  background: var(--hall-coin);
+/* The apotheosis stays a white card; its medal is the emblems' ivory plate. */
+:root[data-theme="paper"] .records-medal {
+  --medal-gold-light: #e2b24a;
+  --medal-gold: #c08a1f;
+  --medal-gold-deep: #8f5f12;
+  --medal-plate-top: #fffaf0;
+  --medal-plate: #f3e7cd;
+  --medal-track: var(--hall-track-ink);
+  --medal-rim: rgba(143, 95, 18, 0.2);
+}
+
+/* A labour's head stays on the card's white, its emblem on a light plate
+   (recordsNotices.css); a complete labour's pill is filled in the gold. */
+:root[data-theme="paper"] .records-complete {
+  background: linear-gradient(180deg, var(--hall-gold-light), var(--hall-gold));
   color: var(--hall-gold-ink);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 1px 3px rgba(90, 55, 0, 0.24);
-}
-
-/* Each labour's head is a black plaque, bled to the card's edges; its myth and
-   its stages stay on white. */
-:root[data-theme="paper"] .records-labour {
-  --plaque: radial-gradient(130% 160% at 0% 0%, #2b2317 0%, #15120d 48%, #0b0a08 100%);
-  --plaque-ink: #f7f0e1;
-  --plaque-ink-2: #cfc3aa;
-  --plaque-ink-3: #9d927c;
-  --plaque-gold: #f0c35e;
-  --plaque-gold-light: #f7d98c;
-  overflow: hidden;
-}
-
-:root[data-theme="paper"] .records-labour-head {
-  margin: -18px -18px 0;
-  padding: 18px;
-  background: var(--plaque);
-}
-
-:root[data-theme="paper"] .records-labour.is-complete .records-labour-head {
-  box-shadow: inset 0 -2px 0 var(--plaque-gold);
-}
-
-:root[data-theme="paper"] .records-labour-head .records-eyebrow {
-  color: var(--plaque-ink-3);
-}
-
-:root[data-theme="paper"] .records-labour-head h3 {
-  color: var(--plaque-ink);
-}
-
-:root[data-theme="paper"] .records-labour-head .records-stage-count {
-  color: var(--plaque-ink-2);
-}
-
-:root[data-theme="paper"] .records-labour-head .records-labour-pips span {
-  background: rgba(255, 255, 255, 0.16);
-}
-
-:root[data-theme="paper"] .records-labour-head .records-labour-pips span.is-reached,
-:root[data-theme="paper"] .records-labour-head .records-complete {
-  background: linear-gradient(180deg, var(--plaque-gold-light), var(--plaque-gold));
-}
-
-:root[data-theme="paper"] .records-labour-head .records-complete {
-  color: #2a1b04;
   font-weight: 700;
-}
-
-:root[data-theme="paper"] .records-myth {
-  margin-top: 2px;
 }
 
 /* A labour's badge on the timeline is a white face on a hairline; on the
@@ -1122,4 +1127,590 @@
     inset 4px 0 0 var(--hall-gold),
     0 0 0 1px var(--hall-gold-edge),
     var(--shadow-card);
+}
+
+/* --- Personal Records ------------------------------------------------------ */
+
+/*
+ * The running distances in a column beside the chosen one's record: the list
+ * never moves, the detail changes beside what was pressed, and neither changes
+ * height doing it — the list has a row for every distance the board holds and
+ * the detail draws the same blocks for every record. In the dark the record
+ * stands on a black plaque, the hall's way of setting a thing apart; on paper
+ * it stands on the card's white.
+ */
+.records-pr {
+  container-type: inline-size;
+  display: grid;
+  gap: 18px;
+}
+
+.records-pr-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.records-pr-head .records-section-label {
+  margin: 0;
+}
+
+.records-pr-board {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+@container (max-width: 760px) {
+  .records-pr-board {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.records-pr-list {
+  display: grid;
+  grid-template-rows: repeat(var(--records-pr-rows), minmax(64px, 1fr));
+  align-content: stretch;
+  gap: 2px;
+  padding: 6px;
+}
+
+.records-pr-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(56px, 104px) minmax(0, 1fr) 84px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 14px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.records-pr-row:hover:not(:disabled) {
+  background: var(--glass-bg-hover);
+}
+
+/* No record in the period: listed, so the column keeps its distances, but
+   there is nothing to open. */
+.records-pr-row:disabled {
+  cursor: default;
+}
+
+.records-pr-row:disabled .records-pr-row-label,
+.records-pr-row:disabled strong {
+  color: var(--text-muted);
+}
+
+/* With no history to draw, its words take the sparkline's place too. */
+.records-pr-row:disabled .records-pr-row-figure {
+  grid-column: 2 / -1;
+}
+
+.records-pr-row[aria-pressed="true"] {
+  background: var(--glass-bg);
+}
+
+.records-pr-row[aria-pressed="true"]::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 2px;
+  height: 22px;
+  margin-top: -11px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+
+.records-pr-row:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.records-pr-row-label {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.records-pr-row-figure {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.records-pr-row-figure strong,
+.records-pr-stat-value,
+.records-pr-figure {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.records-pr-row-figure strong {
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.records-pr-row-figure small {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.records-pr-row-figure small b {
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
+.records-pr-row-spark {
+  display: block;
+  min-width: 0;
+}
+
+/* The record: a plaque over its history. */
+.records-pr-detail {
+  --plaque: radial-gradient(130% 160% at 0% 0%, #2b2317 0%, #15120d 48%, #0b0a08 100%);
+  --plaque-ink: #f7f0e1;
+  --plaque-ink-2: #cfc3aa;
+  --plaque-gold: #f0c35e;
+  --plaque-line: rgba(247, 240, 225, 0.12);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  padding: 0;
+  overflow: hidden;
+}
+
+.records-pr-plaque {
+  display: grid;
+  gap: 18px;
+  padding: 20px 24px;
+  background: var(--plaque);
+  color: var(--plaque-ink);
+}
+
+.records-pr-plaque-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.records-pr-plaque-head > div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.records-pr-wreath {
+  flex: none;
+  display: grid;
+  color: var(--plaque-gold);
+}
+
+.records-pr-eyebrow {
+  margin: 0;
+  color: var(--plaque-gold);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.records-pr-distance {
+  margin: 0;
+  overflow: hidden;
+  color: var(--plaque-ink);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* What the row does not say, one figure a cell, every cell one height. */
+.records-pr-stats {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  margin: 0;
+}
+
+.records-pr-stat {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 0 16px;
+}
+
+.records-pr-stat:first-child {
+  padding-left: 0;
+}
+
+.records-pr-stat + .records-pr-stat {
+  border-left: 1px solid var(--plaque-line);
+}
+
+.records-pr-stat dt {
+  overflow: hidden;
+  color: var(--plaque-ink-2);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.records-pr-stat dd {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.records-pr-stat-value {
+  color: var(--plaque-ink);
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.records-pr-stat-sub {
+  color: var(--plaque-ink-2);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.records-pr-stat-sub .records-pr-link {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--plaque-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.records-pr-session {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin: 0;
+  min-width: 0;
+}
+
+.records-pr-session > * + *::before {
+  content: "·";
+  margin: 0 6px;
+}
+
+.records-pr-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: text-decoration-color var(--dur-fast) var(--ease);
+}
+
+.records-pr-link:hover {
+  text-decoration-color: currentColor;
+}
+
+.records-pr-link:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.records-pr-history {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 18px 24px 16px;
+}
+
+.records-pr-history .records-section-label {
+  margin: 0;
+}
+
+.records-pr-nohistory {
+  display: grid;
+  place-items: center;
+  height: 184px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* A period with no record at any distance: the detail's place, said so. */
+.records-pr-none-period {
+  display: grid;
+  place-items: center;
+  padding: 32px 24px;
+}
+
+.records-pr-none-period p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+/* The history: a line through every time it fell, faster higher. */
+/* As tall as the chart drawn in it (CHART_HEIGHT), drawn or not yet. */
+.records-pr-chart-wrap {
+  position: relative;
+  height: 184px;
+}
+
+.records-pr-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.records-pr-chart-wrap .records-pr-chart {
+  cursor: crosshair;
+}
+
+.records-pr-chart:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.records-pr-chart text {
+  fill: var(--text-muted);
+  font-size: 11px;
+}
+
+.records-pr-chart .records-pr-chart-value {
+  fill: var(--text-secondary);
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.records-pr-chart-tick line {
+  stroke: var(--glass-border);
+  stroke-width: 1;
+}
+
+.records-pr-chart-stop {
+  stop-color: var(--accent);
+}
+
+.records-pr-chart-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.records-pr-chart-guide {
+  stroke: var(--text-muted);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+
+.records-pr-chart-dot {
+  fill: var(--bg-base);
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.records-pr-chart-dot.is-last,
+.records-pr-chart-dot.is-active {
+  fill: var(--accent);
+}
+
+.records-pr-tip {
+  position: absolute;
+  z-index: 5;
+  display: grid;
+  gap: 4px;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 160px;
+  max-width: 260px;
+  padding: 10px 12px;
+  border: 1px solid var(--surface-line, var(--glass-border));
+  border-radius: var(--radius-md);
+  background: var(--menu-surface);
+  box-shadow: var(--shadow-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+  pointer-events: none;
+}
+
+.records-pr-tip strong {
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.records-pr-tip-name {
+  overflow: hidden;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.records-pr-tip em {
+  color: var(--accent-strong);
+  font-style: normal;
+  font-weight: 600;
+}
+
+.records-pr-chart.is-compact .records-pr-chart-line,
+.records-pr-chart.is-compact .records-pr-chart-dot {
+  stroke-width: 1.5;
+}
+
+/* The farthest and the highest. */
+.records-pr-farthest {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.records-pr-far {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  padding: 16px 20px;
+}
+
+.records-pr-far > div {
+  min-width: 0;
+}
+
+.records-pr-far-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.records-pr-figure {
+  margin: 4px 0 2px;
+  color: var(--text-primary);
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+.records-pr-figure span {
+  margin-left: 4px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.records-pr-session {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.records-pr-session .records-pr-link {
+  overflow: hidden;
+  max-width: 240px;
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.records-pr-beyond {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  padding: 4px 0;
+}
+
+.records-pr-beyond-cell {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 12px 20px;
+}
+
+.records-pr-beyond-cell + .records-pr-beyond-cell {
+  border-left: 1px solid var(--glass-border);
+}
+
+.records-pr-beyond .records-pr-figure {
+  font-size: 22px;
+}
+
+/*
+ * Paper: the record stands on the card's own white, not a black plaque — a
+ * dark band on a light page read as a hole in it. Its words take ink and the
+ * accent's words; hairlines part its figures and its history. The line and
+ * its fill take the hall's gold.
+ */
+:root[data-theme="paper"] .records-pr-detail {
+  --plaque: none;
+  --plaque-ink: var(--text-primary);
+  --plaque-ink-2: var(--text-secondary);
+  --plaque-gold: var(--accent-strong);
+  --plaque-line: var(--glass-border);
+}
+
+:root[data-theme="paper"] .records-pr-plaque {
+  border-bottom: 1px solid var(--glass-border);
+}
+
+:root[data-theme="paper"] .records-pr-wreath {
+  color: var(--hall-gold);
+}
+
+:root[data-theme="paper"] .records-pr-chart-stop {
+  stop-color: var(--hall-gold);
+}
+
+:root[data-theme="paper"] .records-pr-chart-line,
+:root[data-theme="paper"] .records-pr-chart-dot {
+  stroke: var(--hall-gold-deep);
+}
+
+:root[data-theme="paper"] .records-pr-chart-dot {
+  fill: var(--glass-bg-elevated);
+}
+
+:root[data-theme="paper"] .records-pr-chart-dot.is-last,
+:root[data-theme="paper"] .records-pr-chart-dot.is-active {
+  fill: var(--hall-gold-deep);
+}
+
+:root[data-theme="paper"] .records-pr-far-icon {
+  background: var(--glass-bg);
 }

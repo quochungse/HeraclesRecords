@@ -66,7 +66,7 @@ const calendar: CalendarMessages = {
   "calendar.week.targetRangeTitle": "ภาระรายสัปดาห์ที่ COROS แนะนำสำหรับความฟิตปัจจุบันของคุณ",
   "calendar.week.targetRangeTitleHeracles": "ภาระรายสัปดาห์ที่แนะนำสำหรับความฟิตปัจจุบันของคุณ ตามสูตรของ COROS บน Heracles TL ค่าของ COROS: {min}–{max}",
   "calendar.week.elevGain": "ไต่ขึ้น",
-  "calendar.week.askTitle": "ถามโค้ชเกี่ยวกับสัปดาห์นี้",
+  "calendar.week.askTitle": "ถามเมนเทอร์เกี่ยวกับสัปดาห์นี้",
   "calendar.card.plan": "แผน",
   "calendar.card.missed": "พลาด",
   "calendar.day.more": "อีก {count} รายการ",

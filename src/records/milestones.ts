@@ -54,6 +54,7 @@ import {
 import type { LabourId, LabourStage, StageProgress } from "./labours";
 import { STAGE_NUMERALS, labourStageKey } from "./labours";
 import type { AdminRegion } from "../trainingMap/adminRegions";
+import { buildRecordBoard, type RecordBoard, type RecordRun } from "./personalBests";
 import {
   clusterPlaces,
   haversineKm,
@@ -194,6 +195,8 @@ export interface RecordsResult {
   toRemember: RememberedMilestone[];
   /** Every place trained in, busiest first, so the screen can name them. */
   places: PlaceCluster[];
+  /** The Personal Records page: the best at each distance, and how it fell. */
+  board: RecordBoard;
 }
 
 // --- Thresholds -------------------------------------------------------------
@@ -1125,6 +1128,12 @@ export function computeRecords(input: RecordsInput): RecordsResult {
   // --- Records: best efforts, and COROS's own -----------------------------------------
   const records = recordMilestones(activities, input);
   for (const milestone of records.milestones) emit.push(milestone);
+  const board = buildRecordBoard({
+    activities,
+    groups: input.personalRecords,
+    fell: records.fell,
+    ...(input.athlete ? { athlete: input.athlete } : {})
+  });
 
   // --- VO2max ---------------------------------------------------------------------------
   const toRemember: RememberedMilestone[] = [];
@@ -1277,7 +1286,8 @@ export function computeRecords(input: RecordsInput): RecordsResult {
     progress,
     withinReach,
     toRemember,
-    places: places.places
+    places: places.places,
+    board
   };
 }
 
@@ -1286,6 +1296,8 @@ export function computeRecords(input: RecordsInput): RecordsResult {
 interface RecordsPart {
   milestones: Milestone[];
   progress: Map<string, StageProgress>;
+  /** Every time each distance's record fell, oldest first, by distance in metres. */
+  fell: Map<number, RecordRun[]>;
 }
 
 function corosAllTimeRecords(
@@ -1321,6 +1333,7 @@ function recordMilestones(
   const progress = new Map<string, StageProgress>();
   const coros = corosAllTimeRecords(input.personalRecords);
   const best = new Map<number, { seconds: number; day: string }>();
+  const fell = new Map<number, RecordRun[]>();
   const firstEffort = new Map<number, string>();
   const labelOf = (distance: number) =>
     RECORD_DISTANCES.find((entry) => entry.distance === distance)?.label ?? `${distance} m`;
@@ -1398,6 +1411,14 @@ function recordMilestones(
       continue;
     }
     best.set(entry.distance, { seconds: entry.seconds, day: entry.day });
+    const history = fell.get(entry.distance) ?? [];
+    history.push({
+      seconds: entry.seconds,
+      day: entry.day,
+      activity: activityRef(entry.activity),
+      ...(entry.activity.name ? { name: entry.activity.name } : {})
+    });
+    fell.set(entry.distance, history);
     if (!firstEffort.has(entry.distance)) firstEffort.set(entry.distance, entry.day);
     // The first effort at a distance beats nothing, so it is no improvement.
     // A record a beginner breaks every other run is no milestone either: the
@@ -1541,7 +1562,7 @@ function recordMilestones(
       });
     }
   }
-  return { milestones, progress };
+  return { milestones, progress, fell };
 }
 
 /** "61.2%": rounded down, so a grade never reads as one it did not reach. */

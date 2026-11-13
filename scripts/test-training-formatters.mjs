@@ -14,12 +14,9 @@ const {
   formatElevationMeters,
   formatHappenDayLabel,
   formatPaceSecondsPerKm,
-  formatPersonalRecordHero,
-  formatPersonalRecordMeta,
   formatSleepClockRange,
   formatSleepNightLabel,
-  formatUpcomingWorkoutVolumeDisplay,
-  isPersonalRecordVisible
+  formatUpcomingWorkoutVolumeDisplay
 } = await import(
   `${formattersUrl.href}?cacheBust=${Date.now()}`
 );
@@ -42,14 +39,6 @@ assert.equal(formatUpcomingWorkoutVolumeDisplay("5 km", "imperial"), "3.11 mi");
 assert.equal(
   formatUpcomingWorkoutVolumeDisplay("custom aerobic volume", "imperial"),
   "custom aerobic volume"
-);
-assert.equal(
-  formatPersonalRecordHero({ type: 101, distance: 8_046.72 }, "imperial"),
-  "5.00mi"
-);
-assert.equal(
-  formatPersonalRecordMeta({ type: 5, duration: 1_500 }, "imperial"),
-  "8:03 /mi"
 );
 
 const imperialWeek = buildWeeklyActivitySeries(
@@ -119,17 +108,5 @@ assert.equal(
   trendPoints.find((point) => point.date === "20260708")?.sleepMinutes,
   undefined
 );
-
-assert.equal(isPersonalRecordVisible({ type: 7, duration: 245 }), true);
-assert.equal(isPersonalRecordVisible({ type: 6, duration: 769 }), true);
-assert.equal(isPersonalRecordVisible({ type: 5, duration: 1309 }), true);
-assert.equal(isPersonalRecordVisible({ type: 4, duration: 5127 }), true);
-assert.equal(isPersonalRecordVisible({ type: 2, duration: 8268 }), true);
-assert.equal(isPersonalRecordVisible({ type: 2 }), true);
-assert.equal(isPersonalRecordVisible({ type: 3, duration: 9759 }), false);
-assert.equal(isPersonalRecordVisible({ type: 10, duration: 1268 }), false);
-assert.equal(isPersonalRecordVisible({ type: 11, duration: 3995 }), false);
-assert.equal(isPersonalRecordVisible({ type: 12, duration: 5967 }), false);
-assert.equal(isPersonalRecordVisible({ type: 8, duration: 408 }), false);
 
 console.log("training formatter tests passed");

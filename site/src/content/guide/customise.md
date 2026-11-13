@@ -11,7 +11,7 @@ Under **Settings → Appearance**:
 - **Color mode**: dark or light.
 - **Accent**: the colour of buttons, links and highlights.
 - **Activity colors**: a colour for each kind of sport, used on every chart, calendar and map.
-- **Language**: the language the app is written in. English, Tiếng Việt, 日本語, 한국어, 简体中文, Español, Português (Brasil), Français, Deutsch, Italiano, Русский, Bahasa Indonesia and ไทย. Dates and numbers follow it too. Coach answers in whatever language you write to it. The names the app gives what it saves to COROS, such as a step called Warm Up, stay in English, as your watch shows them.
+- **Language**: the language the app is written in. English, Tiếng Việt, 日本語, 한국어, 简体中文, Español, Português (Brasil), Français, Deutsch, Italiano, Русский, Bahasa Indonesia and ไทย. Dates and numbers follow it too. Mentor answers in whatever language you write to it. The names the app gives what it saves to COROS, such as a step called Warm Up, stay in English, as your watch shows them.
 
 ## Sidebar and start screen
 
@@ -25,4 +25,4 @@ Under **Settings → Navigation**:
 Open **Personal**, your name at the foot of the sidebar:
 
 - **Units**: metric (km, kg) or imperial (mi, lb), and the temperature scale.
-- **Thresholds and zones**: your heart-rate, pace and power zones as COROS holds them, which every screen and Coach read.
+- **Thresholds and zones**: your heart-rate, pace and power zones as COROS holds them, which every screen and Mentor read.

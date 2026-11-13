@@ -87,7 +87,7 @@ export const SCREEN_TEXT_EN = {
   "main.plan.deleteOnCalendar": "This plan is on the calendar. Take it off the calendar to delete it.",
   "main.plan.chooseStart": "Choose a start day.",
   "main.plan.draftGone": "That draft is no longer in your library.",
-  "main.plan.coachPlanGone": "That Coach plan is not available here.",
+  "main.plan.coachPlanGone": "That Mentor plan is not available here.",
   "main.plan.notOnCalendar": "This plan is not on the calendar.",
   "main.plan.noStartDay": "The calendar copy of this plan has no start day.",
   "main.plan.noRunningCopy": "This plan has no copy on the calendar to update.",
@@ -107,7 +107,7 @@ export const SCREEN_TEXT_EN = {
   "main.coach.changeApplying": "These changes are already being applied.",
   "main.coach.changeLineGone": "That change is not in this proposal any more.",
   "main.coach.changeWait": "These changes are being applied; wait for them to finish.",
-  "main.coach.openRouterKey": "Add an OpenRouter API key in Coach settings first.",
+  "main.coach.openRouterKey": "Add an OpenRouter API key in Mentor settings first.",
   "main.coach.chatgptExpired": "ChatGPT session expired. Sign in again.",
   "main.coach.chatgptSignIn": "Sign in with ChatGPT first.",
   "main.coach.chatgptWindowClosed": "The ChatGPT sign-in window was closed.",
@@ -122,7 +122,7 @@ export const SCREEN_TEXT_EN = {
   // Coach's AI providers
   "main.ai.anthropicKey": "Add your Anthropic API key first.",
   "main.ai.connectedTo": "Connected to {name}.",
-  "main.ai.claudeReady": "Claude Code is connected and ready for Coach conversations.",
+  "main.ai.claudeReady": "Claude Code is connected and ready for Mentor conversations.",
   "main.ai.claudeNoLaunch": "Claude Code was found but could not start: {detail}",
   "main.ai.claudeSignIn": "Claude Code is installed, but sign-in is required.",
   "main.ai.localModelName": "Choose a local model name first.",
@@ -201,7 +201,7 @@ export const SCREEN_TEXT_EN = {
   "screen.gen.sports": "Pick at least one sport.",
   "screen.gen.sportUnknown": "\"{sport}\" is not a sport a plan can hold.",
   "screen.gen.level": "Pick a level.",
-  "screen.gen.levelNeedsData": "Coach can't judge your level without your recent activities — share them, or pick a level.",
+  "screen.gen.levelNeedsData": "Mentor can't judge your level without your recent activities — share them, or pick a level.",
   "screen.gen.weeks": "A generated plan runs 1 to {max} weeks.",
   "screen.gen.start": "Pick the week the plan starts.",
   "screen.gen.startMonday": "A plan starts on a Monday — COROS counts a plan's weeks from one.",
@@ -216,9 +216,9 @@ export const SCREEN_TEXT_EN = {
   "screen.gen.sessionsDays_one": "{count} session a week needs at least {count} day you can train.",
   "screen.gen.sessionsDays_other": "{count} sessions a week need at least {count} days you can train.",
   "screen.gen.hoursBand": "Hours a week are a band from 0 to {max}.",
-  "screen.gen.week": "Say how your week looks, or leave it to Coach.",
+  "screen.gen.week": "Say how your week looks, or leave it to Mentor.",
   "screen.gen.constraints": "Keep the constraints under {max} characters.",
-  "screen.gen.provider": "Pick a provider Coach knows.",
+  "screen.gen.provider": "Pick a provider Mentor knows.",
   "screen.gen.effort": "Pick a reasoning effort.",
   "screen.gen.model": "Pick a model.",
   // The outline's checks (shared: the outline card and Coach's tools)
@@ -381,13 +381,16 @@ let byEnglish: Map<string, ScreenKey> | undefined;
  * The key a stored English sentence was written from, if it is one of these
  * and takes no values. Text the app stored — a change line's reason, written
  * from a `ScreenError` — stays English where it is kept; the screen finds its
- * key again here and says it in the language on screen.
+ * key again here and says it in the language on screen. A sentence stored
+ * while Mentor was still called Coach is found too.
  */
 export function screenKeyForEnglish(text: string): ScreenKey | undefined {
   if (!byEnglish) {
     byEnglish = new Map();
     for (const [key, message] of Object.entries(SCREEN_TEXT_EN)) {
-      if (!message.includes("{")) byEnglish.set(message, key as ScreenKey);
+      if (message.includes("{")) continue;
+      byEnglish.set(message, key as ScreenKey);
+      if (message.includes("Mentor")) byEnglish.set(message.replaceAll("Mentor", "Coach"), key as ScreenKey);
     }
   }
   return byEnglish.get(text);

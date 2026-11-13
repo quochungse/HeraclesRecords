@@ -66,7 +66,7 @@ const calendar: CalendarMessages = {
   "calendar.week.targetRangeTitle": "COROS 根据你当前体能推荐的每周负荷。",
   "calendar.week.targetRangeTitleHeracles": "按 COROS 公式基于 Heracles TL 计算、适合你当前体能的每周推荐负荷。COROS 自己的：{min}–{max}。",
   "calendar.week.elevGain": "爬升",
-  "calendar.week.askTitle": "就本周问教练",
+  "calendar.week.askTitle": "就本周问导师",
   "calendar.card.plan": "计划",
   "calendar.card.missed": "已错过",
   "calendar.day.more": "另有 {count} 项",

@@ -22,7 +22,6 @@ import type {
 } from "../../electron/types";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { FitnessScoresPanel } from "../training/components/FitnessScoresPanel";
-import { PersonalRecordsPanel } from "../training/components/PersonalRecordsPanel";
 import { Vo2MaxWidget } from "../training/components/Vo2MaxWidget";
 import { formatPaceSecondsPerKm } from "../training/formatters";
 import {
@@ -1023,8 +1022,6 @@ export function ProfileView({
             />
             <Vo2MaxWidget snapshot={snapshot} />
           </div>
-
-          <PersonalRecordsPanel dashboard={dashboard} />
         </>
       )}
     </div>

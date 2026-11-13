@@ -11,7 +11,7 @@
 
 <p align="center">
   An unofficial desktop app for COROS athletes: every session read in depth,<br />
-  an AI coach that has read all of it, and a hall for every record you set along the way.<br />
+  an AI mentor that has read all of it, and a hall for every record you set along the way.<br />
   Made to be refined, intuitive and convenient.
 </p>
 
@@ -63,13 +63,13 @@ Version 1.4.8 · [What's new](https://github.com/quochungse/HeraclesRecords/rele
 - **Windows**: SmartScreen may warn about an unrecognised app. Click **More info → Run anyway**.
 - **Linux**: make the AppImage executable (`chmod +x HeraclesRecords-*.AppImage`) and run it, or install the deb on Debian / Ubuntu (`sudo apt install ./HeraclesRecords-*.deb`).
 
-You sign in with your COROS account. Coach also needs an AI: your ChatGPT account, a Claude subscription, a Claude or OpenRouter API key, or a model running on your own computer.
+You sign in with your COROS account. Mentor also needs an AI: your ChatGPT account, a Claude subscription, a Claude or OpenRouter API key, or a model running on your own computer.
 
 </details>
 
 ## What's inside
 
-A tour of the main screens. [heraclesrecords.com](https://heraclesrecords.com) goes further into [each sport](https://heraclesrecords.com/activities/), [strength](https://heraclesrecords.com/activities/strength/), [plans and the library](https://heraclesrecords.com/plan/), [Coach](https://heraclesrecords.com/coach) and the [Twelve Labours](https://heraclesrecords.com/labours), and the [guide](https://heraclesrecords.com/guide/) walks through setting up COROS, Coach, sync and backups.
+A tour of the main screens. [heraclesrecords.com](https://heraclesrecords.com) goes further into [each sport](https://heraclesrecords.com/activities/), [strength](https://heraclesrecords.com/activities/strength/), [plans and the library](https://heraclesrecords.com/plan/), [Mentor](https://heraclesrecords.com/mentor) and the [Twelve Labours](https://heraclesrecords.com/labours), and the [guide](https://heraclesrecords.com/guide/) walks through setting up COROS, Mentor, sync and backups.
 
 ### Today at a glance
 
@@ -136,7 +136,7 @@ Nights and naps, stages, HRV and stress across the night, kept long after the ni
 I run and I lift, and strength was the part of my training I could not trust COROS with. The watch records the sets well. What COROS does with them afterwards is the problem:
 
 - **A training load read from heart rate.** COROS scores every session by heart rate. Lifting raises it in short bursts, so an hour of heavy squats can count for less than a short jog. The week's load, Base Fitness and the recommended range all under-count the gym, and so does any plan built on them.
-- **Movements on the wrong muscles.** COROS's catalogue files a squat as hamstring work and battle ropes as biceps, and its muscle list has no obliques or neck at all, so a side plank works neither. Totals by muscle, and Coach's reading of them, inherit the mistake.
+- **Movements on the wrong muscles.** COROS's catalogue files a squat as hamstring work and battle ropes as biceps, and its muscle list has no obliques or neck at all, so a side plank works neither. Totals by muscle, and Mentor's reading of them, inherit the mistake.
 - **Half the lifting in another app.** Plenty of lifters log in Hevy. COROS never sees those workouts.
 
 So Heracles Records reads strength again, from the sets up, for anyone who mixes lifting with running, cycling or hiking.
@@ -161,7 +161,7 @@ So Heracles Records reads strength again, from the sets up, for anyone who mixes
   </tr>
 </table>
 
-Choose **Heracles TL** under **Strength → Settings → Training load formula**, and Overview, the Calendar, the Training Library, Activities and Coach count strength that way. Load Impact, Base Fitness, Intensity Trend and the recommended weekly range follow, by COROS's own formulas. Ask Coach whether to go long on Sunday and it weighs Tuesday's leg day at what it cost, and a plan's weekly load includes the gym. Other sports, recovery and training effect stay COROS's.
+Choose **Heracles TL** under **Strength → Settings → Training load formula**, and Overview, the Calendar, the Training Library, Activities and Mentor count strength that way. Load Impact, Base Fitness, Intensity Trend and the recommended weekly range follow, by COROS's own formulas. Ask Mentor whether to go long on Sunday and it weighs Tuesday's leg day at what it cost, and a plan's weekly load includes the gym. Other sports, recovery and training effect stay COROS's.
 
 > [!TIP]
 > **How the formula works:** every step, the research behind each constant and a worked example are public at **[heraclesrecords.com/activities/strength/training-load](https://heraclesrecords.com/activities/strength/training-load)**.
@@ -176,19 +176,19 @@ Choose **Heracles TL** under **Strength → Settings → Training load formula**
 
 <img src="docs/readme/10-library.webp" alt="Training Library: a 12-week marathon plan, week by week" />
 
-### A coach that has read your training
+### A mentor that has read your training
 
-Ask about a session, a week or how well you are recovering. Coach reads your COROS data and answers with the numbers and the charts behind them: a session's card carries the same Performance chart, zones and laps as its own page.
+Ask about a session, a week or how well you are recovering. Mentor reads your COROS data and answers with the numbers and the charts behind them: a session's card carries the same Performance chart, zones and laps as its own page.
 
-<img src="docs/readme/11-coach.webp" alt="Coach: an interval session analysed, with heart-rate and pace charts" />
+<img src="docs/readme/11-coach.webp" alt="Mentor: an interval session analysed, with heart-rate and pace charts" />
 
-Ask for a plan and Coach drafts it with you: the brief, the outline, then every session. Read it in the Workbench beside the conversation, change what you like, and save it to COROS and your calendar. Changes Coach suggests to your week arrive as a list you apply one line at a time.
+Ask for a plan and Mentor drafts it with you: the brief, the outline, then every session. Read it in the Workbench beside the conversation, change what you like, and save it to COROS and your calendar. Changes Mentor suggests to your week arrive as a list you apply one line at a time.
 
-<img src="docs/readme/12-coach-plan.webp" alt="Coach: a marathon plan in the Workbench beside the conversation" />
+<img src="docs/readme/12-coach-plan.webp" alt="Mentor: a marathon plan in the Workbench beside the conversation" />
 
-A conversation is yours to shape. Delete a question you regret, edit the last one and ask again, hide a turn from Coach without losing it, or branch a new conversation from any answer to try another idea. In a long thread, a rail of your questions takes you straight back to any of them.
+A conversation is yours to shape. Delete a question you regret, edit the last one and ask again, hide a turn from Mentor without losing it, or branch a new conversation from any answer to try another idea. In a long thread, a rail of your questions takes you straight back to any of them.
 
-Coach runs on your ChatGPT account, your Claude subscription, a Claude or OpenRouter API key, or a local model. Each conversation reads only the data you allow. Scheduled analyses can debrief every new activity on their own, and never change anything without you.
+Mentor runs on your ChatGPT account, your Claude subscription, a Claude or OpenRouter API key, or a local model. Each conversation reads only the data you allow. Scheduled analyses can debrief every new activity on their own, and never change anything without you.
 
 ### Hall of Records
 
@@ -239,7 +239,7 @@ Every place your training has taken you, on a globe beside a list of places. Ope
 
 ## The story behind Heracles Records
 
-Heracles Records began as a fork of CorosLink, a desktop companion for COROS watches. As my own training grew, what I wanted from it changed: a full record of everything I had done, analytics deeper than a summary screen, and an AI coach that reads all of it. A complete training system rather than a set of tools. So I rebuilt the app around that: training records, deep analytics and AI.
+Heracles Records began as a fork of CorosLink, a desktop companion for COROS watches. As my own training grew, what I wanted from it changed: a full record of everything I had done, analytics deeper than a summary screen, and an AI mentor that reads all of it. A complete training system rather than a set of tools. So I rebuilt the app around that: training records, deep analytics and AI.
 
 And I want it to be a pleasure to open every day: calm screens, charts you read at a glance, and a short path from wondering how your training is going to knowing what to do next.
 
@@ -261,7 +261,7 @@ npm run rebuild   # rebuilds the SQLite module for Electron
 npm run dev
 ```
 
-Before submitting Coach changes, run `npm run check:coach`. It builds each target
+Before submitting changes to Mentor (`coach` in the code), run `npm run check:coach`. It builds each target
 once and runs the provider, runtime, settings and renderer checks. See
 [Coach checks](docs/coach-checks.md) for coverage, logs and headless Linux setup.
 

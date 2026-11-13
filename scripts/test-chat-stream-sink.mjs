@@ -33,7 +33,10 @@ const {
   createWindowSink,
   drawChartForTests,
   endRunForTests,
+  forgetLastReads,
+  setLastReadsForTests,
   untilAborted,
+  withLastReads,
   withLiveToolInstructions
 } = require(
   path.join(repoRoot, "dist-electron", "chatService.js")
@@ -353,13 +356,11 @@ for (const rule of [
   /Longer than two weeks → request_plan_brief/,
   /revise_training_plan with its newest draft_id/,
   /propose_schedule_changes once/,
-  /list_scheduled_workouts, then delete_workout/,
+  /from the Workout Library → delete_workout\. A session on the calendar is a\s+removal in propose_schedule_changes/,
   /call search_coros_exercises first/,
   /naming mismatch alone is never a reason/,
-  /exercise_resolution_required/,
-  /call the same draft tool again in the same response/,
   /typed intensity field/,
-  /request_coach_input — once per turn, with one to three concise questions/,
+  /request_coach_input, once per turn, never only in prose/,
   /write it first and ask\s+at the end/,
   /Nothing you call writes to COROS/,
   /Every sport takes step kinds/
@@ -370,6 +371,7 @@ for (const [rule, times] of [[/typed intensity/g, 1], [/search_coros_exercises f
   assert.equal((fullGuide.match(rule) ?? []).length, times, `${rule} is said once`);
 }
 assert.doesNotMatch(fullGuide, /Authoring tools:/, "the model has the tool list already");
+assert.doesNotMatch(fullGuide, /exercise_resolution_required/, "a refusal says what to do next itself");
 assert.doesNotMatch(fullGuide, /Delete from COROS/);
 
 // A read-only turn without the writing tools is told nothing about them.
@@ -386,7 +388,7 @@ assert.doesNotMatch(readOnlyGuide, /recall_conversation/, "a conversation with n
 {
   const recallGuide = withLiveToolInstructions("Coach.", [tool("recall_conversation")]);
   assert.match(recallGuide, /read it with\s+recall_conversation before answering/);
-  assert.doesNotMatch(recallGuide, /Other connected MCP server tools/);
+  assert.doesNotMatch(recallGuide, /other connected MCP servers/);
 }
 // Every provider sends the rules, then the tool guide, then what the turn read;
 // the Anthropic one keeps the last apart so the cache marker falls before it.
@@ -407,6 +409,32 @@ assert.doesNotMatch(readOnlyGuide, /recall_conversation/, "a conversation with n
     5,
     "every provider's prompt is built through it"
   );
+}
+// What the last reading turn read rides on the next question, and only there.
+{
+  const asked = [
+    { role: "user", content: "How was Sunday's run?" },
+    { role: "assistant", content: "Steady." },
+    { role: "user", content: "And the last lap?" }
+  ];
+  const reads = ['get_activity_detail {"activity_id":"a1","sport_type":100}'];
+  setLastReadsForTests("reads-1", reads);
+  const noted = withLastReads(asked, { sessionId: "reads-1" });
+  assert.deepEqual(noted.slice(0, 2), asked.slice(0, 2), "earlier turns go out as they were");
+  assert.equal(
+    noted[2].content,
+    `And the last lap?\n\n[Read for an earlier answer, results not kept: ${reads[0]}. For a figure that answer did not write down, call again with the same arguments.]`
+  );
+  assert.equal(asked[2].content, "And the last lap?", "the question itself is not changed");
+  assert.equal(withLastReads(asked, { sessionId: "reads-2" }), asked, "another conversation has read nothing");
+  assert.equal(withLastReads(asked, {}), asked, "nor has a turn outside any");
+  assert.equal(withLastReads(asked, { sessionId: "reads-1", toolPolicy: "read-only" }), asked, "an analysis run starts from its playbook");
+  assert.equal(withLastReads(asked, { sessionId: "reads-1", textJob: { system: "Summarise." } }), asked, "a text job reads nothing");
+  const answered = asked.slice(0, 2);
+  assert.equal(withLastReads(answered, { sessionId: "reads-1" }), answered, "only a question carries it");
+  // A conversation whose turns changed forgets it: the answer it speaks of may be gone.
+  forgetLastReads("reads-1");
+  assert.equal(withLastReads(asked, { sessionId: "reads-1" }), asked);
 }
 // A plan with no brief tool is drafted at any length.
 assert.match(

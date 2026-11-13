@@ -1,6 +1,7 @@
 import { renderRich, useI18n } from "../i18n/useI18n";
 import { Fragment, useMemo } from "react";
-import { ArrowLeft, CloudOff, MessageCircle, RefreshCw } from "lucide-react";
+import { ArrowLeft, CloudOff, RefreshCw } from "lucide-react";
+import { MentorIcon } from "../chat/mentorIcon";
 import type {
   CoachOpenRequest,
   CorosProfileZoneFamily,
@@ -299,7 +300,7 @@ export function HikeDetailView({
                     )
                   }
                 >
-                  <MessageCircle size={15} aria-hidden="true" />
+                  <MentorIcon size={15} aria-hidden="true" />
                   {t("activity.askCoach")}
                 </button>
               ) : null}

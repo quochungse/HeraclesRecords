@@ -290,7 +290,7 @@ const names = (plans) => plans.map((item) => item.name);
 // 5. An origin is named the same way on a chip and on a badge
 // ---------------------------------------------------------------------------
 {
-  assert.equal(planOriginLabel({ origin: "coach" }), "Coach");
+  assert.equal(planOriginLabel({ origin: "coach" }), "Mentor");
   assert.equal(planOriginLabel({ origin: "user" }), undefined, "a plan written here is not worth a badge");
   assert.equal(planOriginLabel({}), undefined);
 }

@@ -503,7 +503,7 @@ async function main() {
   assert.equal(await page(`document.querySelectorAll(".chat-creation-card").length`), 1, "one card is drawn whole");
   assert.match(
     (await harness("text", ".chat-version-row")) ?? "",
-    /v1 · by Coach\s*View$/,
+    /v1 · by Mentor\s*View$/,
     "and the line says what replaced it"
   );
   assert.match(
@@ -993,7 +993,7 @@ async function main() {
   await waitFor(() => harness("exists", ".chat-composer .chat-ai-chip"), "the composer's AI chip is drawn");
   assert.equal(await harness("exists", ".chat-header-chip"), false, "no Reads chip in the header");
   await harness("click", ".chat-composer .chat-ai-chip");
-  const permissions = '.coach-sheet [aria-label="What Coach may read"] button';
+  const permissions = '.coach-sheet [aria-label="What Mentor may read"] button';
   await waitFor(() => harness("count", permissions).then((n) => n === 4), "three sources and the web to allow or not");
   assert.equal(
     await page(`[...document.querySelectorAll('${permissions}')].map((b) => b.textContent.trim() + ":" + b.getAttribute("aria-pressed")).join(" ")`),
@@ -1056,7 +1056,7 @@ async function main() {
   assert.match(briefText, /Plan brief[\s\S]*Hanoi Half/);
   assert.match(briefText, /from chat/, "a field Coach took from the conversation says so");
   assert.match(briefText, /from your data/, "and one it read from the data");
-  assert.match(briefText, /Coach reads Sleep & HRV · Training zones in this conversation/);
+  assert.match(briefText, /Mentor reads Sleep & HRV · Training zones in this conversation/);
   assert.match(
     (await harness("text", ".chat-brief-open")) ?? "",
     /can't judge your level without your recent activities/,
@@ -1149,7 +1149,7 @@ async function main() {
   );
   const outlineText = (await harness("text", ".chat-outline-card")) ?? "";
   assert.match(outlineText, /Plan outline[\s\S]*8 weeks · 4–5.5 h a week · 5 sessions/);
-  assert.match(outlineText, /What Coach read: About four hours a week lately\./);
+  assert.match(outlineText, /What Mentor read: About four hours a week lately\./);
   assert.equal(await harness("count", ".chat-outline-bar"), 8, "a bar a week");
   assert.equal(await harness("count", ".chat-outline-bar.is-lighter"), 1);
   await page(`document.querySelectorAll(".chat-outline-bar")[1].click()`);

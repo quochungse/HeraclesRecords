@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useId, type CSSProperties } from "react";
 import { createLucideIcon } from "lucide-react";
 import type { LabourId } from "./labours";
 import lionArt from "../assets/labours/lion.webp";
@@ -49,6 +49,57 @@ export function LaurelWreath({ size }: { size: number }) {
 }
 
 /*
+ * The Apotheosis medal: the wreath in the emblems' gold on their plate, inside
+ * a ring that fills with the stages reached — the one figure the panel is
+ * about, drawn rather than only counted. Colours come from `.records-medal`
+ * (records.css), so paper has its own plate and gold.
+ */
+export function ApotheosisMedal({ reached, total }: { reached: number; total: number }) {
+  // React's ids carry characters that do not survive `url(#…)`.
+  const id = useId().replace(/[^\w-]/g, "");
+  const share = total > 0 ? Math.min(1, Math.max(0, reached / total)) : 0;
+  return (
+    <svg
+      className={`records-medal${share >= 1 ? " is-complete" : ""}`}
+      viewBox="0 0 72 72"
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id={`${id}-gold`} x1="0.15" y1="0" x2="0.85" y2="1">
+          <stop offset="0" className="records-medal-stop-light" />
+          <stop offset="0.5" className="records-medal-stop" />
+          <stop offset="1" className="records-medal-stop-deep" />
+        </linearGradient>
+        <radialGradient id={`${id}-plate`} cx="0.5" cy="0.3" r="0.75">
+          <stop offset="0" className="records-medal-stop-plate-top" />
+          <stop offset="1" className="records-medal-stop-plate" />
+        </radialGradient>
+      </defs>
+      <circle className="records-medal-track" cx="36" cy="36" r="34" />
+      {share > 0 ? (
+        <circle
+          className="records-medal-arc"
+          cx="36"
+          cy="36"
+          r="34"
+          pathLength={100}
+          strokeDasharray={`${share * 100} 100`}
+          stroke={`url(#${id}-gold)`}
+          transform="rotate(-90 36 36)"
+        />
+      ) : null}
+      <circle className="records-medal-plate" cx="36" cy="36" r="28.5" fill={`url(#${id}-plate)`} />
+      <path
+        d={LAUREL_PATH}
+        fillRule="evenodd"
+        fill={`url(#${id}-gold)`}
+        transform="translate(16.8 16.2) scale(1.6)"
+      />
+    </svg>
+  );
+}
+
+/*
  * One emblem per labour: gold relief cut from the athlete's own artwork, its
  * black ground keyed out to transparency and its frame taken off, so the frame
  * is drawn here and can follow the size and the state. 256px squares, the
@@ -87,8 +138,8 @@ const EMBLEM_SIZES = {
 export type LabourEmblemSize = keyof typeof EMBLEM_SIZES;
 
 /**
- * A labour's emblem on its plate. The plate is the artwork's own black in
- * every theme — the relief was cast for it — and the light on it says how far
+ * A labour's emblem on its plate (the artwork's own black on dark, ivory on
+ * paper). The light on it says how far
  * the labour has gone, one step per stage: unlit and grey at none, a dim gold
  * at I, nearly full at II, and full gold with a glowing rim at III. `reached`
  * is a count, 0–3.
