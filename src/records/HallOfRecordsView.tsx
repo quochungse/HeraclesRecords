@@ -14,7 +14,7 @@ import {
   type Milestone,
   type WithinReach
 } from "./milestones";
-import { LabourEmblem, LaurelWreath } from "./recordsIcons";
+import { ApotheosisMedal, LabourEmblem } from "./recordsIcons";
 import { PersonalRecordsBoard } from "./PersonalRecordsBoard";
 import { useTodayKey } from "../training/useTodayKey";
 import {
@@ -607,9 +607,7 @@ function LaboursBoard({
   return (
     <>
       <section className="panel records-apotheosis" aria-labelledby="records-apotheosis-title">
-        <span className="records-laurel" aria-hidden="true">
-          <LaurelWreath size={40} />
-        </span>
+        <ApotheosisMedal reached={reachedStages} total={TOTAL_STAGES} />
         <div className="records-apotheosis-copy">
           <h2 id="records-apotheosis-title" className="records-section-label is-accent">
             {t("records.apotheosis")}

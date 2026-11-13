@@ -611,16 +611,62 @@
   padding: 22px 24px;
 }
 
-.records-laurel {
+/* The medal's golds are the emblems' (recordsNotices.css), not the accent. */
+.records-medal {
+  --medal-gold-light: #f7d98c;
+  --medal-gold: #e3b049;
+  --medal-gold-deep: #a8741c;
+  --medal-plate-top: #1d1a14;
+  --medal-plate: #070706;
+  --medal-track: rgba(227, 176, 73, 0.16);
+  --medal-rim: rgba(227, 176, 73, 0.22);
   flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 64px;
-  height: 64px;
-  border-radius: var(--radius-pill);
-  background: var(--accent-soft);
-  color: var(--accent);
+  width: 76px;
+  height: 76px;
+  overflow: visible;
+}
+
+.records-medal.is-complete {
+  filter: drop-shadow(0 0 10px rgba(227, 176, 73, 0.35));
+}
+
+.records-medal-track,
+.records-medal-arc {
+  fill: none;
+  stroke-width: 2;
+}
+
+.records-medal-track {
+  stroke: var(--medal-track);
+}
+
+.records-medal-arc {
+  stroke-linecap: round;
+}
+
+.records-medal-plate {
+  stroke: var(--medal-rim);
+  stroke-width: 1;
+}
+
+.records-medal-stop-light {
+  stop-color: var(--medal-gold-light);
+}
+
+.records-medal-stop {
+  stop-color: var(--medal-gold);
+}
+
+.records-medal-stop-deep {
+  stop-color: var(--medal-gold-deep);
+}
+
+.records-medal-stop-plate-top {
+  stop-color: var(--medal-plate-top);
+}
+
+.records-medal-stop-plate {
+  stop-color: var(--medal-plate);
 }
 
 .records-apotheosis-copy {
@@ -952,11 +998,15 @@
   box-shadow: inset 0 0 0 1px var(--hall-gold-edge);
 }
 
-/* The apotheosis stays a white card; its laurel is a gold coin. */
-:root[data-theme="paper"] .records-laurel {
-  background: var(--hall-coin);
-  color: var(--hall-gold-ink);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 1px 3px rgba(90, 55, 0, 0.24);
+/* The apotheosis stays a white card; its medal is the emblems' ivory plate. */
+:root[data-theme="paper"] .records-medal {
+  --medal-gold-light: #e2b24a;
+  --medal-gold: #c08a1f;
+  --medal-gold-deep: #8f5f12;
+  --medal-plate-top: #fffaf0;
+  --medal-plate: #f3e7cd;
+  --medal-track: var(--hall-track-ink);
+  --medal-rim: rgba(143, 95, 18, 0.2);
 }
 
 /* A labour's head stays on the card's white, its emblem on a light plate
