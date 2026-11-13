@@ -158,6 +158,7 @@ const overview: OverviewMessages = {
   "overview.distribution.easyShare": "เบา {percent}",
   "overview.distribution.moderateShare": "ปานกลาง {percent}",
   "overview.distribution.hardShare": "หนัก {percent}",
+  "overview.distribution.easyTarget": "เส้น 80/20: ประมาณ 80% ของเวลาฝึกเป็นระดับเบา ที่เหลือเป็นปานกลางและหนัก",
   "overview.sport.ascent": "ระยะขึ้นเขา",
   "overview.sport.ascentRate": "อัตราการขึ้น",
   "overview.sport.average": "เฉลี่ย {value}",

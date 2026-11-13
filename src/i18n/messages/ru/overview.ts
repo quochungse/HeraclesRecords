@@ -162,6 +162,7 @@ const overview: OverviewMessages = {
   "overview.distribution.easyShare": "Легко {percent}",
   "overview.distribution.moderateShare": "Умеренно {percent}",
   "overview.distribution.hardShare": "Тяжело {percent}",
+  "overview.distribution.easyTarget": "Линия 80/20: около 80 % тренировочного времени — легко, остальное — умеренно и тяжело.",
   "overview.sport.ascent": "Набор высоты",
   "overview.sport.ascentRate": "Скорость подъёма",
   "overview.sport.average": "в среднем {value}",

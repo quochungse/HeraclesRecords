@@ -1513,6 +1513,13 @@ button.overview-plan-entry:hover .overview-plan-chevron {
   background: var(--text-primary);
 }
 
+/* The line is 2px wide: its tooltip answers a pointer anywhere near it. */
+.overview-dist-split b::after {
+  content: "";
+  position: absolute;
+  inset: -2px -7px;
+}
+
 /* Easy to hard in the app's effort ramp (`--intensity-*`, styles.css) — here
    and in the sport sections' intensity, as the sport screens draw it. */
 .training-dashboard [data-intensity="easy"] { --intensity: var(--intensity-easy); }

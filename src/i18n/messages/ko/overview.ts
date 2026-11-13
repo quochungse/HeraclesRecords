@@ -158,6 +158,7 @@ const overview: OverviewMessages = {
   "overview.distribution.easyShare": "쉬움 {percent}",
   "overview.distribution.moderateShare": "보통 {percent}",
   "overview.distribution.hardShare": "힘듦 {percent}",
+  "overview.distribution.easyTarget": "80/20 기준선: 훈련 시간의 약 80%는 쉽게, 나머지는 보통과 힘들게.",
   "overview.sport.ascent": "상승 고도",
   "overview.sport.ascentRate": "상승 속도",
   "overview.sport.average": "평균 {value}",

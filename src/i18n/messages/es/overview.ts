@@ -158,6 +158,7 @@ const overview: OverviewMessages = {
   "overview.distribution.easyShare": "Suave {percent}",
   "overview.distribution.moderateShare": "Moderado {percent}",
   "overview.distribution.hardShare": "Intenso {percent}",
+  "overview.distribution.easyTarget": "La línea del 80/20: alrededor del 80 % del tiempo de entrenamiento suave, el resto moderado e intenso.",
   "overview.sport.ascent": "Desnivel",
   "overview.sport.ascentRate": "Ritmo de ascenso",
   "overview.sport.average": "media {value}",

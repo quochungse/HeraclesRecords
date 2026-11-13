@@ -159,6 +159,7 @@ const overview = {
   "overview.distribution.easyShare": "Easy {percent}",
   "overview.distribution.moderateShare": "Moderate {percent}",
   "overview.distribution.hardShare": "Hard {percent}",
+  "overview.distribution.easyTarget": "The 80/20 line: about 80% of training time easy, the rest moderate and hard.",
   "overview.sport.ascent": "Ascent",
   "overview.sport.ascentRate": "Ascent rate",
   "overview.sport.average": "avg {value}",

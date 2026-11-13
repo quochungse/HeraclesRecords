@@ -158,6 +158,7 @@ const overview: OverviewMessages = {
   "overview.distribution.easyShare": "Nhẹ {percent}",
   "overview.distribution.moderateShare": "Vừa {percent}",
   "overview.distribution.hardShare": "Nặng {percent}",
+  "overview.distribution.easyTarget": "Mốc 80/20: khoảng 80% thời gian tập ở mức nhẹ, phần còn lại là vừa và nặng.",
   "overview.sport.ascent": "Độ cao leo",
   "overview.sport.ascentRate": "Tốc độ leo",
   "overview.sport.average": "TB {value}",

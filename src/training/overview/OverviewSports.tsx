@@ -416,7 +416,7 @@ function IntensitySplit({
           <i data-intensity="moderate" style={{ flex: share(mix.moderate.duration) }} />
           <i data-intensity="hard" style={{ flex: share(mix.hard.duration) }} />
         </div>
-        <b style={{ left: "80%" }} />
+        <b style={{ left: "80%" }} title={t("overview.distribution.easyTarget")} />
       </div>
       <dl className="overview-sport-split">
         {(["easy", "moderate", "hard"] as const).map((band) => (

@@ -158,6 +158,7 @@ const overview: OverviewMessages = {
   "overview.distribution.easyShare": "轻松 {percent}",
   "overview.distribution.moderateShare": "中等 {percent}",
   "overview.distribution.hardShare": "高强度 {percent}",
+  "overview.distribution.easyTarget": "80/20 基准线：约 80% 的训练时间为轻松强度，其余为中等和高强度。",
   "overview.sport.ascent": "爬升",
   "overview.sport.ascentRate": "爬升速度",
   "overview.sport.average": "平均 {value}",

@@ -159,7 +159,7 @@ export function OverviewDistribution({
                     <i data-intensity="moderate" style={{ flex: split.moderate }} />
                     <i data-intensity="hard" style={{ flex: split.hard }} />
                   </div>
-                  <b style={{ left: `${EASY_TARGET * 100}%` }} />
+                  <b style={{ left: `${EASY_TARGET * 100}%` }} title={t("overview.distribution.easyTarget")} />
                 </div>
                 <p className="overview-dist-legend">
                   <span data-intensity="easy">

@@ -158,6 +158,7 @@ const overview: OverviewMessages = {
   "overview.distribution.easyShare": "イージー {percent}",
   "overview.distribution.moderateShare": "中程度 {percent}",
   "overview.distribution.hardShare": "ハード {percent}",
+  "overview.distribution.easyTarget": "80/20 の目安線：トレーニング時間の約 80% をイージーに、残りをモデレートとハードに。",
   "overview.sport.ascent": "獲得標高",
   "overview.sport.ascentRate": "上昇速度",
   "overview.sport.average": "平均 {value}",

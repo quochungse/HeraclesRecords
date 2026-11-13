@@ -158,6 +158,7 @@ const overview: OverviewMessages = {
   "overview.distribution.easyShare": "Ringan {percent}",
   "overview.distribution.moderateShare": "Sedang {percent}",
   "overview.distribution.hardShare": "Berat {percent}",
+  "overview.distribution.easyTarget": "Garis 80/20: sekitar 80% waktu latihan ringan, sisanya sedang dan berat.",
   "overview.sport.ascent": "Tanjakan",
   "overview.sport.ascentRate": "Laju menanjak",
   "overview.sport.average": "rata-rata {value}",
