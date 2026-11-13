@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, CloudOff, LockKeyhole, RefreshCw } from "lucide-react";
+import { ChevronDown, CloudOff, LockKeyhole, Medal, Milestone as MilestoneIcon, RefreshCw } from "lucide-react";
 import type { TrainingHubActivity } from "../../electron/types";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { OptionGroup } from "../components/OptionGroup";
@@ -14,7 +14,10 @@ import {
   type Milestone,
   type WithinReach
 } from "./milestones";
-import { LabourEmblem, LaurelWreath } from "./recordsIcons";
+import { LabourEmblem, LaurelIcon, LaurelWreath } from "./recordsIcons";
+import { PersonalRecordsBoard } from "./PersonalRecordsBoard";
+import { recordCount } from "./personalBests";
+import { useTodayKey } from "../training/useTodayKey";
 import {
   FILTER_LABELS,
   filtersInUse,
@@ -30,13 +33,13 @@ import {
   useRecordsBackfill,
   type HallOfRecordsState
 } from "./useHallOfRecords";
-import { plural, t, weekdayNames } from "../i18n/core";
+import { formatCount, plural, t, weekdayNames } from "../i18n/core";
 import { useI18n } from "../i18n/useI18n";
 import { labourCategory, labourMyth, labourName, labourShort, labourStage } from "./labourWords";
 import type { LabourId } from "./labours";
 import "./records.css";
 
-export type RecordsTab = "timeline" | "labours";
+export type RecordsTab = "timeline" | "records" | "labours";
 
 export type MilestoneActivity = NonNullable<Milestone["activity"]>;
 
@@ -87,6 +90,8 @@ export function HallOfRecordsView({
   onTabRequestHandled
 }: HallOfRecordsViewProps) {
   const { locale } = useI18n();
+  // How long a record has stood turns over at midnight with the screen open.
+  const today = useTodayKey();
   const [tab, setTab] = useState<RecordsTab>(requestedTab ?? "timeline");
   useEffect(() => {
     if (!requestedTab) return;
@@ -193,16 +198,34 @@ export function HallOfRecordsView({
                 : t("records.reading")}
           </p>
         </div>
-        <OptionGroup<RecordsTab>
-          label={t("records.sections")}
-          value={tab}
-          onChange={setTab}
-          options={[
-            { value: "timeline", label: t("records.tab.timeline") },
-            { value: "labours", label: t("records.tab.labours") }
-          ]}
-        />
       </header>
+      <OptionGroup<RecordsTab>
+        appearance="tabs"
+        className="records-tabs"
+        label={t("records.sections")}
+        value={tab}
+        onChange={setTab}
+        options={[
+          {
+            value: "timeline",
+            label: t("records.tab.timeline"),
+            icon: <MilestoneIcon size={16} aria-hidden="true" />,
+            ...(ready ? { count: formatCount(result.milestones.length) } : {})
+          },
+          {
+            value: "records",
+            label: t("records.tab.records"),
+            icon: <Medal size={16} aria-hidden="true" />,
+            ...(ready ? { count: formatCount(recordCount(result.board)) } : {})
+          },
+          {
+            value: "labours",
+            label: t("records.tab.labours"),
+            icon: <LaurelIcon size={16} aria-hidden="true" />,
+            ...(ready ? { count: `${reachedStages}/${TOTAL_STAGES}` } : {})
+          }
+        ]}
+      />
 
       {/* A sample says so on the toolbar's trigger ("Sample · 1"), as the
           Strength screen's does, and not here: the realistic preset is for
@@ -298,6 +321,12 @@ export function HallOfRecordsView({
             </section>
           ))}
         </>
+      ) : tab === "records" ? (
+        <PersonalRecordsBoard
+          board={result.board}
+          today={today}
+          onOpenActivity={onOpenActivity}
+        />
       ) : (
         <LaboursBoard
           labours={labours}

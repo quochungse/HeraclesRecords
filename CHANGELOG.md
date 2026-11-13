@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### What's new
+- **Personal Records in the Hall of Records** - a page of its own beside Timeline and The Twelve Labours: your best time at 1K, 5K, 10K, half and full marathon for all time, 6 months, 12 weeks or 4 weeks (a distance with no record in that period stays in the list but does not open). Beside the list, the chosen record: the day and the run it was set in (press it to open the run), how long it has stood or how far it is off your all-time record, what it took off the record before it, and a chart of every time it did (point at a record, or step through them with the arrow keys, for its time, pace, run and what it took off the one before). Below, your longest run, most elevation gain, and the farthest you have ridden, swum and hiked.
+- **The Hall of Records' sections are tabs under its title**, each with its icon and what it holds: milestones, records, and labour stages reached.
+
+### Changed
+- **Personal Records left the Personal screen** for the Hall of Records.
+
 ## [1.4.8] - 2026-11-11
 
 A session's chart, route and laps point at one stretch, figures move when you change what they show, and running efficiency reads steadier.

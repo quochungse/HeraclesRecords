@@ -38,6 +38,13 @@ kinds of achievement (`labours.ts`), three stages each, all twelve being Apotheo
   `heraclesrecords.records.notices.v1` (`personal`). **The first reckoning announces nothing**
   and waits for `settled`; a milestone older than 30 days gets no badge, a stage older than 14
   days no toast.
+- **Personal Records** (`personalBests.ts`, `PersonalRecordsBoard.tsx`) is worked out in
+  `computeRecords` as `board`, so samples have it too. Each period's best is COROS's own
+  (`recordDetailList` groups 4/2/3/1 = all, 6 months, 12 weeks, 4 weeks — the figures the
+  watch shows); a record's history is every time the records walk's best effort fell, COROS's
+  figure in place of ours on the same run. Only the best-effort distances are on it: COROS's
+  3K is a figure with no history, and is left out. The page opens on the record that grades
+  highest for age and sex.
 - The developer toolbar's Sample menu has four presets (`sampleRecords.ts`), told against a
   notices record in memory, asking nothing of COROS.
 

@@ -67,6 +67,8 @@ const app = {
   "app.period.d7.phrase": "the last 7 days",
   "app.period.d28": "4 weeks",
   "app.period.d28.phrase": "the last 4 weeks",
+  "app.period.d84": "12 weeks",
+  "app.period.d84.phrase": "the last 12 weeks",
   "app.period.d90": "3 months",
   "app.period.d90.phrase": "the last 3 months",
   "app.period.d180": "6 months",

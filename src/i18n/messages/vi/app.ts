@@ -66,6 +66,8 @@ const app: AppMessages = {
   "app.period.d7.phrase": "7 ngày qua",
   "app.period.d28": "4 tuần",
   "app.period.d28.phrase": "4 tuần qua",
+  "app.period.d84": "12 tuần",
+  "app.period.d84.phrase": "12 tuần qua",
   "app.period.d90": "3 tháng",
   "app.period.d90.phrase": "3 tháng qua",
   "app.period.d180": "6 tháng",

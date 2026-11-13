@@ -66,6 +66,8 @@ const app: AppMessages = {
   "app.period.d7.phrase": "最近 7 天",
   "app.period.d28": "4 周",
   "app.period.d28.phrase": "最近 4 周",
+  "app.period.d84": "12 周",
+  "app.period.d84.phrase": "最近 12 周",
   "app.period.d90": "3 个月",
   "app.period.d90.phrase": "最近 3 个月",
   "app.period.d180": "6 个月",

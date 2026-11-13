@@ -245,6 +245,56 @@ assert.equal(
 assert.ok(!prIds.includes(`pr:${glitch.activityId}`), "an effort far under COROS's own record is a GPS fault");
 assert.match(find(prs, `pr:${r4.activityId}`).detail, /^17:09 faster than the record from 26 Apr 2025/);
 
+// --- The Personal Records page ----------------------------------------------------------
+
+const board = prs.board;
+assert.deepEqual(
+  board.distances.map((row) => row.key),
+  ["1k", "5k", "10k", "half", "marathon"],
+  "every distance with a history, in order, whether or not it has a record — COROS's 3K has none"
+);
+const fiveK = board.distances.find((row) => row.key === "5k");
+assert.deepEqual(
+  fiveK.history.map((run) => [run.day, run.seconds]),
+  [["20250426", 1500], ["20250614", 1430]],
+  "a record's history is every time it fell, COROS's figure in place of ours, the GPS fault left out"
+);
+assert.equal(fiveK.best.all.seconds, 1430, "the all-time best is COROS's");
+assert.equal(fiveK.best.all.activity.activityId, r2.activityId, "and opens the run it was set in");
+assert.equal(fiveK.best.all.name, r2.name);
+assert.ok(Math.abs(fiveK.best.all.grade - 0.537) < 0.001, "graded for age and sex on its day");
+assert.equal(fiveK.best.w4, undefined, "a period COROS sent nothing for has no best");
+const marathon = board.distances.find((row) => row.key === "marathon");
+assert.equal(marathon.best.all.seconds, 15668, "COROS's record stands even when its run is not in the list");
+assert.equal(marathon.best.all.activity, undefined, "and then opens nothing");
+assert.deepEqual(marathon.history, [], "with no history of its own");
+const boardTenK = board.distances.find((row) => row.key === "10k");
+assert.equal(boardTenK.best.all.seconds, 3100, "before COROS has a record, the last time the history fell stands");
+assert.equal(board.distances.find((row) => row.key === "1k").best.all, undefined);
+assert.equal(board.bestByStandard, "5k", "the record that grades highest (53.7% against the half's 1:49:31) is the one the page opens on");
+assert.equal(board.longestRun.meters, 10000, "without COROS's own, the longest run is read off the list");
+assert.deepEqual(board.beyond, [], "nothing outside running, nothing beyond it");
+
+const boardWithCoros = computeRecords({
+  ...base,
+  activities: [r2, longRide, swim],
+  personalRecords: [
+    { type: 4, label: "All", records: [
+      { type: 101, label: "Longest Run", distance: 42400, happenDay: "20260315" },
+      { type: 103, label: "Most Elevation Gain", distance: 1576, happenDay: "20260905" }
+    ] },
+    { type: 1, label: "4 weeks", records: [{ type: 5, label: "5K", duration: 1500, happenDay: "20260920", activityId: r2.activityId }] }
+  ]
+}).board;
+assert.equal(boardWithCoros.longestRun.meters, 42400, "COROS's longest run");
+assert.equal(boardWithCoros.mostClimb.meters, 1576, "and its most elevation gain");
+assert.equal(boardWithCoros.distances.find((row) => row.key === "5k").best.w4.seconds, 1500, "each period is COROS's group");
+assert.deepEqual(
+  boardWithCoros.beyond.map(({ key, mark }) => [key, mark.meters]),
+  [["ride", 102600], ["swim", 1600], ["rideClimb", 50]],
+  "the farthest outside running, sport by sport"
+);
+
 const corosOnly = computeRecords({
   ...base,
   activities: [r2],

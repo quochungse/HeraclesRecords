@@ -66,6 +66,8 @@ const app: AppMessages = {
   "app.period.d7.phrase": "7 วันที่ผ่านมา",
   "app.period.d28": "4 สัปดาห์",
   "app.period.d28.phrase": "4 สัปดาห์ที่ผ่านมา",
+  "app.period.d84": "12 สัปดาห์",
+  "app.period.d84.phrase": "12 สัปดาห์ที่ผ่านมา",
   "app.period.d90": "3 เดือน",
   "app.period.d90.phrase": "3 เดือนที่ผ่านมา",
   "app.period.d180": "6 เดือน",

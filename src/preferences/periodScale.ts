@@ -20,7 +20,7 @@ import { t } from "../i18n/core";
  * out rather than left to a missing value.
  */
 
-export type PeriodDays = 7 | 28 | 90 | 180 | 365 | null;
+export type PeriodDays = 7 | 28 | 84 | 90 | 180 | 365 | null;
 
 export interface PeriodOption {
   days: PeriodDays;
@@ -51,6 +51,16 @@ export const PERIOD_SCALE: readonly PeriodOption[] = [
     },
     get phrase() {
       return t("app.period.d28.phrase");
+    }
+  },
+  {
+    // COROS's own record period, which it calls 12 weeks.
+    days: 84,
+    get label() {
+      return t("app.period.d84");
+    },
+    get phrase() {
+      return t("app.period.d84.phrase");
     }
   },
   {

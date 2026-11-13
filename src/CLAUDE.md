@@ -34,7 +34,9 @@ full-page view is not left with Escape.
 `npm run test:option-groups` closes it (named exemptions only, each a grid, a card set,
 a list of records or a menu). Modes: `expanded` (default), `collapsible` (shows the chosen
 chip, opens in place) and `dropdown` (through `SelectDropdown`). Multi-select is
-`OptionChips` (`appearance="tiles"` for a short set switched once). `fill` splits a form
+`OptionChips` (`appearance="tiles"` for a short set switched once). `appearance="tabs"` is a screen's
+own sections under its title (the Hall of Records'): labels with an icon and a `count` on
+a hairline, an ink sliding to the chosen one; expanded only. `fill` splits a form
 row equally. Rules that are easy to break:
 - A collapsible group is **one row holding every option once**, clipped by the group's
   measured width (`--og-folded`, `--og-open`, `--og-shift`, measured in a layout effect with

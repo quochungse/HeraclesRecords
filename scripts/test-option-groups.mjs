@@ -132,6 +132,11 @@ const EXEMPT = [
     why: "A share image's ground is chosen by its look: each tile is a picture of what it gives — the map style chosen, the athlete's own photo, the colour and its gradient — which a chip holds none of."
   },
   {
+    file: "src/records/PersonalRecordsBoard.tsx",
+    marker: "records-pr-row",
+    why: "The Personal Records page's distances are a list of records, each its time, pace, gain and history: pressing one shows its record beside the list."
+  },
+  {
     file: "src/strength/BodyMapV2.tsx",
     marker: "anatomy-layer-row",
     why: "Muscle group visibility is a list of independent show/hide switches, one per group, not a choice between options."

@@ -66,6 +66,8 @@ const app: AppMessages = {
   "app.period.d7.phrase": "최근 7일",
   "app.period.d28": "4주",
   "app.period.d28.phrase": "최근 4주",
+  "app.period.d84": "12주",
+  "app.period.d84.phrase": "최근 12주",
   "app.period.d90": "3개월",
   "app.period.d90.phrase": "최근 3개월",
   "app.period.d180": "6개월",

@@ -66,6 +66,8 @@ const app: AppMessages = {
   "app.period.d7.phrase": "последние 7 дней",
   "app.period.d28": "4 недели",
   "app.period.d28.phrase": "последние 4 недели",
+  "app.period.d84": "12 недель",
+  "app.period.d84.phrase": "последние 12 недель",
   "app.period.d90": "3 месяца",
   "app.period.d90.phrase": "последние 3 месяца",
   "app.period.d180": "6 месяцев",
