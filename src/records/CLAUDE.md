@@ -58,5 +58,6 @@ celebration open the Labours; a stage's date there opens its milestone on the Ti
 
 A labour's emblem is the athlete's gold artwork (`src/assets/labours/<LabourId>.webp`) in a CSS
 frame with four steps of light by stage; its golds are the artwork's, not `--accent`. On paper
-the hall is gold on white (`--hall-gold*`, derived from the accent in `recordsNotices.css`);
-each labour's head is a black plaque.
+the hall is gold on white (`--hall-gold*`, derived from the accent in `recordsNotices.css`)
+and the emblem's plate is ivory: an unreached stage fades the figure by `opacity`, never a
+lower `brightness`, which on a light ground turns the gold to mud.

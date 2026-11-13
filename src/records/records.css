@@ -902,9 +902,8 @@
  * on the grey canvas, every fill in the accent's muddy brown, and a completed
  * labour drawn exactly like an open one. Here the gold that fills is paper's
  * bright gold (recordsNotices.css), the year's timeline is one white sheet
- * with its big milestones lifted off it as cards, and each labour's head is a
- * black plaque: the emblems were cast for black, and on it their gold reads as
- * gold. Dark is untouched.
+ * with its big milestones lifted off it as cards, and each labour's emblem
+ * stands on a light plate. Dark is untouched.
  */
 
 /* Bars and pips are filled in the bright gold, on a warm track. */
@@ -960,56 +959,12 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 1px 3px rgba(90, 55, 0, 0.24);
 }
 
-/* Each labour's head is a black plaque, bled to the card's edges; its myth and
-   its stages stay on white. */
-:root[data-theme="paper"] .records-labour {
-  --plaque: radial-gradient(130% 160% at 0% 0%, #2b2317 0%, #15120d 48%, #0b0a08 100%);
-  --plaque-ink: #f7f0e1;
-  --plaque-ink-2: #cfc3aa;
-  --plaque-ink-3: #9d927c;
-  --plaque-gold: #f0c35e;
-  --plaque-gold-light: #f7d98c;
-  overflow: hidden;
-}
-
-:root[data-theme="paper"] .records-labour-head {
-  margin: -18px -18px 0;
-  padding: 18px;
-  background: var(--plaque);
-}
-
-:root[data-theme="paper"] .records-labour.is-complete .records-labour-head {
-  box-shadow: inset 0 -2px 0 var(--plaque-gold);
-}
-
-:root[data-theme="paper"] .records-labour-head .records-eyebrow {
-  color: var(--plaque-ink-3);
-}
-
-:root[data-theme="paper"] .records-labour-head h3 {
-  color: var(--plaque-ink);
-}
-
-:root[data-theme="paper"] .records-labour-head .records-stage-count {
-  color: var(--plaque-ink-2);
-}
-
-:root[data-theme="paper"] .records-labour-head .records-labour-pips span {
-  background: rgba(255, 255, 255, 0.16);
-}
-
-:root[data-theme="paper"] .records-labour-head .records-labour-pips span.is-reached,
-:root[data-theme="paper"] .records-labour-head .records-complete {
-  background: linear-gradient(180deg, var(--plaque-gold-light), var(--plaque-gold));
-}
-
-:root[data-theme="paper"] .records-labour-head .records-complete {
-  color: #2a1b04;
+/* A labour's head stays on the card's white, its emblem on a light plate
+   (recordsNotices.css); a complete labour's pill is filled in the gold. */
+:root[data-theme="paper"] .records-complete {
+  background: linear-gradient(180deg, var(--hall-gold-light), var(--hall-gold));
+  color: var(--hall-gold-ink);
   font-weight: 700;
-}
-
-:root[data-theme="paper"] .records-myth {
-  margin-top: 2px;
 }
 
 /* A labour's badge on the timeline is a white face on a hairline; on the

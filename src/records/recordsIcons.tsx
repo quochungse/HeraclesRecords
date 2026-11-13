@@ -87,8 +87,8 @@ const EMBLEM_SIZES = {
 export type LabourEmblemSize = keyof typeof EMBLEM_SIZES;
 
 /**
- * A labour's emblem on its plate. The plate is the artwork's own black in
- * every theme — the relief was cast for it — and the light on it says how far
+ * A labour's emblem on its plate (the artwork's own black on dark, ivory on
+ * paper). The light on it says how far
  * the labour has gone, one step per stage: unlit and grey at none, a dim gold
  * at I, nearly full at II, and full gold with a glowing rim at III. `reached`
  * is a count, 0–3.
