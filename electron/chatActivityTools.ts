@@ -10,7 +10,7 @@ import {
 import { dayKey, isoDay, isoFromDayKey, padTwo } from "./chatDayKeys";
 import { sessionSetsCardExercises, sessionSetsHeartRate } from "./sessionSets";
 import { isRecoveryLap, lapSections } from "./lapSections";
-import { getStoredTrainingActivity } from "./database";
+import { getStoredTrainingActivity, readTrainingActivityFeelTypes } from "./database";
 import { getStrengthLoadSource, heraclesLoadFor, withHeraclesLoads, withPlannedHeraclesLoads } from "./heraclesLoadService";
 import {
   getTrainingHubStatus,
@@ -121,6 +121,8 @@ const MAX_UNDATED_LIMIT = 25;
 const DEFAULT_DATED_LIMIT = 50;
 /** One COROS page. A period with more than this says so rather than paging on. */
 const MAX_DATED_LIMIT = 100;
+/** A period read week by week states no rows, so it may read further. */
+const MAX_WEEKLY_ACTIVITIES = 300;
 
 export function isChatActivityTool(name: string): name is ChatActivityToolName {
   return (CHAT_ACTIVITY_TOOL_NAMES as readonly string[]).includes(name);
@@ -140,10 +142,12 @@ export function getChatActivityTools(): CorosMcpTool[] {
       description:
         "List COROS activities: activity_id, sport_type, local start, distance, " +
         "duration, HR, training load and climb; a strength session also states its " +
-        "Heracles load where it differs. With start_date (and optionally " +
+        "Heracles load where it differs, and a session the athlete rated on the watch how it felt. With start_date (and optionally " +
         "end_date) it returns every activity in that period plus per-sport totals — " +
         "use this for a week or block review instead of paging. Without dates it " +
         "returns the most recent ones; the snapshot already lists the latest 8. " +
+        "With group_by=week it returns each week's totals per sport instead of the rows — " +
+        "the volume trend across a block in one read. " +
         "min/max_km and min/max_minutes find sessions by length (e.g. every run over 15 km).",
       inputSchema: {
         type: "object",
@@ -173,6 +177,11 @@ export function getChatActivityTools(): CorosMcpTool[] {
             description:
               "Page of the plain most-recent list (default 1). Ignored with " +
               "dates or sport — narrow those with start_date/end_date."
+          },
+          group_by: {
+            type: "string",
+            enum: ["week"],
+            description: "Totals per week (Monday to Sunday) and sport, no rows. Needs start_date."
           },
           min_km: { type: "number" },
           max_km: { type: "number" },
@@ -405,6 +414,11 @@ async function handleListRecentActivities(
   const window = parseActivityListWindow(args);
   const sport = parseActivitySportFamily(args.sport);
   const length = parseActivityLengthFilter(args);
+  const byWeek = String(args.group_by ?? args.groupBy ?? "").trim().toLowerCase() === "week";
+  if (byWeek && !window) {
+    throw new Error("group_by needs a start_date.");
+  }
+  const sourceLimit = byWeek ? MAX_WEEKLY_ACTIVITIES : MAX_DATED_LIMIT;
   // A search by length reads as a period does: the rows that match, not a page.
   const limit = window || length
     ? Math.min(Math.max(Number(args.limit) || DEFAULT_DATED_LIMIT, 1), MAX_DATED_LIMIT)
@@ -417,11 +431,11 @@ async function handleListRecentActivities(
   try {
     // A sport filter is applied here, not by COROS, so an undated filtered list
     // reads one full page to have enough of that sport to fill `limit`.
-    const fetched = withCoachHeraclesLoads(
+    const fetched = withCoachFeels(withCoachHeraclesLoads(
       window
-        ? await listTrainingHubActivities(1, MAX_DATED_LIMIT, window.startDay, window.endDay)
+        ? await listTrainingHubActivities(1, sourceLimit, window.startDay, window.endDay)
         : await listTrainingHubActivities(page, sport || length ? MAX_DATED_LIMIT : limit)
-    );
+    ));
     return formatActivityListForChat(fetched, unitSystem, {
       ...(window ? { window } : {}),
       ...(sport ? { sport } : {}),
@@ -430,7 +444,8 @@ async function handleListRecentActivities(
         ? { searchedLatest: fetched.length }
         : {}),
       limit,
-      truncatedAtSource: window !== undefined && fetched.length >= MAX_DATED_LIMIT
+      ...(byWeek ? { byWeek } : {}),
+      truncatedAtSource: window !== undefined && fetched.length >= sourceLimit
     });
   } catch (caught) {
     throw formatActivityToolError("list_recent_activities", caught);
@@ -442,6 +457,8 @@ export interface ActivityListFormatOptions {
   sport?: ActivitySportFamily;
   length?: ActivityLengthFilter;
   limit: number;
+  /** Each week's totals instead of the rows; a dated list only. */
+  byWeek?: boolean;
   /** COROS returned a full page for the period, so there may be more. */
   truncatedAtSource?: boolean;
   /** An undated filter searched only this many of the latest activities. */
@@ -478,6 +495,10 @@ export function formatActivityListForChat(
 
   if (shown.length === 0) {
     return `No activities found (${scope}).`;
+  }
+
+  if (options.byWeek && options.window) {
+    return formatActivityWeeks(matching, unitSystem, scope, options.truncatedAtSource === true);
   }
 
   const lines = [
@@ -517,6 +538,44 @@ export function formatActivityListForChat(
     "",
     "get_activity_detail takes an activity_id from this list for laps, zones and form."
   );
+  return lines.join("\n");
+}
+
+/** The Monday (`yyyyMMdd`) of the local week an activity started in. */
+function weekStartKey(startTime: number): string {
+  const date = new Date(startTime * 1000);
+  date.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+  return dayKey(date);
+}
+
+/**
+ * A period as its weeks: per-sport totals for each, oldest first, then the
+ * period's. "How has my volume moved" is twelve sums over a hundred rows, and
+ * the rows are what the model would otherwise add up.
+ */
+function formatActivityWeeks(
+  activities: TrainingHubActivity[],
+  unitSystem: UnitSystem,
+  scope: string,
+  truncatedAtSource: boolean
+): string {
+  const weeks = new Map<string, TrainingHubActivity[]>();
+  for (const activity of activities) {
+    if (!activity.startTime) continue;
+    const week = weekStartKey(activity.startTime);
+    weeks.set(week, [...(weeks.get(week) ?? []), activity]);
+  }
+  const lines = [`Activities by week (${scope}): ${activities.length}. Weeks run Monday to Sunday; a week with no activity is not listed.`];
+  for (const week of [...weeks.keys()].sort()) {
+    lines.push("", `Week of ${isoFromDayKey(week)}:`, ...formatActivityTotals(weeks.get(week) ?? [], unitSystem));
+  }
+  if (truncatedAtSource) {
+    lines.push(
+      "",
+      "COROS returned as many activities as one read takes, so the oldest weeks may be short — narrow the dates."
+    );
+  }
+  lines.push("", "Whole period:", ...formatActivityTotals(activities, unitSystem));
   return lines.join("\n");
 }
 
@@ -673,8 +732,11 @@ async function handleGetActivityDetail(
       sections,
       coachHeraclesLoad({ activityId, sportType, trainingLoad: detail.trainingLoad ?? listActivity?.trainingLoad })
     );
+    // Read after the detail, which is what caches it.
+    const feel = coachFeelPart(activityId);
+    const rated = feel ? `${text}\n\nThe athlete's own rating on the watch: ${feel}.` : text;
     const window = parseActivityWindow(args.window);
-    return window ? `${formatActivityWindowForChat(detail, window, unitSystem)}\n\n${text}` : text;
+    return window ? `${formatActivityWindowForChat(detail, window, unitSystem)}\n\n${rated}` : rated;
   } catch (caught) {
     throw formatActivityToolError("get_activity_detail", caught);
   }
@@ -1087,7 +1149,8 @@ export function formatActivityListLine(
     formatHeraclesLoadPart(activity),
     activity.elevationGain
       ? `+${formatElevationValue(activity.elevationGain, unitSystem)}`
-      : undefined
+      : undefined,
+    feelPart(activity.feelType)
   ].filter(Boolean);
   return `- ${parts.join(" · ")}`;
 }
@@ -1102,6 +1165,40 @@ export function coachReadsHeracles(): boolean {
     return getStrengthLoadSource() === "heracles";
   } catch {
     return false;
+  }
+}
+
+/** COROS's five end-of-session smileys, as the athlete's own words for the session. */
+const FEEL_WORDS = ["very easy", "easy", "moderate", "hard", "very hard"];
+
+/** "felt hard", from a COROS feelType; nothing for an unrated or unread session. */
+export function feelPart(feelType: number | undefined): string | undefined {
+  const word = feelType ? FEEL_WORDS[feelType - 1] : undefined;
+  return word ? `felt ${word}` : undefined;
+}
+
+/** How the athlete rated one activity on the watch, where the app has read it. */
+function coachFeelPart(activityId: string): string | undefined {
+  try {
+    return feelPart(readTrainingActivityFeelTypes([activityId])[activityId]);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Activities with the athlete's own rating of each, from the cache the
+ * Activities screen fills: it reached Coach only as a day's "RPE load", so a
+ * hard-feeling easy run read as an easy run. Best-effort; never a request.
+ */
+export function withCoachFeels<T extends TrainingHubActivity>(activities: T[]): T[] {
+  try {
+    const feels = readTrainingActivityFeelTypes(activities.map((activity) => activity.activityId));
+    return activities.map((activity) =>
+      feels[activity.activityId] ? { ...activity, feelType: feels[activity.activityId] } : activity
+    );
+  } catch {
+    return activities;
   }
 }
 

@@ -47,7 +47,8 @@ still read it, and the Canvas still hides the old placeholder overview.
   object. `test:chat-workout-tools` holds each schema under 20 kB.
 - `get_training_zones` answers with the account's own tables; the snapshot carries
   thresholds, body metrics and all-time records. An activity analysis is handed the 72 hours
-  before its activity (`formatPrecedingTraining`), strength sessions with their muscles.
+  before its activity (`formatPrecedingTraining`), strength sessions with their muscles, the
+  earlier sessions like it (`similarSessions`) and what the calendar held that day.
 - Coach reads the athlete's COROS plans (`list_training_plans` from the Library's cache,
   `get_training_plan` from `detail`); a plan on the calendar is read as its running copy
   (`calendar_plan_id`). Progress comes from activities, so a conversation withholding them
@@ -61,7 +62,7 @@ Coach never writes to COROS directly; it writes drafts and change sets the athle
   all at once (`chat:applyScheduleChange` / `chat:dismissScheduleChange`).
   `propose_schedule_changes` (move, replace, remove, add, patch; ≤ 20 lines) is checked in the
   turn and refused whole; it writes nothing, so it is read-only-allowed. `delete_workout`
-  stages one. **Every line reads COROS again before it writes** (a session gone or renamed goes
+  stages one for a library workout; a calendar session leaves only through a `remove` line. **Every line reads COROS again before it writes** (a session gone or renamed goes
   `stale`), **one line is one write**, recorded as it lands, never written twice. Moves and
   replacements go through `electron/scheduleMoves.ts`, as the Calendar's do. A set has no
   versions: an apply that lands dismisses the sets of earlier answers still wholly untouched

@@ -353,7 +353,7 @@ for (const rule of [
   /Longer than two weeks → request_plan_brief/,
   /revise_training_plan with its newest draft_id/,
   /propose_schedule_changes once/,
-  /list_scheduled_workouts, then delete_workout/,
+  /from the Workout Library → delete_workout\. A session on the calendar is a\s+removal in propose_schedule_changes/,
   /call search_coros_exercises first/,
   /naming mismatch alone is never a reason/,
   /exercise_resolution_required/,

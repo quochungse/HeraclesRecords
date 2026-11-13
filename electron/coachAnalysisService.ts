@@ -61,10 +61,10 @@ import type {
   CoachPrecedingActivityRow,
   CoachUnseenActivityRow as CoachActivityRow
 } from "./database";
-import { isoDay } from "./chatDayKeys";
+import { dayKey, isoDay } from "./chatDayKeys";
 import { corosText, loadCorosLocale } from "./corosLocale";
 import { EXERCISE_SEARCH_MUSCLES, classifyWorkoutExerciseName } from "./exerciseCatalogSearch";
-import { getTrainingHubStatus, reconnectTrainingHub } from "./trainingHubService";
+import { getTrainingHubStatus, listScheduledWorkoutEntries, reconnectTrainingHub } from "./trainingHubService";
 import { corosSportName } from "./corosSportTypes";
 import { heraclesLoadFor } from "./heraclesLoadService";
 import { coachHeraclesLoadValue, coachReadsHeracles } from "./chatActivityTools";
@@ -95,6 +95,7 @@ import type {
   ConversationSettings,
   ProviderAuthVerdict,
   StrengthDetail,
+  TrainingHubScheduledWorkoutEntry,
   StrengthExercise
 } from "./types";
 import { addTokenUsage, countedTokens } from "./tokenUsage";
@@ -591,6 +592,13 @@ export interface CoachAnalysisRunnerDeps {
     fromEpochSeconds: number,
     toEpochSeconds: number
   ): Promise<CoachPrecedingTraining[]>;
+  /**
+   * Earlier sessions of the analysed activity's sport, oldest first, from the
+   * local store: what a debrief compares it with. Optional, as above.
+   */
+  listSimilarSessions?(activity: CoachActivityRow): Promise<CoachPrecedingTraining[]>;
+  /** What the calendar held on a day (`yyyyMMdd`): what the activity was meant to be. Optional. */
+  listScheduledOn?(day: string): Promise<TrainingHubScheduledWorkoutEntry[]>;
   recordRun(input: Omit<CoachAnalysisRun, "id" | "startedAt">): CoachAnalysisRun;
   updateRun(
     id: string,
@@ -795,6 +803,14 @@ function createDefaultDeps(): CoachAnalysisRunnerDeps {
       await loadCorosLocale().catch(() => undefined);
       return withPrecedingHeraclesLoads(listCoachActivityRowsBetween(from, to));
     },
+    listSimilarSessions: async (activity) =>
+      activity.start_time
+        ? similarSessions(
+            activity,
+            listCoachActivityRowsBetween(activity.start_time - SIMILAR_SESSION_DAYS * 86_400, activity.start_time)
+          )
+        : [],
+    listScheduledOn: (day) => listScheduledWorkoutEntries(day, day),
     recordRun: (input) => recordCoachAnalysisRun(input),
     updateRun: (id, patch) => updateCoachAnalysisRun(id, patch),
     getSessionEntries: (sessionId) => {
@@ -1471,6 +1487,85 @@ export function formatPrecedingTraining(
   ].join("\n");
 }
 
+/** How far back, and how many, the sessions a debrief is handed to compare with. */
+export const SIMILAR_SESSION_DAYS = 42;
+const SIMILAR_SESSION_LIMIT = 5;
+/** A session counts as similar within this share of the activity's length. */
+const SIMILAR_LENGTH_SHARE = 0.3;
+
+/**
+ * The newest earlier sessions of the same sport and about the same length —
+ * by distance where the activity has one, else by time — oldest first.
+ */
+export function similarSessions<Row extends CoachActivityRow>(activity: CoachActivityRow, rows: Row[]): Row[] {
+  const length = (row: CoachActivityRow): number | null =>
+    activity.distance ? row.distance : row.duration;
+  const own = length(activity);
+  if (!own) return [];
+  return rows
+    .filter((row) => {
+      const other = length(row);
+      return (
+        row.activity_id !== activity.activity_id &&
+        row.sport_type === activity.sport_type &&
+        row.start_time !== null &&
+        (activity.start_time === null || row.start_time < activity.start_time) &&
+        Boolean(other) &&
+        Math.abs((other ?? 0) - own) <= own * SIMILAR_LENGTH_SHARE
+      );
+    })
+    .sort((left, right) => (left.start_time ?? 0) - (right.start_time ?? 0))
+    .slice(-SIMILAR_SESSION_LIMIT);
+}
+
+/**
+ * Those sessions for the focus line. Handed over because "how it compares with
+ * similar recent sessions" is the debrief's first question and no single read
+ * answers it; each carries its id, so the run opens one only where it matters.
+ */
+export function formatSimilarSessions(rows: CoachPrecedingTraining[]): string | undefined {
+  if (rows.length === 0) return undefined;
+  return [
+    `Earlier sessions of the same sport and about the same length, last ${SIMILAR_SESSION_DAYS} days, oldest first:`,
+    ...rows.map((row) => {
+      const figures = [
+        row.distance ? `${(row.distance / 1000).toFixed(2)} km` : undefined,
+        row.duration ? `${Math.round(row.duration / 60)} min` : undefined,
+        row.avg_hr ? `avg HR ${row.avg_hr}` : undefined,
+        row.training_load ? `load ${row.training_load}` : undefined
+      ].filter(Boolean);
+      const name = asText(row.name);
+      return `- ${isoDate(new Date((row.start_time ?? 0) * 1000))}${name ? ` "${name}"` : ""} (id ${row.activity_id}): ${figures.join(", ")}.`;
+    })
+  ].join("\n");
+}
+
+/**
+ * What the calendar held that day, for the focus line: a debrief judges a
+ * session against what it was meant to be. COROS's own match is stated; a day
+ * with nothing planned is said, so an unplanned session is read as one.
+ */
+export function formatScheduledForActivity(
+  activity: CoachActivityRow,
+  entries: TrainingHubScheduledWorkoutEntry[]
+): string {
+  if (entries.length === 0) return "Nothing was on the calendar that day.";
+  return [
+    "On the calendar that day:",
+    ...entries.map((entry) => {
+      const sport = entry.sportType !== undefined ? corosSportName(entry.sportType) : undefined;
+      const parts = [sport, entry.volume, entry.trainingLoad ? `planned load ${entry.trainingLoad}` : undefined].filter(Boolean);
+      const done =
+        entry.completedActivityId === activity.activity_id
+          ? " COROS counts this activity as that session."
+          : entry.completedActivityId
+            ? " COROS counts another activity as that session."
+            : "";
+      return `- "${entry.name}"${parts.length > 0 ? ` (${parts.join(", ")})` : ""}, id_in_plan ${entry.idInPlan}.${done}`;
+    })
+  ].join("\n");
+}
+
 async function buildPlaybookTurn(
   queued: QueuedRun,
   deps: CoachAnalysisRunnerDeps,
@@ -1501,6 +1596,20 @@ async function buildPlaybookTurn(
         if (rows) focus += `\n\n${formatPrecedingTraining(activity, rows)}`;
       } catch {
         // The run goes ahead with the activity alone.
+      }
+      try {
+        const similar = formatSimilarSessions((await deps.listSimilarSessions?.(activity)) ?? []);
+        if (similar) focus += `\n\n${similar}`;
+      } catch {
+        // As above.
+      }
+    }
+    if (activity.start_time) {
+      try {
+        const scheduled = await deps.listScheduledOn?.(dayKey(new Date(activity.start_time * 1000)));
+        if (scheduled) focus += `\n\n${formatScheduledForActivity(activity, scheduled)}`;
+      } catch {
+        // A calendar that cannot be read is left out, not called empty.
       }
     }
   }

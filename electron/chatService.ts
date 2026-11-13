@@ -90,6 +90,7 @@ import {
   coachHeraclesLoadValue,
   formatActivityListLine,
   formatHeraclesLoadPart,
+  withCoachFeels,
   withCoachHeraclesLoads,
   withCoachPlannedHeraclesLoads,
   formatActivitySpan,
@@ -1890,14 +1891,72 @@ export async function streamChat(
   if (ownsReach && reach) runTools.set(requestId, { extra: [], ...reach });
   if (options.sessionId) turnSessions.set(requestId, options.sessionId);
   try {
-    await streamChatTurn(sink, requestId, messages, options);
+    await streamChatTurn(sink, requestId, withLastReads(messages, options), options);
   } finally {
+    const reads = turnReads.get(requestId);
+    if (reads?.length && options.sessionId) lastReads.set(options.sessionId, reads);
+    turnReads.delete(requestId);
     if (ownsReach) runTools.delete(requestId);
     turnSessions.delete(requestId);
     turnQuestions.delete(requestId);
     runCards.delete(requestId);
     turnCharts.delete(requestId);
   }
+}
+
+/**
+ * What each turn in flight has read, and what each conversation's last reading
+ * turn read. A tool's result is gone when its turn ends — only the answer's
+ * words are kept — so a follow-up had neither the figures nor the ids to read
+ * them again, and looked the activity up from scratch or answered from memory.
+ * The calls ride on the next question (`withLastReads`), the results do not:
+ * they are the size of a read. Held in memory only; after a restart a turn
+ * simply starts without the note.
+ */
+const turnReads = new Map<string, string[]>();
+const lastReads = new Map<string, string[]>();
+const MAX_READS_NOTED = 12;
+const READ_NOTE_TOOLS: ReadonlySet<string> = new Set([
+  "list_scheduled_workouts",
+  "list_training_plans",
+  "get_training_plan"
+]);
+
+function isNotedRead(name: string): boolean {
+  return (
+    isChatActivityTool(name) ||
+    isChatAnalyticsTool(name) ||
+    isChatSleepTool(name) ||
+    READ_NOTE_TOOLS.has(name) ||
+    isCorosMcpRead(name)
+  );
+}
+
+function noteRead(requestId: string, name: string, args: Record<string, unknown>): void {
+  if (!isNotedRead(name)) return;
+  const reads = turnReads.get(requestId) ?? [];
+  const call = `${name} ${JSON.stringify(args)}`;
+  if (reads.includes(call) || reads.length >= MAX_READS_NOTED) return;
+  turnReads.set(requestId, [...reads, call]);
+}
+
+/** A conversation's turn with the calls its last reading turn made, on the question being asked. */
+export function withLastReads(messages: ChatMessage[], options: StreamChatOptions): ChatMessage[] {
+  const reads = options.sessionId ? lastReads.get(options.sessionId) : undefined;
+  const last = messages[messages.length - 1];
+  const interactive = options.toolPolicy === undefined || options.toolPolicy === "interactive";
+  if (!reads?.length || !interactive || options.textJob || last?.role !== "user") return messages;
+  const note =
+    "[Read for an earlier answer, results not kept: " +
+    reads.join("; ") +
+    ". For a figure that answer did not write down, call again with the same arguments.]";
+  return [...messages.slice(0, -1), { ...last, content: `${last.content}\n\n${note}` }];
+}
+
+/** For suites: what a conversation's next question would be told. */
+export function setLastReadsForTests(sessionId: string, reads: string[] | undefined): void {
+  if (reads) lastReads.set(sessionId, reads);
+  else lastReads.delete(sessionId);
 }
 
 /** The conversation each turn in flight belongs to, for the tools that file something under it. */
@@ -3417,6 +3476,19 @@ async function executeChatTool(
   unitSystem: UnitSystem,
   toolPolicy: ChatToolPolicy = "interactive"
 ): Promise<string> {
+  const output = await runChatTool(name, args, send, requestId, unitSystem, toolPolicy);
+  noteRead(requestId, name, args);
+  return output;
+}
+
+async function runChatTool(
+  name: string,
+  args: Record<string, unknown>,
+  send: (channel: string, payload: unknown) => void,
+  requestId: string,
+  unitSystem: UnitSystem,
+  toolPolicy: ChatToolPolicy
+): Promise<string> {
   // A run's own tools, and the ones it withholds, are settled before the
   // policy: an extra tool is the run's to answer, not the policy's to allow.
   const run = runTools.get(requestId);
@@ -3931,7 +4003,10 @@ function workoutToolGuide(
         "(zero-based); replace only when steps are added, removed or swapped."
       : undefined,
     has("delete_workout")
-      ? "- Removing a workout → find it with list_scheduled_workouts, then delete_workout."
+      ? has("propose_schedule_changes")
+        ? "- Deleting a workout from the Workout Library → delete_workout. A session on the calendar is a " +
+          "removal in propose_schedule_changes."
+        : "- Deleting a workout from the Workout Library → delete_workout."
       : undefined,
     has("list_training_plans")
       ? "- The athlete's own COROS plans — those they made or saved from COROS, not only yours → " +
@@ -4152,7 +4227,7 @@ async function buildTrainingContext(
   const includeSleep = scope?.sleep !== false;
   const [activities, dashboard, upcoming, profile, sleep] = await Promise.allSettled([
     includeActivities
-      ? listTrainingHubActivities(1, 25).then(withCoachHeraclesLoads)
+      ? listTrainingHubActivities(1, 25).then(withCoachHeraclesLoads).then(withCoachFeels)
       : Promise.resolve([] as TrainingHubActivity[]),
     includeActivities
       ? getTrainingDashboard()
