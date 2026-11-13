@@ -7,20 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-13
+
+Coach is now Mentor, and the Hall of Records is three screens of its own: Timeline, Personal Records and The Twelve Labours.
+
 ### What's new
-- **Personal Records** - a screen of its own under Your journey.
-- **The Hall of Records is three screens on the rail** - Timeline, Personal Records and The Twelve Labours, each under Your journey, instead of one screen with a switch.
+- **Coach is now Mentor** - named for the counsellor of the Odyssey, with its own portrait on the rail, the Ask Mentor buttons and its answers. Your conversations and settings carry over.
+- **The Hall of Records is three screens on the rail** - Timeline, Personal Records and The Twelve Labours, each under Your journey, instead of one screen with a switch. Personal Records left the Personal screen for a screen of its own.
+- **The Twelve Labours read better on paper** - a labour's emblem stands on an ivory plate, its stages read apart, and the Apotheosis is a medal whose ring fills with the stages reached.
+- **Lactate threshold heart rate can be edited** - with Lactate threshold chosen as the zone model, the Personal screen's Training card shows and edits LTHR in place of max and resting heart rate, and COROS rebuilds the zones on it.
 
 ### Changed
-- **Personal Records left the Personal screen** for a screen of their own.
-- **Coach is now Mentor** - named for the counsellor of the Odysse.
 - **Mentor shows a chart only when the answer is about it** - a session read to set a pace, or your zones read to write a workout, no longer puts a chart above an answer about something else.
 - Mentor reads how you rated a session on the watch, a training block by its weeks, and what it read for its last answer, so a follow-up question does not start from scratch.
+- Mentor's answers lead with the verdict and its figures, and change your training only as far as your load and recovery allow.
 - An activity analysis is handed the earlier sessions like it and what the calendar held that day.
 - An analysis whose playbook asks for something every run (a review, a briefing, a plan) answers every run; it stays silent only when the playbook asks for what stands out and nothing does.
 
 ### Fixed
 - Mentor: a turn that spent all its reads on data ends with an answer instead of nothing.
+- Mentor: a table in an answer stays inside its bubble.
+- An activity COROS briefly refuses to serve ("Service exceptions") is asked for again, instead of showing an error on the activity screens and in Mentor.
+- Personal Records waits for COROS's records before saying a distance has none, and promises a history only while runs are still being read.
 
 ## [1.4.8] - 2026-11-11
 
