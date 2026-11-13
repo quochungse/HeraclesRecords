@@ -159,6 +159,8 @@ export interface CorosProfilePatch {
   weightKg?: number;
   maxHr?: number;
   restingHr?: number;
+  /** Lactate threshold heart rate, the anchor of zone model 3. */
+  lthr?: number;
   unit?: number;
   temperatureUnit?: number;
   /**

@@ -193,6 +193,35 @@ assert.deepEqual(
   }
 );
 
+// The lactate-threshold model's anchor is LTHR: an edited one is what the zones
+// are rebuilt on, and an LTHR edit on that model carries the model with it.
+assert.deepEqual(
+  Object.fromEntries(
+    buildCorosProfileUpdateFields({ hrZoneType: 3, lthr: 172 }, profile)
+  ),
+  {
+    lthr: "172",
+    hrZoneType: "3",
+    lthrZone: JSON.stringify([{ index: 0, ratio: 80 }]),
+    hasHrCalibrated: "1"
+  }
+);
+assert.deepEqual(
+  Object.fromEntries(
+    buildCorosProfileUpdateFields({ lthr: 170 }, { ...profile, hrZoneType: 3 })
+  ),
+  {
+    lthr: "170",
+    hrZoneType: "3",
+    lthrZone: JSON.stringify([{ index: 0, ratio: 80 }]),
+    hasHrCalibrated: "1"
+  }
+);
+assert.throws(
+  () => buildCorosProfileUpdateFields({ lthr: 230 }, profile),
+  /Lactate threshold heart rate must be between 105 and 215/
+);
+
 assert.throws(
   () => buildCorosProfileUpdateFields({ hrZoneType: 0 }, profile),
   /HR zone model must be 1 \(max heart rate\), 2 \(heart-rate reserve\) or 3 \(lactate threshold\)/

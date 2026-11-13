@@ -1140,6 +1140,7 @@ const COROS_PROFILE_FORM_FIELDS: Record<keyof CorosProfilePatch, string> = {
   weightKg: "weight",
   maxHr: "maxHr",
   restingHr: "rhr",
+  lthr: "lthr",
   unit: "unit",
   temperatureUnit: "temperatureUnit",
   hrZoneType: "hrZoneType"
@@ -1335,6 +1336,17 @@ export function buildCorosProfileUpdateFields(
     );
   }
 
+  if (patch.lthr !== undefined) {
+    fields.set(
+      COROS_PROFILE_FORM_FIELDS.lthr,
+      corosProfileNumberField(
+        "Lactate threshold heart rate",
+        patch.lthr,
+        ranges.lthr ?? { min: 100, max: 220 }
+      )
+    );
+  }
+
   if (patch.unit !== undefined) {
     fields.set(
       COROS_PROFILE_FORM_FIELDS.unit,
@@ -1349,10 +1361,14 @@ export function buildCorosProfileUpdateFields(
     );
   }
 
-  // Last, so a max-HR or resting-HR edit in the same patch is the anchor the
-  // rebuilt zones are pinned to.
-  if (patch.hrZoneType !== undefined) {
-    appendHrZoneModelFields(fields, patch.hrZoneType, current);
+  // Last, so a max-HR, resting-HR or LTHR edit in the same patch is the anchor
+  // the rebuilt zones are pinned to. An LTHR edit on an account already on the
+  // lactate-threshold model carries that model's fields too, as a switch would.
+  const zoneModel =
+    patch.hrZoneType ??
+    (patch.lthr !== undefined && current.hrZoneType === 3 ? 3 : undefined);
+  if (zoneModel !== undefined) {
+    appendHrZoneModelFields(fields, zoneModel, current);
   }
 
   return fields;

@@ -68,6 +68,7 @@ interface ProfileDraft {
   weightKg: string;
   maxHr: string;
   restingHr: string;
+  lthr: string;
   unit: string;
   temperatureUnit: string;
   hrZoneType: string;
@@ -215,6 +216,7 @@ function draftFromProfile(
     ),
     maxHr: text(profile.thresholds.maxHr),
     restingHr: text(profile.thresholds.restingHr),
+    lthr: text(profile.thresholds.lthr),
     unit: text(profile.unit),
     temperatureUnit: text(profile.temperatureUnit),
     hrZoneType: text(profile.hrZoneType)
@@ -271,13 +273,23 @@ function patchFromDraft(
     "weightKg",
     (value) => (patch.weightKg = round1(displayWeightToKilograms(value, unitSystem)))
   );
-  assignNumber("maxHr", (value) => (patch.maxHr = value));
-  assignNumber("restingHr", (value) => (patch.restingHr = value));
+  // Only the anchors of the chosen model are on the form, so only they are sent.
+  if (isLactateThresholdModel(draft.hrZoneType)) {
+    assignNumber("lthr", (value) => (patch.lthr = value));
+  } else {
+    assignNumber("maxHr", (value) => (patch.maxHr = value));
+    assignNumber("restingHr", (value) => (patch.restingHr = value));
+  }
   assignNumber("unit", (value) => (patch.unit = value));
   assignNumber("temperatureUnit", (value) => (patch.temperatureUnit = value));
   assignNumber("hrZoneType", (value) => (patch.hrZoneType = value));
 
   return patch;
+}
+
+/** Zone model 3 is anchored on LTHR alone; the other two on max and resting HR. */
+function isLactateThresholdModel(hrZoneType: string | number | undefined): boolean {
+  return hrZoneModelDefinition(Number(hrZoneType))?.family === "lthr";
 }
 
 function zoneValue(
@@ -447,6 +459,8 @@ export function ProfileView({
   const weightRange = profile?.thresholds.ranges.weightKg;
   const maxHrRange = profile?.thresholds.ranges.maxHr;
   const restingHrRange = profile?.thresholds.ranges.restingHr;
+  const lthrRange = profile?.thresholds.ranges.lthr;
+  const lthrModel = isLactateThresholdModel(profile?.hrZoneType);
 
   return (
     <div className="profile-view">
@@ -713,28 +727,43 @@ export function ProfileView({
                       onChange={(next) => updateDraft("hrZoneType", next)}
                     />
                   </label>
-                  <label className="field">
-                    <span>{t("profile.maxHrField")}</span>
-                    <input
-                      type="number"
-                      min={maxHrRange?.min ?? 120}
-                      max={maxHrRange?.max ?? 240}
-                      value={draft.maxHr}
-                      onChange={(event) => updateDraft("maxHr", event.target.value)}
-                    />
-                  </label>
-                  <label className="field">
-                    <span>{t("profile.restingHrField")}</span>
-                    <input
-                      type="number"
-                      min={restingHrRange?.min ?? 30}
-                      max={restingHrRange?.max ?? 120}
-                      value={draft.restingHr}
-                      onChange={(event) =>
-                        updateDraft("restingHr", event.target.value)
-                      }
-                    />
-                  </label>
+                  {isLactateThresholdModel(draft.hrZoneType) ? (
+                    <label className="field">
+                      <span>{t("profile.lthrField")}</span>
+                      <input
+                        type="number"
+                        min={lthrRange?.min ?? 100}
+                        max={lthrRange?.max ?? 220}
+                        value={draft.lthr}
+                        onChange={(event) => updateDraft("lthr", event.target.value)}
+                      />
+                    </label>
+                  ) : (
+                    <>
+                      <label className="field">
+                        <span>{t("profile.maxHrField")}</span>
+                        <input
+                          type="number"
+                          min={maxHrRange?.min ?? 120}
+                          max={maxHrRange?.max ?? 240}
+                          value={draft.maxHr}
+                          onChange={(event) => updateDraft("maxHr", event.target.value)}
+                        />
+                      </label>
+                      <label className="field">
+                        <span>{t("profile.restingHrField")}</span>
+                        <input
+                          type="number"
+                          min={restingHrRange?.min ?? 30}
+                          max={restingHrRange?.max ?? 120}
+                          value={draft.restingHr}
+                          onChange={(event) =>
+                            updateDraft("restingHr", event.target.value)
+                          }
+                        />
+                      </label>
+                    </>
+                  )}
                   <p className="profile-note">
                     {t("profile.zoneModelNote")}
                   </p>
@@ -758,22 +787,26 @@ export function ProfileView({
                       )}
                     </dd>
                   </div>
-                  <div>
-                    <dt>{t("profile.maxHr")}</dt>
-                    <dd>
-                      {profile.thresholds.maxHr
-                        ? `${profile.thresholds.maxHr} bpm`
-                        : "—"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>{t("profile.restingHr")}</dt>
-                    <dd>
-                      {profile.thresholds.restingHr
-                        ? `${profile.thresholds.restingHr} bpm`
-                        : "—"}
-                    </dd>
-                  </div>
+                  {lthrModel ? null : (
+                    <>
+                      <div>
+                        <dt>{t("profile.maxHr")}</dt>
+                        <dd>
+                          {profile.thresholds.maxHr
+                            ? `${profile.thresholds.maxHr} bpm`
+                            : "—"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>{t("profile.restingHr")}</dt>
+                        <dd>
+                          {profile.thresholds.restingHr
+                            ? `${profile.thresholds.restingHr} bpm`
+                            : "—"}
+                        </dd>
+                      </div>
+                    </>
+                  )}
                   <div>
                     <dt>LTHR</dt>
                     <dd>
