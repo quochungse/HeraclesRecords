@@ -356,10 +356,8 @@ for (const rule of [
   /from the Workout Library → delete_workout\. A session on the calendar is a\s+removal in propose_schedule_changes/,
   /call search_coros_exercises first/,
   /naming mismatch alone is never a reason/,
-  /exercise_resolution_required/,
-  /call the same draft tool again in the same response/,
   /typed intensity field/,
-  /request_coach_input — once per turn, with one to three concise questions/,
+  /request_coach_input, once per turn, never only in prose/,
   /write it first and ask\s+at the end/,
   /Nothing you call writes to COROS/,
   /Every sport takes step kinds/
@@ -370,6 +368,7 @@ for (const [rule, times] of [[/typed intensity/g, 1], [/search_coros_exercises f
   assert.equal((fullGuide.match(rule) ?? []).length, times, `${rule} is said once`);
 }
 assert.doesNotMatch(fullGuide, /Authoring tools:/, "the model has the tool list already");
+assert.doesNotMatch(fullGuide, /exercise_resolution_required/, "a refusal says what to do next itself");
 assert.doesNotMatch(fullGuide, /Delete from COROS/);
 
 // A read-only turn without the writing tools is told nothing about them.
@@ -386,7 +385,7 @@ assert.doesNotMatch(readOnlyGuide, /recall_conversation/, "a conversation with n
 {
   const recallGuide = withLiveToolInstructions("Coach.", [tool("recall_conversation")]);
   assert.match(recallGuide, /read it with\s+recall_conversation before answering/);
-  assert.doesNotMatch(recallGuide, /Other connected MCP server tools/);
+  assert.doesNotMatch(recallGuide, /other connected MCP servers/);
 }
 // Every provider sends the rules, then the tool guide, then what the turn read;
 // the Anthropic one keeps the last apart so the cache marker falls before it.

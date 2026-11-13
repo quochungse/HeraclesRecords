@@ -3881,22 +3881,8 @@ export function withLiveToolInstructions(
   // of them, naming tools a read-only run was never given.
   if (readsData) {
     sections.push(
-      "Read before you fetch. The training snapshot at the end of these instructions, when present, " +
-        "already holds the latest activities, the athlete's thresholds, today's recovery, race predictions " +
-        "and records, last night's sleeping heart rate and the next 14 days of schedule — answer from it " +
-        "when it covers the question. It holds no load or fitness trend, HRV, sleep duration or VO2max: a " +
-        "question that turns on those is read with a tool. Across every tool: ask " +
-        "for only the period, sport and sections the question is about, never fetch the same data twice in " +
-        "one answer, read the totals and averages a tool has already computed rather than recomputing them, " +
-        "and say when a value is missing instead of estimating it."
-    );
-  }
-  if (activityTools.length > 0) {
-    sections.push(
-      "Which activity sections answer which question: pacing or intervals → laps, " +
-        "trend; intensity → zones; hills → elevation; gym → strength. One or two " +
-        "each is usually enough when comparing several activities, and series only " +
-        "when the lap table and trend cannot answer."
+      "The training snapshot at the end of these instructions, when present, is current: answer from it " +
+        "when it covers the question, and read with a tool only what it does not hold."
     );
   }
   if (activityTools.length + analyticsTools.length > 0) {
@@ -3909,17 +3895,12 @@ export function withLiveToolInstructions(
   }
   if (corosMcpTools.length > 0) {
     sections.push(
-      `COROS MCP tools: ${corosMcpTools.map((tool) => tool.name).join(", ")}. ` +
-        "Reach for these only for what the local tools do not cover."
+      "The COROS MCP server's tools are only for what the local tools do not cover."
     );
   }
   if (otherMcpTools.length > 0) {
     sections.push(
-      `Other connected MCP server tools: ${otherMcpTools
-        .map((tool) => tool.name)
-        .join(", ")}. ` +
-        "Use each tool according to its own name, description, and schema. " +
-        "Do not assume these tools return COROS data."
+      "Tools of the other connected MCP servers do not return COROS data unless they say so."
     );
   }
   if (planTools.length > 0) {
@@ -3947,9 +3928,7 @@ export function withLiveToolInstructions(
     sections.push(
       "",
       "## Athlete questions",
-      "Ask the athlete through request_coach_input — once per turn, with one to three concise questions in that " +
-        "call, only as many as are worth asking — each with 2–5 distinct choices, the recommended one first, each " +
-        "description stating the tradeoff that matters. Never ask a question only in prose. When your answer can " +
+      "Ask the athlete through request_coach_input, once per turn, never only in prose. When your answer can " +
         "stand without theirs, write it first and ask at the end; ask first only when you cannot answer without " +
         "it, and then before reading data the answer would change. After calling it, stop and wait for the " +
         "athlete's next message."
@@ -4039,10 +4018,7 @@ function workoutToolGuide(
     "Writing a workout:",
     "- Always set sport, sport=run included. Use distance_km only for a simple Run or Trail Run; anything " +
       "structured goes in steps.",
-    "- Pick each step's target deliberately: distance for easy, long and tempo blocks; time for duration-based " +
-      "reps and recovery jogs; load only when prescribing by training-load budget; open (run until lap) for " +
-      "by-feel warm-ups, cool-downs and fartlek surges. " +
-      buildCoachWorkoutDefaultsGuide(),
+    "- " + buildCoachWorkoutDefaultsGuide(),
     "- Put every prescribed HR, pace, effort pace, power, cadence, stroke, weight, RPE or grade in the step's " +
       "typed intensity field, never only in the name or the prose.",
     ...(has("search_coros_exercises")
@@ -4051,10 +4027,7 @@ function workoutToolGuide(
             "(or the target muscles, movement patterns and known equipment), and use the exact exercise IDs and " +
             "names it returns. A Strength exercise states its sets, target_reps or target_duration_seconds per " +
             "set, rest_type=1 with rest_value in seconds, and its weight intensity. A COROS naming mismatch alone " +
-            "is never a reason to question the athlete. If a draft tool answers exercise_resolution_required, " +
-            "take one of its candidates (or search again), fix those steps and call the same draft tool again in " +
-            "the same response; ask the athlete only when the alternatives change the movement, conflict with " +
-            "their equipment or need a real training decision."
+            "is never a reason to question the athlete."
         ]
       : []),
     ...(has("draft_training_plan")

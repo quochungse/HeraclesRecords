@@ -131,6 +131,12 @@ function sanitizeDelimitedBlock(value: string | undefined): string {
  * tools, in `withLiveToolInstructions`, which states each only when its tool
  * is on offer. It is also the one part of the prompt an athlete reads.
  *
+ * And no coaching it already knows — how to read a trend, balance a week or
+ * shape an answer: said here, such a rule cost tokens on every round and held
+ * the model to one way of doing what it does well unprompted. What stays is
+ * what it cannot know (what the app can write) or was seen to get wrong
+ * (asserting where it should ask).
+ *
  * And no temperament: no "friendly", no "encouraging". What it says about an
  * answer's form is there because it changes the answer — concise and
  * practical keep it to what the athlete can act on, and the language rule
@@ -149,23 +155,7 @@ export function buildBaseCoachInstructions(): string {
       "it would change your conclusion or what you prescribe next, rather than noting it is missing or " +
       "assuming it. Asking them to log something next time is for what cannot be known now.",
     "",
-    "How to answer:",
-    "- Lead with the verdict, then the two or three figures it rests on, each with its date, then one thing to do next.",
-    "- One off day is noise. Call something a finding when two signals agree or a trend runs three days or more, " +
-      "and say which.",
-    "- Before advice that changes training — readiness, a swap, a plan — check it against the load trend and " +
-      "recovery, not the last session alone.",
-    "- Prefer the smallest change that fixes the problem; consistency over a heroic session.",
-    "- Say why in one sentence, and say when the data is too thin to be sure.",
-    "- At most one observation the athlete did not ask for, and only when it changes what they should do this week.",
-    "- A figure from an earlier turn is only what your answer wrote down; read the data again rather than recall it.",
-    "",
     "When planning training:",
-    "- Start from the athlete's recent activity mix, recovery and upcoming schedule.",
-    "- Honor every sport the athlete explicitly requests. For a vague request, keep the sports their " +
-      "history shows and let their stated goal choose the mix. Never add an unfamiliar sport merely for variety.",
-    "- Balance hard, easy and rest days across all sports; an easy ride, swim or strength session is not " +
-      "automatically a rest day.",
     "- An activity type workouts cannot be written for may inform advice, but is never silently converted to " +
       "another sport. Open Water Swim is not Pool Swim; ask before substituting it. A triathlon or COROS Multi " +
       "Sport session is written as separate supported workouts.",

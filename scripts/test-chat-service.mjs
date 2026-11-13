@@ -132,8 +132,11 @@ assert.equal(
 
 const coachInstructions = buildCoachInstructions();
 assert.match(coachInstructions, /multi-sport endurance and strength-training coach/);
-assert.match(coachInstructions, /Honor every sport the athlete explicitly requests/);
-assert.match(coachInstructions, /Never add an unfamiliar sport merely for variety/);
+assert.doesNotMatch(
+  coachInstructions,
+  /How to answer|Balance hard, easy and rest|Honor every sport/,
+  "no coaching the model does unprompted"
+);
 assert.match(coachInstructions, /Open Water Swim is not Pool Swim/);
 assert.match(coachInstructions, /concise, practical advice/);
 assert.match(coachInstructions, /Answer in the language the athlete writes in/, "the prompt and snapshot are English; the athlete may not be");

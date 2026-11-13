@@ -1530,12 +1530,28 @@ export function buildDraftTrainingPlanInputSchema(): Record<string, unknown> {
   // them inside the same turn; and `buildCoachSportCapabilityGuide` puts each
   // sport's kinds, targets and intensities in the system prompt as prose, where
   // it costs a few hundred tokens once rather than tens of thousands per round.
+  // A repeat's steps are steps, but their intensity is named rather than
+  // spelled out again: the block is four fifths of a step, and written here
+  // too it was sent four times across the two draft tools on every round. The
+  // validator checks a nested intensity exactly as it checks an outer one.
+  const repeatedStep = {
+    ...step,
+    properties: {
+      ...step.properties,
+      intensity: {
+        type: "object",
+        properties: { type: { type: "string" } },
+        required: ["type"],
+        description: "The same shapes as a step's intensity outside a repeat."
+      }
+    }
+  };
   const repeatGroup = {
     type: "object",
     properties: {
       repeat: { type: "integer", minimum: 1, maximum: 99 },
       name: { type: "string", maxLength: COROS_NAME_MAX_BYTES, description: "At most 90 UTF-8 bytes." },
-      steps: { type: "array", minItems: 1, items: step }
+      steps: { type: "array", minItems: 1, items: repeatedStep }
     },
     required: ["repeat", "steps"]
   };
