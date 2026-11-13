@@ -1132,8 +1132,7 @@ export function computeRecords(input: RecordsInput): RecordsResult {
     activities,
     groups: input.personalRecords,
     fell: records.fell,
-    ...(input.athlete ? { athlete: input.athlete } : {}),
-    today
+    ...(input.athlete ? { athlete: input.athlete } : {})
   });
 
   // --- VO2max ---------------------------------------------------------------------------
@@ -1567,7 +1566,7 @@ function recordMilestones(
 }
 
 /** "61.2%": rounded down, so a grade never reads as one it did not reach. */
-export function formatAgeGrade(grade: number): string {
+function formatAgeGrade(grade: number): string {
   return `${formatDecimal(Math.floor(grade * 1000) / 10, 1)}%`;
 }
 

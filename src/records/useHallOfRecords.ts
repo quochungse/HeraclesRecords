@@ -62,6 +62,12 @@ export interface HallOfRecordsState {
    * as "new".
    */
   settled: boolean;
+  /**
+   * What Personal Records is read from has answered: COROS's own records (the
+   * snapshot) and the stored summaries. Before that a distance with no record
+   * yet reads as one with none.
+   */
+  recordsRead: boolean;
   /** The renderer's own copy of the summaries, merged as the backfill lands. */
   mergeSummaries: (summaries: readonly ActivityDetailSummary[]) => void;
   /** Ask the place-name cache again, once a name has been resolved. */
@@ -316,6 +322,7 @@ export function useHallOfRecords({
       ready: true,
       failed: false,
       settled: regions !== null,
+      recordsRead: true,
       mergeSummaries,
       refreshPlaceLabels
     };
@@ -336,6 +343,10 @@ export function useHallOfRecords({
       regions !== null &&
       athlete !== undefined &&
       snapshotStatus !== "pending",
+    // A refresh asks for the snapshot again; the one held still answers.
+    recordsRead:
+      (snapshotStatus !== "pending" || Boolean(snapshot?.dashboard)) &&
+      (summariesLoaded || activityIds.length === 0),
     mergeSummaries,
     refreshPlaceLabels
   };

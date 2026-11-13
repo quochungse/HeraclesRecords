@@ -242,7 +242,7 @@ export function HallOfRecordsView({
             </button>
           ) : null}
         </section>
-      ) : !ready ? (
+      ) : !ready || (section === "records" && !records.recordsRead) ? (
         <RecordsSkeleton />
       ) : result.milestones.length === 0 ? (
         <section className="panel records-empty">
@@ -310,6 +310,7 @@ export function HallOfRecordsView({
         <PersonalRecordsBoard
           board={result.board}
           today={today}
+          reading={backfill.remaining === undefined ? live : backfill.remaining > 0}
           onOpenActivity={onOpenActivity}
         />
       ) : (

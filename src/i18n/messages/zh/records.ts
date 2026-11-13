@@ -28,6 +28,7 @@ const records: RecordsMessages = {
   "records.pr.days_one": "{count} 天",
   "records.pr.days_other": "{count} 天",
   "records.pr.noHistory": "读取更早的跑步后,历史会逐步出现。",
+  "records.pr.noHistoryKept": "这里没有保存更早的纪录。",
   "records.pr.tipGain": "比上一个纪录快 {gap}",
   "records.pr.tipFirst": "这个距离的第一个纪录",
   "records.pr.chart": "纪录随时间的变化,越高越快",

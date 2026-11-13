@@ -109,5 +109,4 @@ assert.equal(
   undefined
 );
 
-
 console.log("training formatter tests passed");

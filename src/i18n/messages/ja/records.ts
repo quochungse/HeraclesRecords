@@ -28,6 +28,7 @@ const records: RecordsMessages = {
   "records.pr.days_one": "{count}日",
   "records.pr.days_other": "{count}日",
   "records.pr.noHistory": "過去のランを読み込むと履歴が表示されます。",
+  "records.pr.noHistoryKept": "これ以前の記録はここにはありません。",
   "records.pr.tipGain": "前の記録より{gap}速い",
   "records.pr.tipFirst": "この距離で最初の記録",
   "records.pr.chart": "記録の推移(上ほど速い)",

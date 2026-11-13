@@ -28,6 +28,7 @@ const records: RecordsMessages = {
   "records.pr.days_one": "{count} วัน",
   "records.pr.days_other": "{count} วัน",
   "records.pr.noHistory": "ประวัติจะปรากฏเมื่ออ่านการวิ่งที่เก่ากว่าแล้ว",
+  "records.pr.noHistoryKept": "ไม่มีสถิติก่อนหน้านี้เก็บไว้ที่นี่",
   "records.pr.tipGain": "เร็วกว่าสถิติก่อนหน้า {gap}",
   "records.pr.tipFirst": "สถิติแรกของระยะนี้",
   "records.pr.chart": "สถิติตามเวลา ยิ่งสูงยิ่งเร็ว",

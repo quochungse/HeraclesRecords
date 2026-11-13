@@ -55,7 +55,8 @@ export function LaurelWreath({ size }: { size: number }) {
  * (records.css), so paper has its own plate and gold.
  */
 export function ApotheosisMedal({ reached, total }: { reached: number; total: number }) {
-  const id = useId();
+  // React's ids carry characters that do not survive `url(#…)`.
+  const id = useId().replace(/[^\w-]/g, "");
   const share = total > 0 ? Math.min(1, Math.max(0, reached / total)) : 0;
   return (
     <svg

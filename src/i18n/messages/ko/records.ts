@@ -28,6 +28,7 @@ const records: RecordsMessages = {
   "records.pr.days_one": "{count}일",
   "records.pr.days_other": "{count}일",
   "records.pr.noHistory": "이전 러닝을 읽으면 기록의 역사가 나타납니다.",
+  "records.pr.noHistoryKept": "이전 기록은 여기에 남아 있지 않습니다.",
   "records.pr.tipGain": "이전 기록보다 {gap} 빠름",
   "records.pr.tipFirst": "이 거리의 첫 기록",
   "records.pr.chart": "시간에 따른 기록, 위로 갈수록 빠름",

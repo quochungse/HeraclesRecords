@@ -28,6 +28,7 @@ const records: RecordsMessages = {
   "records.pr.days_one": "{count} día",
   "records.pr.days_other": "{count} días",
   "records.pr.noHistory": "Su historial aparece a medida que se leen carreras más antiguas.",
+  "records.pr.noHistoryKept": "Aquí no se conservan récords anteriores.",
   "records.pr.tipGain": "{gap} más rápido que el récord anterior",
   "records.pr.tipFirst": "El primer récord en esta distancia",
   "records.pr.chart": "El récord a lo largo del tiempo, más rápido más arriba",

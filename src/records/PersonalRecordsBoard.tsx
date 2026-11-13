@@ -62,6 +62,8 @@ interface PersonalRecordsBoardProps {
   board: RecordBoard;
   /** Local `YYYYMMDD`. */
   today: string;
+  /** Older runs are still being read, so a record's history may yet grow. */
+  reading: boolean;
   onOpenActivity: (activity: SessionRef) => void;
 }
 
@@ -75,7 +77,7 @@ interface PersonalRecordsBoardProps {
  * for every distance the board can hold, and the detail is fixed in what it
  * draws, so pressing another row changes words, never the layout.
  */
-export function PersonalRecordsBoard({ board, today, onOpenActivity }: PersonalRecordsBoardProps) {
+export function PersonalRecordsBoard({ board, today, reading, onOpenActivity }: PersonalRecordsBoardProps) {
   useI18n();
   const { unitSystem } = useUnitSystem();
   const [period, setPeriod] = useSelectionPreference(RECORD_PERIOD_PREFERENCE);
@@ -140,6 +142,7 @@ export function PersonalRecordsBoard({ board, today, onOpenActivity }: PersonalR
                 period={period}
                 unitSystem={unitSystem}
                 today={today}
+                reading={reading}
                 onOpenActivity={onOpenActivity}
               />
             ) : (
@@ -272,12 +275,14 @@ function RecordDetail({
   period,
   unitSystem,
   today,
+  reading,
   onOpenActivity
 }: {
   row: DistanceRecord;
   period: RecordPeriod;
   unitSystem: UnitSystem;
   today: string;
+  reading: boolean;
   onOpenActivity: (activity: SessionRef) => void;
 }) {
   const mark = row.best[period] as RecordRun;
@@ -348,7 +353,7 @@ function RecordDetail({
         {history.length > 0 ? (
           <RecordChart history={history} distance={row.distance} unitSystem={unitSystem} />
         ) : (
-          <p className="records-pr-nohistory">{t("records.pr.noHistory")}</p>
+          <p className="records-pr-nohistory">{t(reading ? "records.pr.noHistory" : "records.pr.noHistoryKept")}</p>
         )}
       </div>
     </section>

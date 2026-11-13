@@ -32,6 +32,7 @@ const records: RecordsMessages = {
   "records.pr.days_many": "{count} дней",
   "records.pr.days_other": "{count} дня",
   "records.pr.noHistory": "История появится, когда будут прочитаны более ранние пробежки.",
+  "records.pr.noHistoryKept": "Более ранние рекорды здесь не сохранены.",
   "records.pr.tipGain": "На {gap} быстрее предыдущего рекорда",
   "records.pr.tipFirst": "Первый рекорд на этой дистанции",
   "records.pr.chart": "Рекорд во времени, выше — быстрее",

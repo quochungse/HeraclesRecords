@@ -35,6 +35,7 @@ const records = {
   "records.pr.days_one": "{count} day",
   "records.pr.days_other": "{count} days",
   "records.pr.noHistory": "Its history appears as older runs are read.",
+  "records.pr.noHistoryKept": "No earlier records of it are kept here.",
   "records.pr.tipGain": "{gap} faster than the record before",
   "records.pr.tipFirst": "The first record at this distance",
   "records.pr.chart": "The record over time, faster higher",

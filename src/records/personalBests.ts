@@ -7,6 +7,7 @@ import { isHikeSportType } from "../hiking/hikeType";
 import { isRunSportType } from "../running/runSurface";
 import { isSwimSportType } from "../training/sportTypes";
 import { capitalizeFirst, t } from "../i18n/core";
+import { getLocalHappenDayKey } from "../training/formatters";
 import {
   ageGrade,
   ageOnDay,
@@ -116,8 +117,6 @@ export interface RecordBoardInput {
   /** Every time each distance's record fell, oldest first, by metres. */
   fell: ReadonlyMap<number, readonly RecordRun[]>;
   athlete?: { birthday?: number; sex?: number };
-  /** Local `YYYYMMDD`. */
-  today: string;
 }
 
 const isDay = (day: string | undefined): day is string => Boolean(day && /^\d{8}$/.test(day));
@@ -235,6 +234,5 @@ export function daysFrom(from: string, to: string): number {
 }
 
 function localDay(epochSeconds: number): string {
-  const date = new Date(epochSeconds * 1000);
-  return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
+  return getLocalHappenDayKey(new Date(epochSeconds * 1000));
 }

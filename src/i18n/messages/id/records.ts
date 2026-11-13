@@ -28,6 +28,7 @@ const records: RecordsMessages = {
   "records.pr.days_one": "{count} hari",
   "records.pr.days_other": "{count} hari",
   "records.pr.noHistory": "Riwayatnya muncul saat lari-lari lama dibaca.",
+  "records.pr.noHistoryKept": "Rekor sebelumnya tidak tersimpan di sini.",
   "records.pr.tipGain": "{gap} lebih cepat dari rekor sebelumnya",
   "records.pr.tipFirst": "Rekor pertama di jarak ini",
   "records.pr.chart": "Rekor dari waktu ke waktu, makin tinggi makin cepat",

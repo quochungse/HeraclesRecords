@@ -28,6 +28,7 @@ const records: RecordsMessages = {
   "records.pr.days_one": "{count} ngày",
   "records.pr.days_other": "{count} ngày",
   "records.pr.noHistory": "Lịch sử hiện dần khi các buổi chạy cũ được đọc.",
+  "records.pr.noHistoryKept": "Ở đây không lưu kỷ lục nào trước đó.",
   "records.pr.tipGain": "Nhanh hơn kỷ lục trước {gap}",
   "records.pr.tipFirst": "Kỷ lục đầu tiên ở cự ly này",
   "records.pr.chart": "Kỷ lục theo thời gian, càng cao càng nhanh",
