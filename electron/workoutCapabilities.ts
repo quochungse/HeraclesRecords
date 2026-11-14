@@ -1390,94 +1390,104 @@ function formatPace(secondsPerKm: number, unit: "km" | "mi"): string {
 
 /** JSON Schema used by the MCP tool. Runtime validation still uses this registry. */
 export function buildDraftTrainingPlanInputSchema(): Record<string, unknown> {
-  const numberRange = (low: string, high: string, unit?: string) => ({
+  // An intensity is one shape per way of stating it, not one per combination:
+  // a percentage takes a preset or a range in the same shape, as does every
+  // basis of a heart-rate percentage. Spelled out per combination this block
+  // was 22 shapes and three fifths of each draft schema, on every round. What
+  // a merged shape cannot say — exactly one of a preset or a range, which
+  // presets a basis has — its description says, and `validateWorkoutIntensity`
+  // holds, with the reason handed back to the model.
+  const variant = (
+    type: string | readonly string[],
+    fields: Record<string, unknown>,
+    required: readonly string[],
+    description?: string
+  ) => ({
     type: "object",
+    ...(description ? { description } : {}),
     properties: {
-      type: { type: "string" },
-      [low]: { type: "number" },
-      [high]: { type: "number" },
-      ...(unit ? { [unit]: { type: "string" } } : {})
+      type: typeof type === "string" ? { const: type } : { type: "string", enum: type },
+      ...fields
     },
-    required: ["type", low, high, ...(unit ? [unit] : [])]
+    required: ["type", ...required]
   });
-  const percent = (type: string, presetValues: readonly string[], extra = {}) => ({
-    oneOf: [
+  const number = { type: "number" };
+  const percentRange = {
+    lowPercent: { type: "number", minimum: 1, maximum: 300 },
+    highPercent: { type: "number", minimum: 1, maximum: 300 }
+  };
+  const presetNames = (entries: readonly { preset: string }[]) => entries.map((entry) => entry.preset);
+  // Bases that share their presets share a shape, and each shape keeps its
+  // presets as an enum: named only in a description, a zone asked for by name
+  // ("my fat burn zone") was written as a guessed percentage range (probed).
+  const heartRateBasesByPresets = new Map<string, WorkoutHeartRateBasis[]>();
+  for (const basis of Object.keys(HEART_RATE_PRESETS) as WorkoutHeartRateBasis[]) {
+    const names = presetNames(HEART_RATE_PRESETS[basis]).join(",");
+    heartRateBasesByPresets.set(names, [...(heartRateBasesByPresets.get(names) ?? []), basis]);
+  }
+  const heartRatePercentShapes = [...heartRateBasesByPresets.values()].map((bases) =>
+    variant(
+      "heartRatePercent",
       {
-        type: "object",
-        properties: {
-          type: { const: type },
-          ...extra,
-          preset: { type: "string", enum: presetValues }
-        },
-        required: ["type", ...Object.keys(extra), "preset"]
+        basis: bases.length === 1 ? { const: bases[0] } : { type: "string", enum: bases },
+        preset: { type: "string", enum: presetNames(HEART_RATE_PRESETS[bases[0]]) },
+        ...percentRange
       },
-      {
-        type: "object",
-        properties: {
-          type: { const: type },
-          ...extra,
-          lowPercent: { type: "number", minimum: 1, maximum: 300 },
-          highPercent: { type: "number", minimum: 1, maximum: 300 }
-        },
-        required: ["type", ...Object.keys(extra), "lowPercent", "highPercent"]
-      }
-    ]
-  });
+      ["basis"],
+      "Either preset, or lowPercent and highPercent."
+    )
+  );
+  const pacePresets = presetNames(PACE_PRESETS);
+  const ftpOnlyPresets = presetNames(FTP_PRESETS).filter((preset) => !pacePresets.includes(preset));
+  const paceRange = {
+    lowSecondsPerKm: number,
+    highSecondsPerKm: number,
+    displayUnit: { type: "string", enum: ["km", "mi"] }
+  };
   const intensity = {
     oneOf: [
-      { type: "object", properties: { type: { const: "none" } }, required: ["type"] },
-      { ...numberRange("lowBpm", "highBpm"), properties: { ...numberRange("lowBpm", "highBpm").properties, type: { const: "heartRate" } } },
-      {
-        oneOf: (Object.keys(HEART_RATE_PRESETS) as WorkoutHeartRateBasis[]).flatMap((basis) => {
-          const basisSchema = { basis: { const: basis } };
-          const schema = percent(
-            "heartRatePercent",
-            HEART_RATE_PRESETS[basis].map((entry) => entry.preset),
-            basisSchema
-          );
-          return schema.oneOf;
-        })
-      },
-      {
-        ...numberRange("lowSecondsPerKm", "highSecondsPerKm", "displayUnit"),
-        properties: {
-          ...numberRange("lowSecondsPerKm", "highSecondsPerKm", "displayUnit").properties,
-          type: { const: "pace" },
-          displayUnit: { type: "string", enum: ["km", "mi"] }
-        }
-      },
-      {
-        ...numberRange("lowSecondsPerKm", "highSecondsPerKm", "displayUnit"),
-        properties: {
-          ...numberRange("lowSecondsPerKm", "highSecondsPerKm", "displayUnit").properties,
-          type: { const: "effortPace" },
-          displayUnit: { type: "string", enum: ["km", "mi"] }
-        }
-      },
-      percent("thresholdPacePercent", PACE_PRESETS.map((entry) => entry.preset)),
-      percent("effortPacePercent", PACE_PRESETS.map((entry) => entry.preset)),
-      percent("ftpPercent", FTP_PRESETS.map((entry) => entry.preset)),
-      {
-        oneOf: [
-          { type: "object", properties: { type: { const: "power" }, lowWatts: { type: "number" }, highWatts: { type: "number" } }, required: ["type", "lowWatts", "highWatts"] }
-        ]
-      },
-      { type: "object", properties: { type: { const: "speed" }, low: { type: "number" }, high: { type: "number" }, unit: { type: "string", enum: ["km/h", "mph"] } }, required: ["type", "low", "high", "unit"] },
-      { type: "object", properties: { type: { const: "cadence" }, low: { type: "number" }, high: { type: "number" }, unit: { type: "string", enum: ["spm", "rpm"] } }, required: ["type", "low", "high", "unit"] },
-      { type: "object", properties: { type: { const: "swimStroke" }, stroke: { type: "string", enum: Object.keys(SWIM_STROKE_IDS) } }, required: ["type", "stroke"] },
-      {
-        oneOf: [
-          { type: "object", properties: { type: { const: "weight" }, mode: { const: "bodyweight" } }, required: ["type", "mode"] },
-          { type: "object", properties: { type: { const: "weight" }, mode: { const: "weight" }, value: { type: "number", minimum: 0 }, unit: { type: "string", enum: ["kg", "lb"] } }, required: ["type", "mode", "value", "unit"] }
-        ]
-      },
-      { type: "object", properties: { type: { const: "rpe" }, value: { type: "integer", minimum: 1, maximum: 10 } }, required: ["type", "value"] },
-      {
-        oneOf: [
-          { type: "object", properties: { type: { const: "climbGrade" }, system: { type: "string", enum: Object.keys(CLIMB_SYSTEM_IDS) }, relativeToOnsight: { type: "integer", minimum: -8, maximum: 4 } }, required: ["type", "system", "relativeToOnsight"] },
-          { type: "object", properties: { type: { const: "climbGrade" }, system: { type: "string", enum: Object.keys(CLIMB_SYSTEM_IDS) }, absoluteGrade: { type: "string" } }, required: ["type", "system", "absoluteGrade"] }
-        ]
-      }
+      variant("none", {}, []),
+      variant("heartRate", { lowBpm: number, highBpm: number }, ["lowBpm", "highBpm"]),
+      ...heartRatePercentShapes,
+      variant(["pace", "effortPace"], paceRange, Object.keys(paceRange)),
+      variant(
+        ["thresholdPacePercent", "effortPacePercent", "ftpPercent"],
+        {
+          preset: {
+            type: "string",
+            enum: [...pacePresets, ...ftpOnlyPresets],
+            ...(ftpOnlyPresets.length > 0 ? { description: `${ftpOnlyPresets.join(", ")}: ftpPercent only.` } : {})
+          },
+          ...percentRange
+        },
+        [],
+        "Either preset, or lowPercent and highPercent."
+      ),
+      variant("power", { lowWatts: number, highWatts: number }, ["lowWatts", "highWatts"]),
+      variant("speed", { low: number, high: number, unit: { type: "string", enum: ["km/h", "mph"] } }, ["low", "high", "unit"]),
+      variant("cadence", { low: number, high: number, unit: { type: "string", enum: ["spm", "rpm"] } }, ["low", "high", "unit"]),
+      variant("swimStroke", { stroke: { type: "string", enum: Object.keys(SWIM_STROKE_IDS) } }, ["stroke"]),
+      variant(
+        "weight",
+        {
+          mode: { type: "string", enum: ["bodyweight", "weight"] },
+          value: { type: "number", minimum: 0 },
+          unit: { type: "string", enum: ["kg", "lb"] }
+        },
+        ["mode"],
+        "mode weight states value and unit."
+      ),
+      variant("rpe", { value: { type: "integer", minimum: 1, maximum: 10 } }, ["value"]),
+      variant(
+        "climbGrade",
+        {
+          system: { type: "string", enum: Object.keys(CLIMB_SYSTEM_IDS) },
+          relativeToOnsight: { type: "integer", minimum: -8, maximum: 4 },
+          absoluteGrade: { type: "string" }
+        },
+        ["system"],
+        "Either relativeToOnsight or absoluteGrade."
+      )
     ]
   };
   const step = {
@@ -1534,10 +1544,19 @@ export function buildDraftTrainingPlanInputSchema(): Record<string, unknown> {
   // spelled out again: the block is four fifths of a step, and written here
   // too it was sent four times across the two draft tools on every round. The
   // validator checks a nested intensity exactly as it checks an outer one.
+  // Nor are a field's notes said twice: a repeat's step has the outer step's
+  // fields and limits, and reads their descriptions there.
+  const undescribed = Object.fromEntries(
+    Object.entries(step.properties).map(([name, property]) => {
+      const { description: _description, ...rest } = property as { description?: string };
+      return [name, rest];
+    })
+  );
   const repeatedStep = {
     ...step,
+    description: "A step as outside a repeat; a repeat holds no repeat.",
     properties: {
-      ...step.properties,
+      ...undescribed,
       intensity: {
         type: "object",
         properties: { type: { type: "string" } },

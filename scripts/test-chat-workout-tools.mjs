@@ -142,6 +142,76 @@ assert.ok(workoutItem.properties.sport_options.properties.gradingSystem);
 const stepVariants = workoutItem.properties.steps.items.oneOf;
 assert.equal(stepVariants.length, 2);
 assert.ok(stepVariants[0].properties.intensity.oneOf.length > 5, "every intensity type is offered");
+// An intensity is one shape per way of stating it: a preset and a range, and
+// heart-rate bases with the same presets, share a shape. Per combination it was 22 shapes and
+// three fifths of each draft schema. Every combination must still pass the
+// schema as the Claude Code bridge rebuilds it, exactly one shape each.
+const intensityShapes = stepVariants[0].properties.intensity.oneOf;
+assert.equal(intensityShapes.some((shape) => shape.oneOf), false, "no shape branches again");
+// A zone has to stay an enum where it is chosen: named only in a description,
+// "my fat burn zone" was written as a guessed percentage range (probed live).
+for (const shape of intensityShapes.filter((entry) => /Percent$/.test(entry.properties.type.const ?? entry.properties.type.enum[0]))) {
+  assert.ok(shape.properties.preset.enum.length >= 6, "a percentage shape lists its presets");
+}
+assert.deepEqual(
+  intensityShapes.filter((shape) => shape.properties.type.const === "heartRatePercent").map((shape) => shape.properties.preset.enum.includes("fatBurn")),
+  [true, false],
+  "max HR has its own zone names"
+);
+const intensityValidator = z.fromJSONSchema(stepVariants[0].properties.intensity);
+const statedIntensities = [
+  { type: "none" },
+  { type: "heartRate", lowBpm: 140, highBpm: 150 },
+  { type: "heartRatePercent", basis: "maxHr", preset: "fatBurn" },
+  { type: "heartRatePercent", basis: "reserve", preset: "aerobicEndurance" },
+  { type: "heartRatePercent", basis: "lthr", lowPercent: 80, highPercent: 90 },
+  { type: "pace", lowSecondsPerKm: 300, highSecondsPerKm: 330, displayUnit: "km" },
+  { type: "effortPace", lowSecondsPerKm: 300, highSecondsPerKm: 330, displayUnit: "mi" },
+  { type: "thresholdPacePercent", preset: "threshold" },
+  { type: "effortPacePercent", lowPercent: 90, highPercent: 95 },
+  { type: "ftpPercent", preset: "sprint" },
+  { type: "ftpPercent", lowPercent: 88, highPercent: 94 },
+  { type: "power", lowWatts: 200, highWatts: 220 },
+  { type: "speed", low: 25, high: 30, unit: "km/h" },
+  { type: "cadence", low: 85, high: 95, unit: "rpm" },
+  { type: "swimStroke", stroke: "freestyle" },
+  { type: "weight", mode: "bodyweight" },
+  { type: "weight", mode: "weight", value: 40, unit: "kg" },
+  { type: "rpe", value: 7 },
+  { type: "climbGrade", system: "french", relativeToOnsight: -2 },
+  { type: "climbGrade", system: "vScale", absoluteGrade: "V4" }
+];
+for (const stated of statedIntensities) {
+  assert.deepEqual(intensityValidator.parse(stated), stated, `${JSON.stringify(stated)} passes whole`);
+}
+assert.deepEqual(
+  new Set(intensityShapes.flatMap((shape) => shape.properties.type.enum ?? [shape.properties.type.const])),
+  new Set(statedIntensities.map((stated) => stated.type)),
+  "every intensity type has a shape"
+);
+for (const refused of [
+  { type: "heartRate", lowBpm: 140 },
+  { type: "heartRatePercent", preset: "aerobic" },
+  { type: "pace", lowSecondsPerKm: 300, highSecondsPerKm: 330 },
+  { type: "watts", low: 200, high: 220 }
+]) {
+  assert.equal(intensityValidator.safeParse(refused).success, false, `${JSON.stringify(refused)} is refused`);
+}
+// What a merged shape leaves open, the validator closes with a reason.
+const intervalWith = (intensity) =>
+  validatePlanDraft({
+    name: "Plan",
+    workouts: [{ key: "a", name: "A", sport: "run", steps: [{ kind: "training", target_type: "time", target_duration_seconds: 600, intensity }] }]
+  });
+assert.equal(intervalWith({ type: "heartRatePercent", basis: "maxHr", preset: "fatBurn" }).ok, true);
+assert.match(intervalWith({ type: "heartRatePercent", basis: "lthr", preset: "fatBurn" }).errors.join(" "), /heart-rate preset/);
+assert.match(intervalWith({ type: "heartRatePercent", basis: "lthr" }).errors.join(" "), /exactly one preset or custom/);
+assert.match(intervalWith({ type: "thresholdPacePercent", preset: "sprint" }).errors.join(" "), /pace preset/);
+// A repeat's step has the outer step's fields and limits, and reads their
+// notes there rather than restating them.
+const repeatedStep = stepVariants[1].properties.steps.items;
+assert.equal(repeatedStep.properties.overview.maxLength, stepVariants[0].properties.overview.maxLength);
+assert.equal(Object.values(repeatedStep.properties).some((property) => property.description && property !== repeatedStep.properties.intensity), false);
 assert.deepEqual(stepVariants[1].required, ["repeat", "steps"]);
 assert.deepEqual(
   Object.keys(stepVariants[1].properties.steps.items.properties),
@@ -180,17 +250,17 @@ for (const field of ["schedule_date", "save_to_library", "sort_no"]) {
 }
 
 // The regression guard: this is what the duplication cost, and what it must not
-// cost again. Measured after the rewrite at 15.4 kB for the plan and 15.3 kB for
-// the single workout, against 67 kB before. What is left is the step schema,
-// which still appears twice — once on its own and once inside the repeat group —
-// and is 81% intensity variants. Collapsing that last copy needs `$defs`/`$ref`,
-// which not every provider resolves well when *writing* arguments, so it is
-// deliberately not done on the app's main write path.
+// cost again: 9.3 kB for the plan and 8.4 kB for the single workout, against
+// 67 kB when it branched per sport. What is left is the step, which still
+// appears twice — once on its own and once, without its notes or its intensity
+// shapes, inside the repeat group. Collapsing that last copy needs
+// `$defs`/`$ref`, which not every provider resolves well when *writing*
+// arguments, so it is deliberately not done on the app's main write path.
 // The revision carries one workout schema, for replace_session and add_session.
 for (const [label, built] of [["plan", schema], ["workout", workoutSchema], ["revise", buildRevisePlanInputSchema()]]) {
   const size = JSON.stringify(built).length;
   assert.ok(
-    size < 20_000,
+    size < (label === "revise" ? 20_000 : 10_000),
     `the ${label} schema is ${size} chars; it was 67,000 when it branched per sport`
   );
 }
