@@ -471,7 +471,9 @@ export interface HeraclesRecordsApi {
     /** The conversation the turn is in, whose sources and AI it takes (P2.0). */
     sessionId?: string,
     /** A step of the plan pipeline rather than a question (P2.2). */
-    pipeline?: ChatPipelineStep
+    pipeline?: ChatPipelineStep,
+    /** `creationIndex`: what Coach has made here, as it stands; it closes the system prompt. */
+    creations?: string
   ) => Promise<void>;
   /** The briefs behind a conversation's brief cards (P2.1). */
   getPlanBriefs: (artifactIds: string[]) => Promise<PlanBrief[]>;

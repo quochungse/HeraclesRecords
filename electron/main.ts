@@ -1790,7 +1790,8 @@ function registerIpcHandlers(): void {
       messages: ChatMessage[],
       unitSystem?: UnitSystem,
       sessionId?: string,
-      pipeline?: import("./types").ChatPipelineStep
+      pipeline?: import("./types").ChatPipelineStep,
+      creations?: string
     ) =>
       streamConversationTurn(
         createWindowSink(mainWindow),
@@ -1804,7 +1805,8 @@ function registerIpcHandlers(): void {
               artifactId: pipeline.artifactId,
               ...(typeof pipeline.note === "string" && pipeline.note.trim() ? { note: pipeline.note.trim() } : {})
             }
-          : undefined
+          : undefined,
+        typeof creations === "string" && creations.trim() ? creations : undefined
       )
   );
   ipcMain.handle("chat:planBriefs", (_event, artifactIds: string[]) => listConversationPlanBriefs(artifactIds));

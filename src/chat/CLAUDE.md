@@ -169,7 +169,8 @@ Coach never writes to COROS directly; it writes drafts and change sets the athle
   **next version**; a save begun on a replaced version answers `conflict`. An edit leaves a
   `planEvent` (with Undo while newest). **Every turn carries `creationIndex`**
   (`chatContextCompaction.ts`): a line per creation, its newest draft id, author, saved state,
-  and the outcome of every proposal.
+  and the outcome of every proposal. The window sends it beside the wire (`chat:send`'s sixth
+  argument) and it closes the system prompt; only a pipeline step's wire carries it.
 - **A saved plan stays the conversation's to change**: later versions carry its COROS identity
   and save through `plan/update` (**Update COROS plan**). A change made on COROS comes back as
   a version authored `coros` (`syncPlanDraftFromCoros`); an unsaved version is never synced
@@ -252,7 +253,14 @@ Coach never writes to COROS directly; it writes drafts and change sets the athle
   `buildBaseCoachInstructions` (who the coach is; **names no tool** — `test:chat-service`
   fails on one), then tool rules written once in `withLiveToolInstructions` (each only when
   its tool is offered), then `buildTrainingContext`'s live part last (today's date, no time,
-  and the snapshot). The Messages API sends two blocks with a cache marker on the first.
+  the snapshot, then `creationIndex`). The Messages API sends two blocks with a cache marker
+  on the first.
+- **A message already sent is sent again word for word.** A provider caches by prefix and
+  finds it only where the last turn ended, so one changed character in an earlier message —
+  or in the live part, which comes before them all — writes the whole conversation into the
+  cache again (probed with Claude Code: 38k of 39k tokens). What changes turn to turn goes
+  in the live part, changed as rarely as it can be; never in front of the latest question,
+  which is an earlier message one turn later.
 - **A long conversation is three layers held to tokens** (`planTranscriptContext`): recent
   turns verbatim, older ones condensed (the athlete's words plus a digest of each answer), the
   rest as the running summary (`chat_sessions.coach_summary_through`,

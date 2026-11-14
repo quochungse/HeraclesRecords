@@ -599,7 +599,16 @@ function changeSetState(set: ScheduleChangeSet): string {
   return parts.join(" · ");
 }
 
-/** The wire with `creationIndex` put in front of the latest user message. */
+/**
+ * The wire with `creationIndex` put in front of the latest user message.
+ *
+ * For a wire sent once — a pipeline step — and no other. A conversation's turn
+ * hands the index to the system prompt instead (`StreamChatOptions.creations`):
+ * in front of the latest question, the question before it lost the index on
+ * the next turn, so its text changed, and a provider that caches by prefix
+ * wrote the whole conversation into its cache again on every turn (probed with
+ * Claude Code: 36k of 39k tokens written where an unchanged wire wrote 0.4k).
+ */
 export function withCreationIndex(
   messages: ChatMessage[],
   entries: PersistedChatEntry[],
@@ -607,7 +616,11 @@ export function withCreationIndex(
   briefs: readonly PlanBrief[] = [],
   changeSets: readonly ScheduleChangeSet[] = []
 ): ChatMessage[] {
-  const note = creationIndex(entries, versions, briefs, changeSets);
+  return withCreationNote(messages, creationIndex(entries, versions, briefs, changeSets));
+}
+
+/** `withCreationIndex` for an index already written. */
+export function withCreationNote(messages: ChatMessage[], note: string | null | undefined): ChatMessage[] {
   if (!note) return messages;
   let last = -1;
   messages.forEach((message, index) => {

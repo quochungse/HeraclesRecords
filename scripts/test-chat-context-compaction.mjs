@@ -35,7 +35,8 @@ const {
   planTranscriptContext,
   summaryContextMessage,
   toWireMessages,
-  withCreationIndex
+  withCreationIndex,
+  withCreationNote
 } = await import(
   `${distUrl("chatContextCompaction.js")}?cacheBust=${Date.now()}`
 );
@@ -1157,6 +1158,12 @@ assert.deepEqual(
   assert.ok(wire[2].content.startsWith(index), "it rides in front of the latest question");
   assert.ok(wire[2].content.endsWith("Is Sunday too long?"), "which is kept whole");
   assert.equal(wire[0].content, "Write me a block", "earlier turns are untouched");
+  // A conversation's turn sends the index beside its wire, for the system
+  // prompt: in front of the latest question it changed the question before it
+  // on every turn, and a provider caching by prefix wrote the whole
+  // conversation again. Only a wire sent once still carries it.
+  assert.deepEqual(withCreationNote(toWireMessages(conversation), index), wire, "the same wire from an index already written");
+  assert.equal(withCreationNote(wire, null), wire, "no index, the wire as it was");
 
   // Two versions of one creation: only the newest is listed, with who made it.
   const v2 = planCard({ draftId: "d2", name: "Base block, Sunday long", editedAt: 9 });
