@@ -14022,6 +14022,131 @@ label.chat-settings-toggle-row {
   text-decoration: line-through;
 }
 
+/* What a line changes: of the session it acts on, and of the proposal before it. */
+.chat-change-line:has(.chat-change-diff) {
+  align-items: flex-start;
+}
+
+.chat-change-since {
+  color: var(--text-muted);
+}
+
+.chat-change-since-mark {
+  justify-self: start;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.chat-change-since-mark[data-mark="new"] {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.chat-change-since-mark[data-mark="changed"] {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+.chat-change-diff {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  margin-top: 4px;
+}
+
+.chat-change-diff dl {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  gap: 2px 10px;
+  margin: 0;
+}
+
+.chat-change-diff dl > div {
+  display: contents;
+}
+
+.chat-change-diff dt {
+  overflow: hidden;
+  max-width: 18ch;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-change-diff dd {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 2;
+  gap: 0 6px;
+  min-width: 0;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.chat-change-diff dl > div:not(:has(dt)) dd {
+  grid-column: 1 / -1;
+}
+
+.chat-change-diff :is(s, b) {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+}
+
+.chat-change-diff b {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.chat-change-diff [data-status="added"] b {
+  color: var(--success-text);
+}
+
+.chat-change-diff-more {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+button.chat-change-diff-more {
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease);
+}
+
+button.chat-change-diff-more:hover {
+  color: var(--text-primary);
+}
+
+button.chat-change-diff-more:focus-visible {
+  --focus-ring-color: var(--chat-signal);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.chat-change-gone {
+  padding: 0 10px;
+}
+
+.chat-change-gone .chat-change-line-label {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
 .chat-change-line-actions {
   display: flex;
   flex: none;
@@ -21276,6 +21401,155 @@ label.chat-settings-toggle-row {
   position: absolute;
   inset: 0 0 auto;
   visibility: hidden;
+}
+
+/* Two views set side by side, step against step (`WorkoutCompareBody`). */
+.workout-compare {
+  display: grid;
+  gap: 12px;
+}
+
+.workout-compare-none {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.workout-compare-fields {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+}
+
+.workout-compare-fields > div {
+  display: contents;
+}
+
+.workout-compare-fields dt {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.workout-compare-fields dd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  min-width: 0;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.workout-compare-fields b {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.workout-compare-heads,
+.workout-compare-rows > li {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.workout-compare-heads span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.workout-compare-rows {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.workout-compare-cell {
+  display: grid;
+  align-content: start;
+  gap: 1px;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+}
+
+.workout-compare-rows > li[data-nested] .workout-compare-cell {
+  margin-left: 12px;
+}
+
+.workout-compare-cell.is-empty {
+  background: none;
+}
+
+.workout-compare-side {
+  display: none;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.workout-compare-title {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.workout-compare-cell[data-kind="repeat"] .workout-compare-title {
+  font-weight: 600;
+}
+
+.workout-compare-label,
+.workout-compare-asks {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.workout-compare-rows > li[data-status="same"] .workout-compare-title {
+  color: var(--text-secondary);
+}
+
+.workout-compare-rows > li:is([data-status="changed"], [data-status="removed"]) > [data-side="before"] {
+  background: var(--error-bg);
+}
+
+.workout-compare-rows > li:is([data-status="changed"], [data-status="added"]) > [data-side="after"] {
+  background: var(--success-bg);
+}
+
+@media (max-width: 520px) {
+  .workout-compare-heads {
+    display: none;
+  }
+
+  .workout-compare-rows > li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+  }
+
+  .workout-compare-cell.is-empty {
+    display: none;
+  }
+
+  .workout-compare-side {
+    display: block;
+  }
 }
 
 .workout-editor-scroll {

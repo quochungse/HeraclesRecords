@@ -10,7 +10,8 @@ import type {
   ScheduleChangeSet,
   ScheduleChangeStatus
 } from "../../electron/types";
-import type { WorkoutView } from "../calendar/WorkoutViewModal";
+import type { WorkoutView, WorkoutViewCompare } from "../calendar/WorkoutViewModal";
+import { sameWorkoutInput } from "../../electron/planDiff";
 import { getIntlLocale, getLocale, messageRecord, plural, screenSentence, t, type MessageKey } from "../i18n/core";
 
 const KNOWN_OPS: ReadonlySet<string> = new Set(["move", "replace", "patch", "remove", "add", "deleteWorkout"]);
@@ -233,12 +234,19 @@ export function lineViews(line: ScheduleChangeLine): WorkoutView[] {
   const proposed: WorkoutView | undefined = line.workout
     ? { id: "proposed", label: t("chat.change.view.proposed"), source: { kind: "proposed", workout: line.workout } }
     : undefined;
+  // The session as it stood when the change was proposed: once the line is
+  // applied, the only copy left of what it wrote over.
+  const before: WorkoutView | undefined =
+    applied && line.before
+      ? { id: "before", label: t("chat.change.view.before"), source: { kind: "proposed", workout: line.before } }
+      : undefined;
   const views: (WorkoutView | undefined)[] = [];
   switch (line.op) {
     case "move":
       views.push(session ? onCalendar(applied && line.toDay ? line.toDay : session.happenDay) : undefined);
       break;
     case "patch":
+      views.push(before);
       if (line.patch?.ref.kind === "library") {
         views.push({ id: "current", label: t("chat.change.view.library"), source: { kind: "library", programId: line.patch.ref.programId } });
       } else if (session) views.push(onCalendar(session.happenDay));
@@ -248,7 +256,7 @@ export function lineViews(line: ScheduleChangeLine): WorkoutView[] {
       if (!applied && session) views.push(onCalendar(session.happenDay));
       break;
     case "replace":
-      if (!applied && session) views.push(onCalendar(session.happenDay));
+      views.push(applied ? before : session ? onCalendar(session.happenDay) : undefined);
       views.push(proposed);
       break;
     case "add":
@@ -263,6 +271,22 @@ export function lineViews(line: ScheduleChangeLine): WorkoutView[] {
       break;
   }
   return views.filter((view): view is WorkoutView => Boolean(view));
+}
+
+/**
+ * The two views of a line the dialog sets side by side: the session as it
+ * stands (or stood) and what the line makes of it.
+ */
+export function lineCompare(views: readonly WorkoutView[], line?: ScheduleChangeLine): WorkoutViewCompare | undefined {
+  const has = (id: string) => views.some((view) => view.id === id);
+  if (has("proposed")) {
+    const before = ["current", "before"].find(has);
+    if (!before) return undefined;
+    // Read from the calendar, the session may be gone since; the line's own copy of it stands in.
+    const kept = before === "current" && line?.before ? { label: t("chat.change.view.before"), workout: line.before } : undefined;
+    return { before, after: "proposed", ...(kept ? { beforeFallback: kept } : {}) };
+  }
+  return has("before") && has("current") ? { before: "before", after: "current" } : undefined;
 }
 
 /** The dialog's line over the name: the day, or the two days of a move. */
@@ -356,4 +380,98 @@ export function supersededChangeSets(
     const set = sets[id];
     return id !== changeSetId && Boolean(set) && isUntouched(set!);
   });
+}
+
+/** What a line acts on, the same in every proposal that names it. */
+function lineTarget(line: ScheduleChangeLine): string | undefined {
+  if (line.session) return `session:${line.session.planId}:${line.session.idInPlan}`;
+  const program = line.program?.id ?? (line.patch?.ref.kind === "library" ? line.patch.ref.programId : undefined);
+  if (program) return `program:${program}`;
+  if (line.op === "add" && line.toDay && line.workout) return `add:${line.toDay}:${line.workout.name}`;
+  return undefined;
+}
+
+function sameProposal(left: ScheduleChangeLine, right: ScheduleChangeLine): boolean {
+  if (left.op !== right.op || (left.toDay ?? "") !== (right.toDay ?? "")) return false;
+  if (!left.workout || !right.workout) return !left.workout && !right.workout;
+  return sameWorkoutInput(left.workout, right.workout);
+}
+
+/** A line against the proposal before it. */
+export interface LineSincePrevious {
+  mark: "new" | "changed" | "same";
+  /** The earlier proposal's line for the same session or workout. */
+  previous?: ScheduleChangeLine;
+}
+
+export interface SincePrevious {
+  /** By `lineId`. */
+  lines: Record<string, LineSincePrevious>;
+  /** What the earlier proposal held and this one leaves out. */
+  dropped: ScheduleChangeLine[];
+  counts: { new: number; changed: number; same: number; dropped: number };
+}
+
+/**
+ * What a proposal changes of the one before it. A set has no versions — a
+ * later answer that proposes again restates every change still wanted — so
+ * the revision is read off the two cards: the nearest earlier answer's set
+ * that names something this one names, and that nobody has applied a line
+ * of (a set part-applied changed the calendar this one was written on, and
+ * is not an earlier draft of it). Nothing when there is no such set.
+ */
+export function changesSincePrevious(
+  entries: readonly (ChatEntry | PersistedChatEntry)[],
+  changeSetId: string,
+  sets: Readonly<Record<string, ScheduleChangeSet | null | undefined>>
+): SincePrevious | undefined {
+  const set = sets[changeSetId];
+  const at = entries.findIndex((entry) => entry.kind === "scheduleChange" && entry.changeSetId === changeSetId);
+  if (!set || at < 0) return undefined;
+  let answer = at - 1;
+  while (answer >= 0 && entries[answer].kind !== "message" && entries[answer].kind !== "coachPrompt") answer -= 1;
+  if (answer < 0) return undefined;
+  const targets = new Set(set.lines.flatMap((line) => lineTarget(line) ?? []));
+  let previous: ScheduleChangeSet | undefined;
+  for (const id of scheduleChangeIds(entries.slice(0, answer)).reverse()) {
+    if (id === changeSetId) continue;
+    const earlier = sets[id];
+    // Not read yet (or gone): the nearest set is not known, and an older one must not stand in for it.
+    if (!earlier) return undefined;
+    if (
+      earlier.lines.every((line) => line.status !== "applied") &&
+      earlier.lines.some((line) => targets.has(lineTarget(line) ?? ""))
+    ) {
+      previous = earlier;
+      break;
+    }
+  }
+  if (!previous) return undefined;
+  const earlier = new Map(previous.lines.flatMap((line) => {
+    const target = lineTarget(line);
+    return target ? [[target, line] as const] : [];
+  }));
+  const lines: SincePrevious["lines"] = {};
+  const counts = { new: 0, changed: 0, same: 0, dropped: 0 };
+  for (const line of set.lines) {
+    const target = lineTarget(line);
+    const was = target ? earlier.get(target) : undefined;
+    if (target) earlier.delete(target);
+    const mark = !was ? "new" : sameProposal(was, line) ? "same" : "changed";
+    lines[line.lineId] = { mark, ...(was ? { previous: was } : {}) };
+    counts[mark] += 1;
+  }
+  const dropped = [...earlier.values()];
+  counts.dropped = dropped.length;
+  // A proposal that restates the one before it word for word has nothing to say about it.
+  if (!counts.new && !counts.changed && !counts.dropped) return undefined;
+  return { lines, dropped, counts };
+}
+
+/** "1 new · 1 changed · 2 as before · 1 dropped", only the parts there are. */
+export function sincePreviousSummary(counts: SincePrevious["counts"]): string {
+  return (["new", "changed", "same", "dropped"] as const)
+    .filter((key) => counts[key] > 0)
+    .map((key) => t(`chat.change.prev.count.${key}`, { count: counts[key] }))
+    .join(" · ");
 }

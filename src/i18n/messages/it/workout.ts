@@ -334,6 +334,11 @@ const workout: WorkoutMessages = {
   "workout.v.pool": "Vasca da {value} {unit}",
   "workout.v.loading": "Caricamento dell’allenamento",
   "workout.v.which": "Quale allenamento",
+  "workout.compare.view": "Modifiche",
+  "workout.compare.none": "I due sono uguali.",
+  "workout.compare.changed": "Modificato",
+  "workout.compare.added": "Aggiunto",
+  "workout.compare.removed": "Rimosso",
 };
 
 export default workout;

@@ -350,6 +350,11 @@ const workout: WorkoutMessages = {
   "workout.v.pool": "Бассейн {value} {unit}",
   "workout.v.loading": "Загрузка тренировки",
   "workout.v.which": "Какая тренировка",
+  "workout.compare.view": "Изменения",
+  "workout.compare.none": "Они одинаковы.",
+  "workout.compare.changed": "Изменено",
+  "workout.compare.added": "Добавлено",
+  "workout.compare.removed": "Удалено",
 };
 
 export default workout;

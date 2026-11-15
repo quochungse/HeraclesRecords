@@ -68,6 +68,13 @@ Coach never writes to COROS directly; it writes drafts and change sets the athle
   versions: an apply that lands dismisses the sets of earlier answers still wholly untouched
   (`supersededChangeSets`, re-read first), so Coach's prompt has a revision restate every
   change still wanted.
+- **The card says what a proposal changes, twice over.** A `patch` or `replace` line keeps the
+  session as it stood when proposed (`ScheduleChangeLine.before`; best-effort, absent on older
+  lines) and the card sets `workout` against it — an applied line has written over the only
+  other copy. A later answer's set is read against the nearest earlier one that names the same
+  sessions and has no applied line (`changesSincePrevious`): each line new, changed or as
+  before, and what it left out. Both, and the dialog's **Changes** view, compare workouts as
+  they are drawn (`src/calendar/workoutCompare.ts`), never as stored. `test:workout-compare`.
 - **Partial edits** ([docs/coach-workout-patches.md](../../docs/coach-workout-patches.md),
   `electron/workoutPatch.ts`): Coach sends only changed fields — `patch_session` in
   `revise_training_plan` for a draft or a Coach plan session, `op: "patch"` in

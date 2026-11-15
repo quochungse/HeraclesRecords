@@ -127,9 +127,11 @@ import {
   lineViews,
   proposedLines,
   scheduleChangeIds,
-  supersededChangeSets
+  supersededChangeSets,
+  changesSincePrevious,
+  lineCompare
 } from "./scheduleChangeModel";
-import type { WorkoutView } from "../calendar/WorkoutViewModal";
+import type { WorkoutView, WorkoutViewCompare } from "../calendar/WorkoutViewModal";
 import { CoachOutlineCard } from "./CoachOutlineCard";
 import { CoachStepTrail, stepRunEvent, type StepRun } from "./CoachStepTrail";
 import { EMPTY_NOTES } from "../training-library/runTrail";
@@ -1345,7 +1347,16 @@ export function ChatView({
   /** The line being applied (`"*"` for a whole set), by set. */
   const [applyingChange, setApplyingChange] = useState<{ changeSetId: string; lineId: string } | null>(null);
   /** A workout opened from a card — a change line's session, what it would write, a calendar ref. */
-  const [viewedWorkout, setViewedWorkout] = useState<{ views: WorkoutView[]; eyebrow?: string; initialView?: string } | null>(null);
+  const [viewedWorkout, setViewedWorkout] = useState<{
+    views: WorkoutView[];
+    eyebrow?: string;
+    initialView?: string;
+    compare?: WorkoutViewCompare;
+  } | null>(null);
+  const sincePrevious = useMemo(
+    () => Object.fromEntries(scheduleChangeIds(timeline).map((id) => [id, changesSincePrevious(timeline, id, scheduleChanges)])),
+    [timeline, scheduleChanges]
+  );
   const missingChangeSets = scheduleChangeIds(timeline)
     .filter((changeSetId) => !(changeSetId in scheduleChanges))
     .join(",");
@@ -6224,17 +6235,22 @@ export function ChatView({
                       changeSet={changeSet}
                       busyLine={busyLine}
                       disabled={Boolean(applyingChange) || streaming}
+                      since={sincePrevious[entry.changeSetId]}
+                      context={athlete}
                       onApply={(lineId) => void settleScheduleChange(entry.changeSetId, lineId, true)}
                       onDismiss={(lineId) => void settleScheduleChange(entry.changeSetId, lineId, false)}
                       onView={
                         api
-                          ? (line) =>
+                          ? (line) => {
+                              const views = lineViews(line);
                               setViewedWorkout({
-                                views: lineViews(line),
+                                views,
                                 eyebrow: lineViewEyebrow(line),
-                                // What the line would write is the news; the session it replaces is a switch away.
-                                initialView: line.workout ? "proposed" : undefined
-                              })
+                                // What the line would write is the news; set against the session it acts on where both can be read.
+                                initialView: line.workout ? "proposed" : undefined,
+                                compare: lineCompare(views, line)
+                              });
+                            }
                           : undefined
                       }
                     />
@@ -6769,6 +6785,7 @@ export function ChatView({
             api={api}
             views={viewedWorkout.views}
             initialView={viewedWorkout.initialView}
+            compare={viewedWorkout.compare}
             eyebrow={viewedWorkout.eyebrow}
             onClose={() => setViewedWorkout(null)}
           />

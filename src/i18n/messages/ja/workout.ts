@@ -334,6 +334,11 @@ const workout: WorkoutMessages = {
   "workout.v.pool": "{value} {unit} プール",
   "workout.v.loading": "ワークアウトを読み込み中",
   "workout.v.which": "どのワークアウト",
+  "workout.compare.view": "変更点",
+  "workout.compare.none": "両者は同じです。",
+  "workout.compare.changed": "変更",
+  "workout.compare.added": "追加",
+  "workout.compare.removed": "削除",
 };
 
 export default workout;

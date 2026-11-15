@@ -32,6 +32,12 @@
 //         analysis's proposal, chips from the Calendar and the Library, and
 //         creations for the canvas.
 //
+//     changes  what a proposal changes: a run and a strength session each
+//         patched and replaced, with the session as it stood kept on the
+//         line; the same proposal revised by a later answer (new, changed,
+//         as before, dropped); and one applied. `--only changes` adds its
+//         conversation to a sample already there.
+//
 //   npm run sample:coach -- --only p0,p2
 //     Just those phases. `npm run sample:coach-p3` is `--only p3`.
 //
@@ -71,10 +77,10 @@ const LIVE = process.argv.includes("--live");
 const CLEANUP = process.argv.includes("--cleanup");
 const onlyAt = process.argv.indexOf("--only");
 const PHASES = new Set(
-  onlyAt >= 0 ? String(process.argv[onlyAt + 1] ?? "").toLowerCase().split(",").map((phase) => phase.trim()) : ["p0", "p1", "p2", "p3"]
+  onlyAt >= 0 ? String(process.argv[onlyAt + 1] ?? "").toLowerCase().split(",").map((phase) => phase.trim()) : ["p0", "p1", "p2", "p3", "changes"]
 );
-if (![...PHASES].every((phase) => ["p0", "p1", "p2", "p3"].includes(phase))) {
-  console.error("--only takes phases from p0,p1,p2,p3, comma-separated.");
+if (![...PHASES].every((phase) => ["p0", "p1", "p2", "p3", "changes"].includes(phase))) {
+  console.error("--only takes phases from p0,p1,p2,p3,changes, comma-separated.");
   process.exit(1);
 }
 
@@ -237,7 +243,9 @@ if (CLEANUP) {
   process.exit(0);
 }
 
-for (const file of [manifestPath, legacyManifestPath]) {
+/* The one phase that only adds a conversation of fictional sessions joins a sample already made. */
+const JOINS = PHASES.size === 1 && PHASES.has("changes") && !LIVE;
+for (const file of JOINS ? [] : [manifestPath, legacyManifestPath]) {
   if (fs.existsSync(file)) {
     console.error(`A sample is already there (${file}). Remove it first: npm run sample:coach -- --cleanup`);
     process.exit(1);
@@ -256,7 +264,9 @@ if (LIVE) openCorosSession();
 // ---------------------------------------------------------------------------
 
 const provider = database.getSetting("chat.provider") || "claude-code";
-const manifest = { createdAt: new Date().toISOString(), provider, sessions: [], drafts: [], artifacts: [], corosPlans: [] };
+const manifest = JOINS && fs.existsSync(manifestPath)
+  ? JSON.parse(fs.readFileSync(manifestPath, "utf8"))
+  : { createdAt: new Date().toISOString(), provider, sessions: [], drafts: [], artifacts: [], corosPlans: [] };
 const saveManifest = () => fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 const made = [];
 
@@ -1225,6 +1235,184 @@ if (PHASES.has("p3")) {
     console.log("\nget_training_plan →");
     console.log(JSON.stringify({ ...read, workouts: read.workouts?.map(({ workout_steps: _steps, ...rest }) => rest) }, null, 2));
   }
+}
+
+if (PHASES.has("changes")) {
+  // --- what a proposal changes, and what a later one changes of it ----------------------
+  const sessionId = conversation(
+    "Sample · what a proposal changes",
+    "run and strength lines with what each changes; a revised proposal marked against the first; applied lines"
+  );
+  const pace = (low, high) => ({ type: "pace", lowSecondsPerKm: low, highSecondsPerKm: high, displayUnit: "km" });
+  const dist = (kind, meters, intensity, name) => ({
+    kind,
+    ...(name ? { name } : {}),
+    target_type: "distance",
+    target_distance_meters: meters,
+    intensity: intensity ?? { type: "none" }
+  });
+  const pause = (seconds) => ({ kind: "rest", target_type: "time", target_duration_seconds: seconds, intensity: { type: "none" } });
+  const tempo = (repeat, low, high, restSeconds = 90) => ({
+    key: "tempo",
+    name: "Tempo 1 km reps",
+    sport: "run",
+    steps: [
+      dist("warmup", 2000),
+      { repeat, steps: [dist("training", 1000, pace(low, high), "Tempo rep"), pause(restSeconds)] },
+      dist("cooldown", 2000)
+    ]
+  });
+  const longRun = (meters, strides) => ({
+    key: "long",
+    name: "Long run",
+    sport: "run",
+    description: strides ? "Easy all the way, then strides on tired legs." : "Easy all the way.",
+    steps: [
+      dist("training", meters, pace(330, 350), "Easy"),
+      ...(strides ? [{ repeat: 4, steps: [dist("training", 100, pace(210, 230), "Stride"), pause(60)] }] : [])
+    ]
+  });
+  const lift = (name, sets, reps, kg, restSeconds) => ({
+    kind: "training",
+    exercise_name: name,
+    target_type: "reps",
+    target_reps: reps,
+    sets,
+    rest_type: 1,
+    rest_value: restSeconds,
+    intensity: kg ? { type: "weight", mode: "weight", value: kg, unit: "kg" } : { type: "weight", mode: "bodyweight" }
+  });
+  const upper = (bench, rows, extra = []) => ({ key: "upper", name: "Upper body", sport: "strength", steps: [bench, rows, ...extra] });
+  const upperNow = upper(lift("Bench Press", 4, 8, 60, 120), lift("Barbell Row", 4, 10, 50, 90), [lift("Pull-up", 3, 8, 0, 90)]);
+  const legsNow = {
+    key: "legs",
+    name: "Legs",
+    sport: "strength",
+    steps: [lift("Back Squat", 5, 5, 90, 180), lift("Romanian Deadlift", 3, 8, 80, 120), lift("Walking Lunge", 3, 12, 20, 60)]
+  };
+  const mobility = {
+    key: "mobility",
+    name: "Mobility and core",
+    sport: "strength",
+    steps: [lift("Plank", 3, 1, 0, 45), lift("Glute Bridge", 3, 15, 0, 45), lift("Bird Dog", 3, 10, 0, 30)]
+  };
+  const [d1, d2, d3, d4, d5, d6] = [2, 3, 4, 5, 6, 7].map(fromToday);
+  const scheduled = (session) => ({
+    ref: { kind: "scheduled", happenDay: session.happenDay, planId: session.planId, idInPlan: session.idInPlan, planProgramId: "" },
+    revision: "sample-revision",
+    changes: { set: {} }
+  });
+  const tempoSession = fake(21, d1, "Tempo 1 km reps");
+  const upperSession = fake(22, d2, "Upper body");
+  const longSession = fake(23, d4, "Long run");
+  const legsSession = fake(24, d3, "Legs");
+  const easySession = fake(25, d5, "Easy 8 km");
+
+  const first = storedSet(sessionId, "A lighter week before the race", [
+    {
+      op: "patch",
+      label: `Update "Tempo 1 km reps" on ${label(d1)}`,
+      session: tempoSession,
+      workout: tempo(4, 270, 280),
+      before: tempo(6, 260, 270),
+      patch: scheduled(tempoSession)
+    },
+    {
+      op: "patch",
+      label: `Update "Upper body" on ${label(d2)}`,
+      session: upperSession,
+      workout: upper(lift("Bench Press", 3, 8, 55, 120), lift("Barbell Row", 3, 10, 50, 90)),
+      before: upperNow,
+      patch: scheduled(upperSession)
+    },
+    {
+      op: "replace",
+      label: `Replace "Legs" on ${label(d3)} with "Mobility and core"`,
+      session: legsSession,
+      workout: mobility,
+      before: legsNow
+    },
+    { op: "move", label: `Move "Long run" from ${label(d4)} to ${label(d6)}`, session: longSession, toDay: d6 },
+    { op: "remove", label: `Remove "Easy 8 km" from ${label(d5)}`, session: easySession }
+  ]);
+  const second = storedSet(sessionId, "A lighter week, with the long run kept where it is", [
+    {
+      // Changed since the first proposal: five reps, not four, and a longer rest.
+      op: "patch",
+      label: `Update "Tempo 1 km reps" on ${label(d1)}`,
+      session: tempoSession,
+      workout: tempo(5, 270, 280, 120),
+      before: tempo(6, 260, 270),
+      patch: scheduled(tempoSession)
+    },
+    {
+      // Changed: the bench stays at 60 kg, the pull-ups stay in.
+      op: "patch",
+      label: `Update "Upper body" on ${label(d2)}`,
+      session: upperSession,
+      workout: upper(lift("Bench Press", 3, 8, 60, 120), lift("Barbell Row", 3, 10, 50, 90), [lift("Pull-up", 2, 8, 0, 90)]),
+      before: upperNow,
+      patch: scheduled(upperSession)
+    },
+    {
+      // As before.
+      op: "replace",
+      label: `Replace "Legs" on ${label(d3)} with "Mobility and core"`,
+      session: legsSession,
+      workout: mobility,
+      before: legsNow
+    },
+    {
+      // Changed: no longer moved, but shortened where it stands, with strides.
+      op: "patch",
+      label: `Update "Long run" on ${label(d4)}`,
+      session: longSession,
+      workout: longRun(16000, true),
+      before: longRun(22000, false),
+      patch: scheduled(longSession)
+    },
+    {
+      // New.
+      op: "add",
+      label: `Add "Shake-out 4 km" on ${label(d6)}`,
+      toDay: d6,
+      workout: { key: "shake", name: "Shake-out 4 km", sport: "run", steps: [dist("training", 4000, pace(345, 365), "Easy")] }
+    }
+    // Dropped: the first proposal's removal of "Easy 8 km".
+  ]);
+  const done = storedSet(sessionId, "Applied: last week's change", [
+    {
+      op: "replace",
+      label: `Replace "Legs" on ${label(d3)} with "Mobility and core"`,
+      session: fake(26, d3, "Legs"),
+      workout: mobility,
+      before: legsNow,
+      status: "applied"
+    },
+    {
+      op: "replace",
+      label: `Replace "Tempo 1 km reps" on ${label(d1)} with "Tempo 1 km reps"`,
+      session: fake(27, d1, "Tempo 1 km reps"),
+      workout: tempo(5, 270, 280),
+      before: tempo(6, 260, 270),
+      status: "applied"
+    }
+  ]);
+  write(sessionId, [
+    user("I race in ten days. Make this week lighter, runs and gym both."),
+    coach(
+      "Fewer tempo reps at an easier pace, a lighter upper-body session, mobility in place of legs, the long run moved a day and the easy run gone. " +
+        "(A sample: the sessions are fictional, so Apply reads the calendar, finds nothing, and the line goes out of date. " +
+        "Press a line's words to see the two workouts side by side.)"
+    ),
+    { kind: "scheduleChange", changeSetId: first },
+    user("Keep the long run where it is, and the easy run. I can do five reps. Keep the bench weight."),
+    coach("Changed: five reps with a longer rest, the bench back at 60 kg with the pull-ups kept, the long run shortened where it stands, and a shake-out added."),
+    { kind: "scheduleChange", changeSetId: second },
+    user("And what did last week's change look like once applied?"),
+    coach("Two replacements, both applied. Each still says what it changed, and opens on Before against what was written."),
+    { kind: "scheduleChange", changeSetId: done }
+  ]);
 }
 
 database.closeDatabase();

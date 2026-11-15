@@ -1,5 +1,8 @@
 import { Loader2 } from "lucide-react";
-import type { ScheduleChangeLine, ScheduleChangeSet } from "../../electron/types";
+import { useMemo } from "react";
+import type { ScheduleChangeLine, ScheduleChangeSet, UnitSystem, WorkoutEditorContext } from "../../electron/types";
+import { compareWorkoutInputs, comparisonLines, type CompareLine, type CompareOptions } from "../calendar/workoutCompare";
+import { useUnitSystem } from "../units/UnitSystemProvider";
 import {
   canApply,
   changeDayLabel,
@@ -10,7 +13,10 @@ import {
   groupChangeLines,
   lineStatusLabel,
   lineViews,
-  proposedLines
+  proposedLines,
+  sincePreviousSummary,
+  type LineSincePrevious,
+  type SincePrevious
 } from "./scheduleChangeModel";
 import { t } from "../i18n/core";
 
@@ -28,9 +34,15 @@ export function CoachScheduleChangeCard({
   disabled = false,
   onApply,
   onDismiss,
-  onView
+  onView,
+  since,
+  context
 }: {
   changeSet: ScheduleChangeSet;
+  /** What this proposal changes of the one before it (`changesSincePrevious`); absent when it revises none. */
+  since?: SincePrevious;
+  /** The account's context, for a session's distance and time before and after. */
+  context?: WorkoutEditorContext;
   /** The line being applied, `"*"` for the whole set; the card waits while it runs. */
   busyLine?: string | null;
   /** Something else is being applied, or a turn is running. */
@@ -40,6 +52,7 @@ export function CoachScheduleChangeCard({
   /** Opens a line on the session it acts on and the workout it would write. */
   onView?: (line: ScheduleChangeLine) => void;
 }) {
+  const { unitSystem } = useUnitSystem();
   const open = proposedLines(changeSet);
   const busy = Boolean(busyLine) || disabled;
   const { toDecide, retry, done } = groupChangeLines(changeSet);
@@ -63,6 +76,9 @@ export function CoachScheduleChangeCard({
         <ChangeLine
           key={line.lineId}
           line={line}
+          since={since?.lines[line.lineId]}
+          unitSystem={unitSystem}
+          context={context}
           busy={busyLine === line.lineId || (busyLine === "*" && line.status === "proposed")}
           disabled={busy}
           onApply={onApply ? () => onApply(line.lineId) : undefined}
@@ -81,6 +97,11 @@ export function CoachScheduleChangeCard({
           <span className="chat-creation-kicker">{t("chat.change.kicker")}</span>
           <h4>{changeSet.summary}</h4>
           <span className="chat-plan-card-summary">{changeSetHead(changeSet)}</span>
+          {since ? (
+            <span className="chat-plan-card-summary chat-change-since">
+              {t("chat.change.prev.head", { parts: sincePreviousSummary(since.counts) })}
+            </span>
+          ) : null}
         </div>
       </header>
 
@@ -120,6 +141,19 @@ export function CoachScheduleChangeCard({
         ) : null
       )}
 
+      {since?.dropped.length ? (
+        <section className="chat-change-group chat-change-dropped" aria-label={t("chat.change.prev.dropped")}>
+          <span className="chat-creation-kicker">{t("chat.change.prev.dropped")}</span>
+          <ul className="chat-change-lines">
+            {since.dropped.map((line) => (
+              <li key={line.lineId} className="chat-change-gone">
+                <span className="chat-change-line-label">{changeLineLabel(line)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       {open.length > 1 && (onApply || onDismiss) ? (
         <div className="chat-plan-actions">
           {onApply ? (
@@ -139,8 +173,76 @@ export function CoachScheduleChangeCard({
   );
 }
 
+const NO_LINES: CompareLine[] = [];
+
+/** How many differences a line states before the rest wait in its details. */
+const DIFF_ROWS = 3;
+
+/** What a line changes of the session it acts on: the workout it would write against the one there. */
+function lineDiff(line: ScheduleChangeLine, compare: CompareOptions): CompareLine[] {
+  if (!line.before || !line.workout || (line.op !== "patch" && line.op !== "replace")) return [];
+  const comparison = compareWorkoutInputs(line.before, line.workout, compare);
+  return comparison ? comparisonLines(comparison) : [];
+}
+
+/** What a line changes of the earlier proposal's line for the same session. */
+function previousDiff(line: ScheduleChangeLine, since: LineSincePrevious | undefined, compare: CompareOptions): CompareLine[] {
+  const was = since?.mark === "changed" ? since.previous : undefined;
+  if (!was) return [];
+  // Another kind of change to the same session: the line says what it is now, so only what it was is added.
+  if (was.op !== line.op) return [{ status: "removed", from: changeLineLabel(was) }];
+  const lines: CompareLine[] = [];
+  if (was.toDay && line.toDay && was.toDay !== line.toDay) {
+    lines.push({ status: "changed", from: changeDayLabel(was.toDay), to: changeDayLabel(line.toDay) });
+  }
+  const comparison = was.workout && line.workout ? compareWorkoutInputs(was.workout, line.workout, compare) : undefined;
+  return comparison ? [...lines, ...comparisonLines(comparison)] : lines;
+}
+
+function DiffRows({
+  lines,
+  caption,
+  onMore
+}: {
+  lines: CompareLine[];
+  caption: string;
+  onMore?: () => void;
+}) {
+  if (!lines.length) return null;
+  const more = lines.length - DIFF_ROWS;
+  return (
+    <div className="chat-change-diff">
+      <span className="chat-creation-kicker">{caption}</span>
+      <dl>
+        {lines.slice(0, DIFF_ROWS).map((line, index) => (
+          <div key={index} data-status={line.status}>
+            {line.name ? <dt>{line.name}</dt> : null}
+            <dd>
+              {line.from ? <s>{line.from}</s> : null}
+              {line.from && line.to ? <span aria-hidden="true">→</span> : null}
+              {line.to ? <b>{line.to}</b> : null}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {more > 0 ? (
+        onMore ? (
+          <button type="button" className="chat-change-diff-more" onClick={onMore}>
+            {t("chat.change.diff.more", { count: more })}
+          </button>
+        ) : (
+          <span className="chat-change-diff-more">{t("chat.change.diff.more", { count: more })}</span>
+        )
+      ) : null}
+    </div>
+  );
+}
+
 function ChangeLine({
   line,
+  since,
+  unitSystem,
+  context,
   busy,
   disabled,
   onApply,
@@ -148,6 +250,9 @@ function ChangeLine({
   onView
 }: {
   line: ScheduleChangeLine;
+  since?: LineSincePrevious;
+  unitSystem: UnitSystem;
+  context?: WorkoutEditorContext;
   busy: boolean;
   disabled: boolean;
   onApply?: () => void;
@@ -155,8 +260,21 @@ function ChangeLine({
   onView?: () => void;
 }) {
   const destructive = line.op === "remove" || line.op === "deleteWorkout";
+  // A line that came to nothing states no difference: nothing of it will be written.
+  const live = line.status !== "dismissed" && line.status !== "stale";
+  // The card is drawn again with every token of a turn; a comparison is worked out when its line changes.
+  const [diff, revised] = useMemo(() => {
+    const compare = { unitSystem, context };
+    return live ? [lineDiff(line, compare), previousDiff(line, since, compare)] : [NO_LINES, NO_LINES];
+  }, [live, line, since, unitSystem, context]);
   return (
-    <li className="chat-change-line" data-status={line.status} data-op={line.op} data-line-id={line.lineId}>
+    <li
+      className="chat-change-line"
+      data-status={line.status}
+      data-op={line.op}
+      data-line-id={line.lineId}
+      data-since={live ? since?.mark : undefined}
+    >
       <div className="chat-change-line-text">
         {/* The words are the way in, as a title is elsewhere: a separate
             Open button on every line would double the row's controls. */}
@@ -172,6 +290,18 @@ function ChangeLine({
         ) : (
           <span className="chat-change-line-label">{changeLineLabel(line)}</span>
         )}
+        {live && since ? (
+          <span className="chat-change-since-mark" data-mark={since.mark}>
+            {t(`chat.change.prev.mark.${since.mark}`)}
+          </span>
+        ) : null}
+        <DiffRows
+          lines={diff}
+          caption={line.status === "applied" ? t("chat.change.diff.was") : t("chat.change.diff.now")}
+          onMore={onView}
+        />
+        {/* The line's details set it against the calendar, not against the earlier proposal: no way in from here. */}
+        <DiffRows lines={revised} caption={t("chat.change.diff.previous")} />
         {line.status !== "proposed" ? (
           <span className="chat-change-line-status">
             {lineStatusLabel(line)}

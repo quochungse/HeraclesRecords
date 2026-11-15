@@ -841,6 +841,9 @@ test("a calendar metadata patch is persisted, writes only on Apply, and keeps ra
   assert.equal(staged.lines[0].workout.description, "Relax your shoulders.");
   const restored = changes.readScheduleChanges([staged.changeSetId])[0];
   assert.deepEqual(restored.lines[0].patch, staged.lines[0].patch);
+  // The session as it stood is kept with the line: once applied, nothing else holds it.
+  assert.equal(restored.lines[0].before.name, staged.lines[0].workout.name);
+  assert.notEqual(restored.lines[0].before.description, "Relax your shoulders.");
   const applied = await changes.applyScheduleChange(staged.changeSetId);
   assert.equal(applied.lines[0].status, "applied", JSON.stringify(applied));
   const [write] = coros.writesTo("/training/schedule/update");

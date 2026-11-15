@@ -334,6 +334,11 @@ const workout: WorkoutMessages = {
   "workout.v.pool": "Bassin de {value} {unit}",
   "workout.v.loading": "Chargement de la séance",
   "workout.v.which": "Quelle séance",
+  "workout.compare.view": "Changements",
+  "workout.compare.none": "Les deux sont identiques.",
+  "workout.compare.changed": "Modifié",
+  "workout.compare.added": "Ajouté",
+  "workout.compare.removed": "Supprimé",
 };
 
 export default workout;

@@ -334,6 +334,11 @@ const workout: WorkoutMessages = {
   "workout.v.pool": "Kolam {value} {unit}",
   "workout.v.loading": "Memuat latihan",
   "workout.v.which": "Latihan yang mana",
+  "workout.compare.view": "Perubahan",
+  "workout.compare.none": "Keduanya sama.",
+  "workout.compare.changed": "Diubah",
+  "workout.compare.added": "Ditambahkan",
+  "workout.compare.removed": "Dihapus",
 };
 
 export default workout;

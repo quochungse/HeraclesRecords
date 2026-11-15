@@ -4298,6 +4298,13 @@ export interface ScheduleChangeLine {
   toDay?: string;
   /** What a replace or an add puts on the calendar. */
   workout?: PlanWorkoutEntryInput;
+  /**
+   * The session a patch or a replace acts on, as it stood when it was
+   * proposed: what the card sets `workout` against, kept because an applied
+   * line has written over the only other copy. Absent on a line from before
+   * this was kept, and where the session could not be read.
+   */
+  before?: PlanWorkoutEntryInput;
   /** A partial edit, applied only to the exact source revision reviewed on the card. */
   patch?: { ref: WorkoutEditRef; revision: string; changes: WorkoutPatch };
   /** A library workout a deletion removes. */

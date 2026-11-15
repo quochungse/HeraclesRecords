@@ -334,6 +334,11 @@ const workout: WorkoutMessages = {
   "workout.v.pool": "{value}-{unit}-Becken",
   "workout.v.loading": "Workout wird geladen",
   "workout.v.which": "Welches Workout",
+  "workout.compare.view": "Änderungen",
+  "workout.compare.none": "Beide sind gleich.",
+  "workout.compare.changed": "Geändert",
+  "workout.compare.added": "Hinzugefügt",
+  "workout.compare.removed": "Entfernt",
 };
 
 export default workout;

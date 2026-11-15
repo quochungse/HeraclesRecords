@@ -334,6 +334,11 @@ const workout: WorkoutMessages = {
   "workout.v.pool": "{value} {unit} 수영장",
   "workout.v.loading": "운동 불러오는 중",
   "workout.v.which": "어떤 운동",
+  "workout.compare.view": "변경 사항",
+  "workout.compare.none": "둘은 같습니다.",
+  "workout.compare.changed": "변경됨",
+  "workout.compare.added": "추가됨",
+  "workout.compare.removed": "삭제됨",
 };
 
 export default workout;

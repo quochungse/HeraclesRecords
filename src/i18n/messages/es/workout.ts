@@ -334,6 +334,11 @@ const workout: WorkoutMessages = {
   "workout.v.pool": "Piscina de {value} {unit}",
   "workout.v.loading": "Cargando el entrenamiento",
   "workout.v.which": "Qué entrenamiento",
+  "workout.compare.view": "Cambios",
+  "workout.compare.none": "Los dos son iguales.",
+  "workout.compare.changed": "Modificado",
+  "workout.compare.added": "Añadido",
+  "workout.compare.removed": "Eliminado",
 };
 
 export default workout;

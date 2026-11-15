@@ -334,6 +334,11 @@ const workout: WorkoutMessages = {
   "workout.v.pool": "Hồ {value} {unit}",
   "workout.v.loading": "Đang tải bài tập",
   "workout.v.which": "Bài tập nào",
+  "workout.compare.view": "Thay đổi",
+  "workout.compare.none": "Hai bản giống nhau.",
+  "workout.compare.changed": "Đã sửa",
+  "workout.compare.added": "Đã thêm",
+  "workout.compare.removed": "Đã bỏ",
 };
 
 export default workout;

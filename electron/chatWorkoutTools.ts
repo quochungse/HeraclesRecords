@@ -93,6 +93,8 @@ import type {
   UploadPlanResult,
   ScheduleChangeSet,
   WorkoutEditRef,
+  RunWorkoutEditorDraft,
+  TrainingHubScheduledWorkoutEntry,
   UnitSystem
 } from "./types";
 import {
@@ -2053,6 +2055,7 @@ async function handleProposeScheduleChanges(
   const seen = new Set<string>();
   const libraryReads = new Map<string, Promise<LibraryRead>>();
   const lines: NewScheduleChangeLine[] = [];
+  const replaced: { line: NewScheduleChangeLine; entry: TrainingHubScheduledWorkoutEntry }[] = [];
   for (const [index, change] of changes.entries()) {
     const at = `changes[${index}]`;
     const op = String(change.op ?? "");
@@ -2162,7 +2165,9 @@ async function handleProposeScheduleChanges(
     } else if (op === "move") {
       lines.push({ op, label: `Move "${entry!.name}"${inPlan} from ${cardDay(entry!.happenDay)} to ${cardDay(toDay!)}`, session, toDay });
     } else if (op === "replace") {
-      lines.push({ op, label: `Replace "${entry!.name}"${inPlan} on ${cardDay(entry!.happenDay)} with "${workout!.name}"`, session, workout });
+      const line: NewScheduleChangeLine = { op, label: `Replace "${entry!.name}"${inPlan} on ${cardDay(entry!.happenDay)} with "${workout!.name}"`, session, workout };
+      lines.push(line);
+      replaced.push({ line, entry: entry! });
     } else if (op === "remove") {
       lines.push({ op, label: `Remove "${entry!.name}"${inPlan} from ${cardDay(entry!.happenDay)}`, session });
     } else {
@@ -2173,6 +2178,9 @@ async function handleProposeScheduleChanges(
     }
   }
   if (errors.length) return refuse(errors.slice(0, 20));
+
+  // Only for a proposal that stands, and together: a read each, of a day each.
+  await Promise.all(replaced.map(async ({ line, entry }) => Object.assign(line, await sessionBefore(entry, unitSystem))));
 
   const changeSet = createScheduleChangeSet({
     ...(sessionId ? { sessionId } : {}),
@@ -2209,9 +2217,35 @@ async function proposedWorkoutPatch(ref: WorkoutEditRef, change: Record<string, 
     op: "patch",
     label: `Update "${name}" in the workout library`,
     workout,
+    ...beforeWorkout(document.draft),
     ...(ref.kind === "library" ? { program: { id: ref.programId, name } } : {}),
     patch: { ref, revision: document.revision, changes: patch }
   };
+}
+
+/**
+ * A workout as it stood when a change to it was proposed, for the card to set
+ * the proposal against. Left out when it will not convert: the proposal does
+ * not depend on it.
+ */
+function beforeWorkout(draft: RunWorkoutEditorDraft): { before?: PlanWorkoutEntryInput } {
+  try {
+    return { before: editorDraftToPlanWorkoutInput(draft, { key: "before", name: corosText(draft.name) }) };
+  } catch {
+    return {};
+  }
+}
+
+/** The same for a calendar session a line would replace; nothing when it cannot be read. */
+async function sessionBefore(
+  entry: TrainingHubScheduledWorkoutEntry,
+  unitSystem: UnitSystem
+): Promise<{ before?: PlanWorkoutEntryInput }> {
+  try {
+    return beforeWorkout((await getWorkoutForEdit(scheduledWorkoutEditRef(entry), unitSystem)).draft);
+  } catch {
+    return {};
+  }
 }
 
 /**

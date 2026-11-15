@@ -335,6 +335,11 @@ const workout = {
   "workout.v.pool": "{value} {unit} pool",
   "workout.v.loading": "Loading workout",
   "workout.v.which": "Which workout",
+  "workout.compare.view": "Changes",
+  "workout.compare.none": "The two are the same.",
+  "workout.compare.changed": "Changed",
+  "workout.compare.added": "Added",
+  "workout.compare.removed": "Removed",
 };
 
 export default workout;

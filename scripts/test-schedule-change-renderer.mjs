@@ -11,8 +11,13 @@
 //     in the saved transcript;
 //   * applying a later answer's proposal dismisses the earlier ones nobody
 //     has touched;
-//   * a delete card from before change sets is drawn and offers nothing.
+//   * a delete card from before change sets is drawn and offers nothing;
+//   * a line states what it changes of its session and of the proposal
+//     before it, and opens on the two workouts side by side.
+//
+// HERACLES_TEST_SHOTS=<folder> keeps pictures of the card and the dialog.
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
@@ -119,6 +124,17 @@ async function settle() {
     await page("new Promise((resolve) => setTimeout(resolve, 60))");
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
+}
+
+/** A picture of the window, kept only when HERACLES_TEST_SHOTS names a folder. */
+const shots = process.env.HERACLES_TEST_SHOTS;
+async function shoot(name, selector) {
+  if (!shots) return;
+  // A hidden window draws no frames, and the dialog opens on an animation.
+  win.showInactive();
+  if (selector) await page(`document.querySelector(${JSON.stringify(selector)})?.scrollIntoView({ block: "center" })`);
+  await new Promise((resolve) => setTimeout(resolve, 700));
+  fs.writeFileSync(path.join(shots, `schedule-change-${name}.png`), (await win.webContents.capturePage()).toPNG());
 }
 
 const lineStates = () =>
@@ -433,6 +449,87 @@ async function main() {
   await harness("click", ".chat-change-apply");
   await waitFor(async () => (await lineStates())[0][0] === "applied", "the partial update is settled");
   assert.deepEqual((await harness("calls", "applyScheduleChange"))[0].args, ["sc-1", "p1"]);
+
+  // What a proposal changes: of the session it acts on, and of the proposal
+  // before it; the dialog sets the two workouts side by side.
+  const pace = (low, high) => ({ type: "pace", lowSecondsPerKm: low, highSecondsPerKm: high, displayUnit: "km" });
+  const dist = (kind, meters, intensity) => ({ kind, target_type: "distance", target_distance_meters: meters, ...(intensity ? { intensity } : {}) });
+  const tempo = (repeat, low, high) => ({
+    key: "tempo",
+    name: "Tempo",
+    sport: "run",
+    steps: [
+      dist("warmup", 2000),
+      { repeat, steps: [dist("training", 1000, pace(low, high)), { kind: "rest", target_type: "time", target_duration_seconds: 90 }] },
+      dist("cooldown", 2000)
+    ]
+  });
+  const on = (id, day, name) => ({ planId: "p", idInPlan: id, happenDay: day, name });
+  const firstSet = {
+    ...SET,
+    summary: "An easier week",
+    lines: [
+      line("l1", "replace", 'Replace "Tempo" on Thu 25 Sep with "Tempo"', "proposed", { session: on("4", "20260925", "Tempo"), workout: tempo(4, 270, 280), before: tempo(6, 260, 270) }),
+      line("l2", "move", 'Move "Long run" from Sat 27 Sep to Sun 28 Sep', "proposed", { session: on("6", "20260927", "Long run"), toDay: "20260928" }),
+      line("l3", "remove", 'Remove "Strides" from Fri 26 Sep', "proposed", { session: on("5", "20260926", "Strides") })
+    ]
+  };
+  const secondSet = {
+    ...SET,
+    changeSetId: "sc-2",
+    summary: "An easier week, with the strides kept",
+    lines: [
+      line("l1", "replace", 'Replace "Tempo" on Thu 25 Sep with "Tempo"', "applied", { session: on("4", "20260925", "Tempo"), workout: tempo(5, 270, 280), before: tempo(6, 260, 270) }),
+      line("l2", "move", 'Move "Long run" from Sat 27 Sep to Sun 28 Sep', "proposed", { session: on("6", "20260927", "Long run"), toDay: "20260928" }),
+      line("l3", "add", 'Add "Easy 5 km" on Wed 24 Sep', "proposed", { toDay: "20260924", workout: { key: "easy", name: "Easy 5 km", sport: "run", steps: [dist("training", 5000)] } })
+    ]
+  };
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT,
+    getChatSession: [
+      ...TRANSCRIPT.slice(0, 3),
+      { kind: "message", role: "user", content: "Keep the strides, and one more rep" },
+      { kind: "message", role: "assistant", content: "Changed." },
+      { kind: "scheduleChange", changeSetId: "sc-2" }
+    ],
+    getScheduleChanges: [firstSet, secondSet]
+  });
+  const second = '[data-change-set-id="sc-2"]';
+  await waitFor(() => harness("exists", `${second} .chat-change-diff`), "the later proposal states what it changes");
+  await waitFor(() => harness("appStylesReady"), "the app stylesheet loads");
+  // The earlier card revises nothing; the later one is read against it.
+  assert.equal(await harness("exists", '[data-change-set-id="sc-1"] .chat-change-since'), false);
+  assert.equal(await harness("text", `${second} .chat-change-since`), "Against the previous proposal: 1 new · 1 changed · 1 as before · 1 dropped");
+  const marks = await page(`Object.fromEntries([...document.querySelectorAll('${second} .chat-change-line')].map((row) => [row.dataset.lineId, row.dataset.since]))`);
+  assert.deepEqual(marks, { l1: "changed", l2: "same", l3: "new" });
+  assert.equal(await harness("text", `${second} .chat-change-gone`), 'Remove "Strides" from Fri 26 Sep');
+  // Against the calendar: six repeats become five, at an easier pace; against the earlier proposal, four became five.
+  const diffs = await page(`[...document.querySelectorAll('${second} [data-line-id="l1"] .chat-change-diff')].map((block) => [block.querySelector(".chat-creation-kicker").textContent, block.querySelector("dl").textContent])`);
+  assert.equal(diffs.length, 2);
+  assert.equal(diffs[0][0], "What changed");
+  assert.match(diffs[0][1], /×6.*×5/);
+  assert.match(diffs[0][1], /4:20.*4:30/);
+  assert.equal(diffs[1][0], "Since the previous proposal");
+  assert.match(diffs[1][1], /×4.*×5/);
+  assert.equal(await harness("exists", '[data-change-set-id="sc-1"] [data-line-id="l1"] .chat-change-diff'), true, "the earlier proposal states its own change too");
+  await shoot("card", second);
+
+  // The applied line opens on the two workouts side by side: the session as it stood, and what was written.
+  await page(`document.querySelector('${second} [data-line-id="l1"] .chat-change-line-open').click()`);
+  await waitFor(() => harness("exists", ".workout-compare-rows"), "the dialog opens on the comparison");
+  assert.deepEqual(
+    await page(`[...document.querySelectorAll(".workout-view-switch button")].map((button) => button.textContent.trim())`),
+    ["Changes", "Before", "Proposed"]
+  );
+  assert.deepEqual(
+    await page(`[...document.querySelectorAll(".workout-compare-rows > li")].map((row) => row.dataset.status)`),
+    ["same", "changed", "changed", "same", "same"]
+  );
+  assert.deepEqual(await page(`[...document.querySelectorAll(".workout-compare-heads span")].map((head) => head.textContent)`), ["Before", "Proposed"]);
+  await shoot("dialog");
+  // A switch away shows one workout alone, as before.
+  await page(`[...document.querySelectorAll(".workout-view-switch button")].find((button) => button.textContent.trim() === "Proposed").click()`);
+  await waitFor(() => page(`document.querySelector(".workout-view-bodies > [data-shown=true] .workout-view") !== null`), "the proposed workout alone");
 
   const errors = await harness("consoleErrors");
   assert.deepEqual(errors.filter((text) => !/act\(|ReactDOMTestUtils|COROS is away/.test(text)), []);

@@ -42,6 +42,7 @@ import {
   strengthWork
 } from "./WorkoutStructureView";
 import { workoutSportView } from "./workoutSportIcons";
+import { WorkoutCompareBody } from "./WorkoutCompareView";
 import { isStrengthStyleWorkout, workoutSportLabel } from "../training/workoutSport";
 import { formatCount, plural, t } from "../i18n/core";
 
@@ -75,11 +76,26 @@ export interface WorkoutView {
   source: WorkoutViewSource;
 }
 
+export interface WorkoutViewCompare {
+  before: string;
+  after: string;
+  /**
+   * The earlier side as its caller holds it, for when the view of it will not
+   * read: a session gone from the calendar since is still what was changed.
+   */
+  beforeFallback?: { label: string; workout: PlanWorkoutEntryInput };
+}
+
 interface WorkoutViewModalProps {
   api: HeraclesRecordsApi;
   /** What can be read, first shown unless `initialView` names another; past one, a switch picks. */
   views: readonly WorkoutView[];
   initialView?: string;
+  /**
+   * Two of the views set side by side, step against step, as a view of its
+   * own and the one the dialog opens on: a change is read as what it changes.
+   */
+  compare?: WorkoutViewCompare;
   /** The line over the name; "Library" when absent. */
   eyebrow?: string;
   onClose: () => void;
@@ -110,11 +126,20 @@ type ViewDocument = {
 };
 type ViewState = { document?: ViewDocument; error?: string };
 
-export function WorkoutViewModal({ api, views, initialView, eyebrow, onClose }: WorkoutViewModalProps) {
+/** The comparison's place in the switch; no view is named this. */
+const COMPARE_VIEW = "__compare__";
+
+export function WorkoutViewModal({ api, views, initialView, compare, eyebrow, onClose }: WorkoutViewModalProps) {
   const { unitSystem } = useUnitSystem();
   const reducedMotion = useReducedMotion();
-  const [viewId, setViewId] = useState(initialView ?? views[0]?.id ?? "");
-  const view = views.find((item) => item.id === viewId) ?? views[0];
+  const compared = compare
+    ? { before: views.find((item) => item.id === compare.before), after: views.find((item) => item.id === compare.after) }
+    : undefined;
+  const comparing = compared?.before && compared.after ? { before: compared.before, after: compared.after } : undefined;
+  const [viewId, setViewId] = useState(comparing ? COMPARE_VIEW : (initialView ?? views[0]?.id ?? ""));
+  // The comparison is headed by the workout the change leaves: its name, its sport.
+  const view = (viewId === COMPARE_VIEW ? comparing?.after : views.find((item) => item.id === viewId)) ?? views[0];
+  const showsCompare = Boolean(comparing) && viewId === COMPARE_VIEW;
   // Keyed by content: a caller builds its views every render, and a new
   // object for the same workout must not read it again.
   const viewsKey = JSON.stringify(views.map((item) => [item.id, item.source]));
@@ -167,7 +192,7 @@ export function WorkoutViewModal({ api, views, initialView, eyebrow, onClose }: 
    * measured.
    */
   const bodiesRef = useRef<HTMLDivElement>(null);
-  const several = views.length > 1;
+  const several = views.length > 1 || Boolean(comparing);
   useLayoutEffect(() => {
     const scroll = scrollRef.current;
     const bodies = bodiesRef.current;
@@ -231,12 +256,15 @@ export function WorkoutViewModal({ api, views, initialView, eyebrow, onClose }: 
                 ))}
               </h2>
             </div>
-            {views.length > 1 ? (
+            {several ? (
               <OptionGroup
                 className="workout-view-switch"
                 label={t("workout.v.which")}
-                options={views.map((item) => ({ value: item.id, label: item.label }))}
-                value={view?.id ?? ""}
+                options={[
+                  ...(comparing ? [{ value: COMPARE_VIEW, label: t("workout.compare.view") }] : []),
+                  ...views.map((item) => ({ value: item.id, label: item.label }))
+                ]}
+                value={showsCompare ? COMPARE_VIEW : (view?.id ?? "")}
                 onChange={setViewId}
               />
             ) : null}
@@ -252,9 +280,20 @@ export function WorkoutViewModal({ api, views, initialView, eyebrow, onClose }: 
                   key={item.id}
                   api={api}
                   state={loaded[item.id]}
-                  shown={item.id === view?.id}
+                  shown={!showsCompare && item.id === view?.id}
                 />
               ))}
+              {comparing ? (
+                <WorkoutCompareCell
+                  api={api}
+                  before={loaded[comparing.before.id]}
+                  after={loaded[comparing.after.id]}
+                  beforeLabel={comparing.before.label}
+                  fallback={compare?.beforeFallback}
+                  afterLabel={comparing.after.label}
+                  shown={showsCompare}
+                />
+              ) : null}
             </div>
           </div>
           <footer className="workout-editor-footer">
@@ -290,6 +329,63 @@ function WorkoutViewCell({ api, state, shown }: { api: HeraclesRecordsApi; state
           <AlertTriangle size={22} aria-hidden="true" />
           <h3>{t("workout.builderModal.loadFailed")}</h3>
           {state.error ? <p>{state.error}</p> : null}
+        </div>
+      ) : (
+        <EditorSkeleton />
+      )}
+    </div>
+  );
+}
+
+/** The comparison of two views: waiting for both, refused where one will not read, or the two side by side. */
+function WorkoutCompareCell({
+  api,
+  before,
+  after,
+  beforeLabel,
+  afterLabel,
+  fallback,
+  shown
+}: {
+  api: HeraclesRecordsApi;
+  before?: ViewState;
+  after?: ViewState;
+  beforeLabel: string;
+  afterLabel: string;
+  fallback?: WorkoutViewCompare["beforeFallback"];
+  shown: boolean;
+}) {
+  const { byId: exercisesById } = useWorkoutExerciseCatalog(api, after?.document?.draft.sport);
+  const kept = useMemo(() => {
+    if (!fallback) return undefined;
+    try {
+      return planWorkoutInputToEditorDraft(fallback.workout);
+    } catch {
+      return undefined;
+    }
+  }, [fallback]);
+  // The view that would not read gives way to the copy the caller kept.
+  const stoodIn = before?.error !== undefined && kept !== undefined;
+  const beforeDraft = stoodIn ? kept : before?.document?.draft;
+  const error = (stoodIn ? undefined : before?.error) ?? after?.error;
+  // The account's own context, from whichever side has it; a stand-in is no context to work a figure out on.
+  const context = [after?.document, before?.document].find((document) => document && !document.contextPending)?.context;
+  return (
+    <div data-shown={shown} aria-hidden={!shown} inert={!shown}>
+      {beforeDraft && after?.document ? (
+        <WorkoutCompareBody
+          before={beforeDraft}
+          after={after.document.draft}
+          beforeLabel={stoodIn && fallback ? fallback.label : beforeLabel}
+          afterLabel={afterLabel}
+          context={context}
+          exercisesById={exercisesById}
+        />
+      ) : error !== undefined ? (
+        <div className="workout-editor-state is-error">
+          <AlertTriangle size={22} aria-hidden="true" />
+          <h3>{t("workout.builderModal.loadFailed")}</h3>
+          {error ? <p>{error}</p> : null}
         </div>
       ) : (
         <EditorSkeleton />

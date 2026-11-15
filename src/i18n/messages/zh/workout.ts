@@ -334,6 +334,11 @@ const workout: WorkoutMessages = {
   "workout.v.pool": "{value} {unit} 泳池",
   "workout.v.loading": "正在加载训练",
   "workout.v.which": "哪个训练",
+  "workout.compare.view": "变更",
+  "workout.compare.none": "两者相同。",
+  "workout.compare.changed": "已修改",
+  "workout.compare.added": "已添加",
+  "workout.compare.removed": "已移除",
 };
 
 export default workout;

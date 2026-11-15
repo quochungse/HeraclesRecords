@@ -334,6 +334,11 @@ const workout: WorkoutMessages = {
   "workout.v.pool": "สระ {value} {unit}",
   "workout.v.loading": "กำลังโหลดการฝึก",
   "workout.v.which": "การฝึกใด",
+  "workout.compare.view": "การเปลี่ยนแปลง",
+  "workout.compare.none": "ทั้งสองเหมือนกัน",
+  "workout.compare.changed": "แก้ไข",
+  "workout.compare.added": "เพิ่ม",
+  "workout.compare.removed": "ลบออก",
 };
 
 export default workout;
