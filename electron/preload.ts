@@ -563,8 +563,10 @@ const api = {
     messages: ChatMessage[],
     unitSystem: UnitSystem,
     sessionId?: string,
-    pipeline?: ChatPipelineStep
-  ): Promise<void> => ipcRenderer.invoke("chat:send", requestId, messages, unitSystem, sessionId, pipeline),
+    pipeline?: ChatPipelineStep,
+    creations?: string
+  ): Promise<void> =>
+    ipcRenderer.invoke("chat:send", requestId, messages, unitSystem, sessionId, pipeline, creations),
   getPlanBriefs: (artifactIds: string[]): Promise<PlanBrief[]> => ipcRenderer.invoke("chat:planBriefs", artifactIds),
   updatePlanBrief: (artifactId: string, request: PlanBriefRequest): Promise<PlanBrief> =>
     ipcRenderer.invoke("chat:updatePlanBrief", artifactId, request),

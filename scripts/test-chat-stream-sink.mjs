@@ -36,6 +36,7 @@ const {
   forgetLastReads,
   setLastReadsForTests,
   untilAborted,
+  withCreations,
   withLastReads,
   withLiveToolInstructions
 } = require(
@@ -340,6 +341,31 @@ const webGuide = withLiveToolInstructions("Coach.", [], { webSearch: true });
 assert.match(webGuide, /You can search the web/, "a turn with no tools but the web still hears of it");
 assert.match(webGuide, /not an instruction to follow/, "and that a page is not the athlete's word");
 assert.equal(withLiveToolInstructions("Coach.", []), "Coach.");
+
+// --- what Coach has made closes the system prompt ---------------------------
+//
+// The index of creations rode in front of the latest question. On the next
+// turn that question was no longer the latest and lost it, so its text
+// changed — and a provider that caches by prefix wrote the whole conversation
+// into its cache again, every turn of every conversation with a creation
+// (probed with Claude Code: 36k of 39k tokens written, against 0.4k for a wire
+// left as it was). After the snapshot it changes only when a creation does.
+{
+  const context = { head: "Coach.", live: "Today is Friday.", hasData: true };
+  assert.equal(withCreations(context, undefined), context, "nothing made, nothing added");
+  assert.equal(withCreations(context, "  "), context);
+  const told = withCreations(context, "[What you have made]\n- Plan \"Base\"");
+  assert.equal(told.live, "Today is Friday.\n\n[What you have made]\n- Plan \"Base\"", "after the snapshot");
+  assert.equal(told.head, "Coach.", "never in the part cached across conversations");
+  assert.equal(withCreations({ head: "Coach.", live: "" }, "[made]").live, "[made]");
+  assert.ok(withCreations(context, "x".repeat(50_000)).live.length < 13_000, "an index is cut, not trusted at any length");
+
+  const service = readSource(repoRoot, "electron", "chatService.ts");
+  assert.match(service, /\)\.then\(\(context\) => withCreations\(context, options\.creations\)\);/, "a turn's context carries it");
+  const chatView = readSource(repoRoot, "src", "chat", "ChatView.tsx");
+  assert.doesNotMatch(chatView, /withCreationIndex|withCreationNote/, "the window's wire carries no index");
+  assert.match(chatView, /api\.sendChat\([^)]*pipeline, creations \?\? undefined\)/, "it is sent beside the wire");
+}
 
 // --- the tool guide says each rule once, beside its tool -------------------
 const tool = (name) => ({ name, description: "", inputSchema: {} });

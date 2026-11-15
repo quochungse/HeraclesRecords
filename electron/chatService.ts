@@ -257,7 +257,7 @@ import type {
 } from "./types";
 import { formatDistanceValue, normalizeUnitSystem } from "./unitSystem.js";
 import { parseChatGptUsage, parseClaudeSubscriptionUsage } from "./providerUsage";
-import { pipelineWire } from "./chatContextCompaction";
+import { pipelineWire, withCreationNote } from "./chatContextCompaction";
 import {
   buildCoachInstructions,
   buildCoachSportCapabilityGuide,
@@ -871,7 +871,9 @@ export async function streamConversationTurn(
   messages: ChatMessage[],
   unitSystem: UnitSystem,
   sessionId?: string,
-  pipeline?: ChatPipelineStep
+  pipeline?: ChatPipelineStep,
+  /** `creationIndex` as the window read it: what Coach has made here, as it stands. */
+  creations?: string
 ): Promise<void> {
   let settings: import("./types").ConversationSettings | undefined;
   try {
@@ -880,14 +882,17 @@ export async function streamConversationTurn(
     settings = undefined;
   }
   if (!pipeline && settings?.runtime) rememberConversationRuntime(settings.runtime);
+  // A step's wire is cut to its last messages and sent once: the index rides
+  // in front of its latest question, where the cut keeps it.
   if (pipeline?.step === "outline") {
-    return streamOutlineStep(sink, requestId, messages, unitSystem, pipeline, sessionId, settings);
+    return streamOutlineStep(sink, requestId, withCreationNote(messages, creations), unitSystem, pipeline, sessionId, settings);
   }
   if (pipeline?.step === "sessions") {
-    return streamSessionsStep(sink, requestId, messages, unitSystem, pipeline, sessionId, settings);
+    return streamSessionsStep(sink, requestId, withCreationNote(messages, creations), unitSystem, pipeline, sessionId, settings);
   }
   return streamChat(sink, requestId, messages, {
     unitSystem,
+    ...(creations ? { creations } : {}),
     ...(sessionId ? { sessionId } : {}),
     ...(settings?.runtime ? { runtime: settings.runtime } : {}),
     ...(settings ? { sources: settings.sources } : {}),
@@ -1525,6 +1530,13 @@ export interface StreamChatOptions {
    */
   webSearch?: boolean;
   /**
+   * `creationIndex`: what Coach has made in the conversation, as it stands
+   * now. It closes the system prompt, after the snapshot, so it changes what
+   * is sent only when a creation changes — never the conversation's own
+   * messages, which a provider caching by prefix would then write again whole.
+   */
+  creations?: string;
+  /**
    * A text job — a digest, a rolling summary — rather than a turn of Coach:
    * this system prompt instead of Coach's, and no snapshot, no MCP
    * connections and no tools (pass `toolPolicy: "none"`). A job compressing
@@ -2156,7 +2168,7 @@ async function streamChatTurn(
             roleInstructions,
             runTools.get(requestId)?.context,
             settings.coachStyle
-          );
+          ).then((context) => withCreations(context, options.creations));
     // An analysis may run on a different provider than the interactive chat
     // without touching the saved settings (decision 2).
     const provider = runtime.provider ?? settings.provider;
@@ -4072,6 +4084,15 @@ function coachSystemPrompt(
   options: { inlineSuggestions?: boolean; webSearch?: boolean } = {}
 ): CoachSystemPrompt {
   return { stable: withLiveToolInstructions(context.head, tools, options), live: context.live };
+}
+
+/** The index of creations a window may send; past it the index is cut, not the turn refused. */
+const CREATIONS_NOTE_MAX_CHARS = 12_000;
+
+/** The turn's context with `creationIndex` closing its live part. */
+export function withCreations<T extends { live: string }>(context: T, creations: string | undefined): T {
+  const note = creations?.trim().slice(0, CREATIONS_NOTE_MAX_CHARS);
+  return note ? { ...context, live: context.live ? `${context.live}\n\n${note}` : note } : context;
 }
 
 function joinSystemPrompt({ stable, live }: CoachSystemPrompt): string {

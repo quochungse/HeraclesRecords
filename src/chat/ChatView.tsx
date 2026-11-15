@@ -166,9 +166,9 @@ import {
 } from "./creationVersions";
 import {
   DEFAULT_COMPACT_CONTEXT,
+  creationIndex,
   summaryContextMessage,
-  toWireMessages,
-  withCreationIndex
+  toWireMessages
 } from "../../electron/chatContextCompaction";
 import { ClaudeCodeLoginCard } from "./ClaudeCodeLoginCard";
 import {
@@ -3972,20 +3972,23 @@ export function ChatView({
     const changeSetIds = scheduleChangeIds(persisted);
     const changeSets = changeSetIds.length ? await api.getScheduleChanges(changeSetIds).catch(() => []) : [];
     if (activeRequestIdRef.current !== requestId) return;
-    const wireMessages = withCreationIndex(
-      [
-        ...(context?.summary ? [summaryContextMessage(context.summary)] : []),
-        // The condensed layer, as the main process built it: it holds the digests.
-        ...(context?.middle ?? []),
-        ...toWireMessages(persisted.slice(context?.tailStart ?? 0))
-      ],
+    const wireMessages = [
+      ...(context?.summary ? [summaryContextMessage(context.summary)] : []),
+      // The condensed layer, as the main process built it: it holds the digests.
+      ...(context?.middle ?? []),
+      ...toWireMessages(persisted.slice(context?.tailStart ?? 0))
+    ];
+    // Sent beside the wire, not in it: in front of the latest question it
+    // changed the question before it on every turn, and the whole conversation
+    // went into the provider's cache again.
+    const creations = creationIndex(
       persisted,
       Array.isArray(versions) ? versions : [],
       Array.isArray(briefs) ? briefs : [],
       Array.isArray(changeSets) ? changeSets : []
     );
     try {
-      await api.sendChat(requestId, wireMessages, unitSystem, sessionId ?? undefined, pipeline);
+      await api.sendChat(requestId, wireMessages, unitSystem, sessionId ?? undefined, pipeline, creations ?? undefined);
     } catch (caught) {
       activeRequestIdRef.current = null;
       setStreaming(false);
