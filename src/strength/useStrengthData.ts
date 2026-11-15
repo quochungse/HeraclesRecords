@@ -17,6 +17,7 @@ import {
 import { buildSampleStrengthSessions } from "./sampleSessions";
 import { useWorkoutExerciseCatalog } from "../calendar/useWorkoutExerciseCatalog";
 import { strengthSessionsWithCatalog } from "./exerciseTargets";
+import { announceStrengthBreakdownsRead } from "./strengthBreakdownSignal";
 import { answerFigureMotion, freshFigureMotion } from "../motion/figureMotion";
 import {
   buildStrengthAnalytics,
@@ -212,8 +213,12 @@ export function useStrengthData({
       setError(null);
       setWarnings([]);
 
+      // Counted whoever is still listening to this run: a later run finds the
+      // breakdowns already read and would never say they landed.
+      let breakdownsRead = 0;
       try {
         let result = await api.syncStrengthHistory({ days, force, source });
+        breakdownsRead += result.fetched ?? 0;
         if (syncSequenceRef.current !== sequence) {
           return;
         }
@@ -234,6 +239,7 @@ export function useStrengthData({
             force: false,
             source
           });
+          breakdownsRead += next.fetched ?? 0;
           if (syncSequenceRef.current !== sequence) {
             return;
           }
@@ -252,6 +258,9 @@ export function useStrengthData({
           setError(toErrorMessage(caught));
         }
       } finally {
+        if (breakdownsRead > 0) {
+          announceStrengthBreakdownsRead();
+        }
         if (syncSequenceRef.current === sequence) {
           setLoading(false);
           setSettled(true);

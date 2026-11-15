@@ -37,6 +37,7 @@ import {
   TRAINING_TREND_MAX_DAYS
 } from "./training/chartConfig";
 import { recentTrainingHubDateList } from "./training/formatters";
+import { onStrengthBreakdownsRead } from "./strength/strengthBreakdownSignal";
 import type {
   SportScreenRequest,
   TrainingHubDetailRequest,
@@ -856,6 +857,46 @@ export default function App() {
       // reported the write, and blanking the card would be the louder lie.
     }
   }, [api]);
+
+  // A strength session's Heracles load is COROS's figure until its sets are
+  // read, and they are read by the Strength sync, after the core load above:
+  // the week chart stood at COROS's load for a session Strength already scored.
+  // So what carries a Heracles figure is read again once breakdowns land —
+  // quietly, keeping what is shown where a read fails.
+  const refreshHeraclesLoads = useCallback(async () => {
+    if (!api) {
+      return;
+    }
+
+    const loadSequence = trainingCoreLoadSequenceRef.current;
+    const keep = <T,>(request: Promise<T>, set: (value: T) => void): Promise<void> =>
+      request.then(
+        (value) => {
+          if (trainingCoreLoadSequenceRef.current === loadSequence) {
+            set(value);
+          }
+        },
+        () => undefined,
+      );
+    await Promise.all([
+      keep(listAllTrainingHubActivities(api), setTrainingHubActivities),
+      keep(api.getTrainingAnalytics(), setTrainingHubAnalytics),
+      keep(
+        api.getDailyMetrics(recentTrainingHubDateList(TRAINING_HEATMAP_DAYS)),
+        setTrainingHubDailyMetrics,
+      ),
+      keep(fetchUpcomingWorkouts(api, 14), setTrainingHubUpcomingWorkouts),
+    ]);
+  }, [api]);
+
+  useEffect(
+    () =>
+      onStrengthBreakdownsRead(() => {
+        void refreshHeraclesLoads();
+        setCalendarRefreshToken((token) => token + 1);
+      }),
+    [refreshHeraclesLoads],
+  );
 
   // A calendar write made outside the Calendar view has to reach both readers:
   // Overview's card off App state, and the Calendar's own range cache.
