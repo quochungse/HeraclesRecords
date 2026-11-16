@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-11-16
+
+Mentor's Calendar changes say what they change, and its conversations cost fewer tokens.
+
+### What's new
+- **Mentor's Calendar changes card says what a proposal changes** - a line that updates or replaces a session states what it changes, and its dialog opens on Changes: the workout as it stood and the one Mentor would write, side by side, step against step. A revised proposal marks each line as new, changed or as before, and says what it left out.
+
+### Changed
+- Mentor's conversations cost fewer tokens: what Mentor has made no longer makes a provider re-read the whole conversation on every turn, and its workout drafts take about 1,200 tokens less a round.
+- The 80/20 mark on Overview's intensity bars says what it is when you hover it.
+
+### Fixed
+- Mentor: a review of one session comes back with its chart.
+- Overview: the week chart counts a strength session at Heracles Training Load once its sets are read, as the Strength block under it already did.
+
 ## [1.5.0] - 2026-11-13
 
 Coach is now Mentor, and the Hall of Records is three screens of its own: Timeline, Personal Records and The Twelve Labours.
