@@ -48,11 +48,12 @@ export const ACTIVITY_SUMMARY_VERSION = 2;
  * row keeps serving those while the records backfill fills in the rest.
  */
 // 2: a stretch no longer crosses a GPS jump (`MAX_PLAUSIBLE_STEP_SPEED`).
-export const RECORDS_SUMMARY_VERSION = 2;
+// 3: 3K and 15K, the metric records COROS keeps besides these.
+export const RECORDS_SUMMARY_VERSION = 3;
 
-/** 1K, 5K, 10K, half and full marathon, in metres. */
+/** 1K, 3K, 5K, 10K, 15K, half and full marathon, in metres. */
 export const BEST_EFFORT_DISTANCES: readonly number[] = [
-  1000, 5000, 10000, 21097.5, 42195
+  1000, 3000, 5000, 10000, 15000, 21097.5, 42195
 ];
 
 /**

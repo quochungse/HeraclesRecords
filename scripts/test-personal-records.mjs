@@ -149,8 +149,9 @@ assert.equal(periodGroups[1]?.label, "12 weeks");
 assert.equal(periodGroups[2]?.label, "Half year");
 assert.equal(periodGroups[3]?.label, "All");
 assert.equal(periodGroups[0]?.records[0]?.duration, 1782);
-assert.equal(periodGroups[1]?.records[0]?.duration, 1847);
-assert.equal(periodGroups[2]?.records[0]?.duration, 1845);
+// Group 2 is the 12 weeks, group 3 the half year (probed on a live account).
+assert.equal(periodGroups[1]?.records[0]?.duration, 1845);
+assert.equal(periodGroups[2]?.records[0]?.duration, 1847);
 assert.equal(periodGroups[3]?.records[0]?.duration, 1849);
 assert.equal(periodGroups[3]?.records[0]?.avgPace, 369.8);
 
@@ -173,7 +174,7 @@ assert.equal(tenKFixture?.avgPace, 512.7);
 
 const halfYearGroup = parsePersonalRecordGroups([
   {
-    type: 2,
+    type: 3,
     recordList: [
       {
         type: 10,

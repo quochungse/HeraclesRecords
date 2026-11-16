@@ -250,8 +250,8 @@ assert.match(find(prs, `pr:${r4.activityId}`).detail, /^17:09 faster than the re
 const board = prs.board;
 assert.deepEqual(
   board.distances.map((row) => row.key),
-  ["1k", "5k", "10k", "half", "marathon"],
-  "every distance with a history, in order, whether or not it has a record — COROS's 3K has none"
+  ["1k", "3k", "5k", "10k", "15k", "half", "marathon"],
+  "every metric distance COROS keeps, in order, whether or not it has a record"
 );
 const fiveK = board.distances.find((row) => row.key === "5k");
 assert.deepEqual(
@@ -692,11 +692,16 @@ assert.ok(
 // --- What still needs a detail fetch ------------------------------------------------------------------
 
 assert.equal(needsRecordsSummary({ sportType: 100, distance: 5000 }, undefined), true);
-assert.equal(needsRecordsSummary({ sportType: 100, distance: 5000 }, { recordsVersion: 2 }), false);
+assert.equal(needsRecordsSummary({ sportType: 100, distance: 5000 }, { recordsVersion: 3 }), false);
 assert.equal(
   needsRecordsSummary({ sportType: 100, distance: 5000 }, { recordsVersion: 1 }),
   true,
   "a summary from before the jump guard is read again"
+);
+assert.equal(
+  needsRecordsSummary({ sportType: 100, distance: 5000 }, { recordsVersion: 2 }),
+  true,
+  "a summary from before 3K and 15K is read again"
 );
 assert.equal(needsRecordsSummary({ sportType: 101, distance: 5000 }, undefined), false, "a treadmill has no start and no record");
 assert.equal(needsRecordsSummary({ sportType: 402, distance: 0 }, undefined), false);

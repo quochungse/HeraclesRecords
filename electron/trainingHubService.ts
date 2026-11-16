@@ -5082,15 +5082,15 @@ const RACE_PREDICTOR_DISPLAY_ORDER = [5, 4, 2, 1];
 
 const RECORD_GROUP_LABELS: Record<number, string> = {
   1: "4 weeks",
-  2: "Half year",
-  3: "12 weeks",
+  2: "12 weeks",
+  3: "Half year",
   4: "All"
 };
 
 const RECORD_GROUP_DISPLAY_ORDER: Record<number, number> = {
   1: 0,
-  3: 1,
-  2: 2,
+  2: 1,
+  3: 2,
   4: 3
 };
 

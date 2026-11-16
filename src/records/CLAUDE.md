@@ -46,11 +46,12 @@ celebration open the Labours; a stage's date there opens its milestone on the Ti
   days no toast.
 - **Personal Records** (`personalBests.ts`, `PersonalRecordsBoard.tsx`) is worked out in
   `computeRecords` as `board`, so samples have it too. Each period's best is COROS's own
-  (`recordDetailList` groups 4/2/3/1 = all, 6 months, 12 weeks, 4 weeks — the figures the
-  watch shows); a record's history is every time the records walk's best effort fell, COROS's
-  figure in place of ours on the same run. Only the best-effort distances are on it: COROS's
-  3K is a figure with no history, and is left out. The page opens on the record that grades
-  highest for age and sex.
+  (`recordDetailList` groups 4/3/2/1 = all, 6 months, 12 weeks, 4 weeks — probed: group 2
+  holds nothing older than 12 weeks — the figures the watch shows); a record's history is
+  every time the records walk's best effort fell, COROS's figure in place of ours on the same
+  run. Only the best-effort distances are on it — every metric distance COROS keeps (1K, 3K,
+  5K, 10K, 15K, half, marathon); a new one needs `RECORDS_SUMMARY_VERSION` bumped so the
+  backfill reads it. The page opens on the record that grades highest for age and sex.
 - The developer toolbar's Sample menu has four presets (`sampleRecords.ts`), told against a
   notices record in memory, asking nothing of COROS.
 

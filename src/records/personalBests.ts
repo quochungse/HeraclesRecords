@@ -33,10 +33,11 @@ export type RecordPeriod = "all" | "half" | "w12" | "w4";
 
 export const RECORD_PERIODS: readonly RecordPeriod[] = ["all", "half", "w12", "w4"];
 
+// Probed: group 2 holds nothing older than 12 weeks, group 3 reaches past them.
 const COROS_PERIOD_GROUP: Readonly<Record<RecordPeriod, number>> = {
   all: 4,
-  half: 2,
-  w12: 3,
+  half: 3,
+  w12: 2,
   w4: 1
 };
 
@@ -61,7 +62,7 @@ export interface RecordRun {
 }
 
 export interface DistanceRecord {
-  /** Stable: "1k", "5k", "10k", "half", "marathon". */
+  /** Stable: "1k", "3k", "5k", "10k", "15k", "half", "marathon". */
   key: string;
   /** Metres. */
   distance: number;
@@ -96,12 +97,14 @@ export interface RecordBoard {
 /**
  * The distances on the board, with COROS's record type for each: those the hall
  * reads off every run's best efforts (`BEST_EFFORT_DISTANCES`), so each has a
- * history. COROS's 3K is a figure without one, and is left out.
+ * history: every metric distance COROS keeps a record at.
  */
 const BOARD_DISTANCES: ReadonlyArray<{ key: string; distance: number; corosType: number; label: () => string }> = [
   { key: "1k", distance: 1000, corosType: 7, label: () => "1K" },
+  { key: "3k", distance: 3000, corosType: 6, label: () => "3K" },
   { key: "5k", distance: 5000, corosType: 5, label: () => "5K" },
   { key: "10k", distance: 10000, corosType: 4, label: () => "10K" },
+  { key: "15k", distance: 15000, corosType: 3, label: () => "15K" },
   { key: "half", distance: 21097.5, corosType: 2, label: () => capitalizeFirst(t("records.dist.half")) },
   { key: "marathon", distance: 42195, corosType: 13, label: () => capitalizeFirst(t("records.dist.marathon")) }
 ];

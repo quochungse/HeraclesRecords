@@ -420,7 +420,11 @@ const located = metrics.summarizeActivityDetail({
     track: { points: [{ lat: 0, lon: 0 }, { lat: 21.028511, lon: 105.804817 }] }
   }
 });
-assert.equal(located.bestEfforts.length, 3, "an outdoor run has its 1K, 5K and 10K");
+assert.deepEqual(
+  located.bestEfforts.map((effort) => effort.distance),
+  [1000, 3000, 5000, 10000],
+  "an outdoor run has its 1K, 3K, 5K and 10K"
+);
 assert.deepEqual(
   located.startPoint,
   { lat: 21.03, lon: 105.8 },

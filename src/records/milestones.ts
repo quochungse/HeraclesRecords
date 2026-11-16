@@ -393,8 +393,10 @@ const PLAN_STAGES: ReadonlyArray<{ stage: LabourStage; weeks: number; ratio: num
 /** The best-effort distances, with COROS's record type for each. */
 export const RECORD_DISTANCES: ReadonlyArray<{ distance: number; label: string; corosType: number }> = [
   { distance: 1000, label: "1K", corosType: 7 },
+  { distance: 3000, label: "3K", corosType: 6 },
   { distance: 5000, label: "5K", corosType: 5 },
   { distance: 10000, label: "10K", corosType: 4 },
+  { distance: 15000, label: "15K", corosType: 3 },
   {
     distance: 21097.5,
     get label() {

@@ -28,7 +28,11 @@
 // A sample milestone's activity has no page: its id starts with
 // `SAMPLE_ACTIVITY_PREFIX`, and App says so rather than opening Activities.
 
-import { ACTIVITY_SUMMARY_VERSION, RECORDS_SUMMARY_VERSION } from "../../electron/activityMetrics";
+import {
+  ACTIVITY_SUMMARY_VERSION,
+  BEST_EFFORT_DISTANCES,
+  RECORDS_SUMMARY_VERSION
+} from "../../electron/activityMetrics";
 import type {
   ActivityDetailSummary,
   BestEffort,
@@ -201,7 +205,7 @@ class SampleHistory {
   }
 }
 
-const EFFORT_DISTANCES = [1000, 5000, 10000, 21097.5, 42195];
+const EFFORT_DISTANCES = BEST_EFFORT_DISTANCES;
 
 /** Every standard distance a run of this length covers, each at one pace. */
 function effortsAt(distance: number, secondsPerKm: number, spread = () => 0): BestEffort[] {
@@ -698,8 +702,10 @@ function livedHistory(today: string): RecordsSampleInput {
       label: "All",
       records: [
         ...corosRecord(7, "1K", 1000),
+        ...corosRecord(6, "3K", 3000),
         ...corosRecord(5, "5K", 5000),
         ...corosRecord(4, "10K", 10000),
+        ...corosRecord(3, "15K", 15000),
         ...corosRecord(2, "Half Marathon", 21097.5),
         ...corosRecord(13, "Marathon", 42195)
       ]
