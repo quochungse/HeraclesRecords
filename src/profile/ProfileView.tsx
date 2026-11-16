@@ -1020,7 +1020,7 @@ export function ProfileView({
               dashboard={dashboard}
               racePredictor={dashboard?.racePredictor ?? null}
             />
-            <Vo2MaxWidget snapshot={snapshot} />
+            <Vo2MaxWidget snapshot={snapshot} profile={profile} />
           </div>
         </>
       )}

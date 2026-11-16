@@ -3751,268 +3751,45 @@ td span {
 /* Matte cards in dark. Paper's `.panel` rule outranks this, so there they are
    white cards on their shadow like every other panel. */
 
+/*
+ * VO2 Max: The Cooper Institute's five ratings for the athlete's age and sex
+ * (src/training/vo2Level.ts), in the hues Garmin rates them in. The card is
+ * the Running Fitness card's frame and dial; `--vo2-tone` is the rating
+ * reached, which the plateau bar draws in.
+ */
 .vo2-widget-panel {
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.022);
-  box-shadow: none;
-  backdrop-filter: none;
-}
-
-.vo2-widget-panel {
+  --vo2-level-1: #ff4f5f;
+  --vo2-level-2: #ffb23f;
+  --vo2-level-3: #3ee88e;
+  --vo2-level-4: #4aa3ff;
+  --vo2-level-5: #a77bff;
   --vo2-tone: var(--text-muted);
-  position: relative;
-  display: grid;
-  align-content: space-between;
-  gap: 14px;
-  /* The Personal screen has not had the elevation ladder yet (phase 7 of
-     docs/ui-system-refinement.md), so this card keeps the radius it had. */
-  border-radius: var(--radius-md);
-  border-color: color-mix(in srgb, var(--vo2-tone) 18%, rgba(255, 255, 255, 0.07));
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--vo2-tone) 5%, transparent), transparent 44%),
-    rgba(255, 255, 255, 0.026);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08), var(--shadow-card), 0 0 24px color-mix(in srgb, var(--vo2-tone) 10%, transparent);
-  min-width: 0;
-  min-height: clamp(282px, 31vh, 392px);
-  padding: clamp(16px, 1.55vw, 21px);
-  overflow: hidden;
 }
 
-.vo2-widget-panel::before {
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  background:
-    radial-gradient(
-      82% 48% at 50% 12%,
-      color-mix(in srgb, var(--vo2-tone) 18%, transparent),
-      transparent 72%
-    ),
-    linear-gradient(180deg, color-mix(in srgb, var(--vo2-tone) 7%, transparent), transparent);
-  content: "";
-  opacity: 0;
-  pointer-events: none;
-  /* Part of a staged reveal on load: a designed length, not a reaction time. */
-  transition: opacity 0.75s var(--ease) 0.22s;
-}
+.vo2-widget-panel.level-poor { --vo2-tone: var(--vo2-level-1); }
+.vo2-widget-panel.level-fair { --vo2-tone: var(--vo2-level-2); }
+.vo2-widget-panel.level-good { --vo2-tone: var(--vo2-level-3); }
+.vo2-widget-panel.level-excellent { --vo2-tone: var(--vo2-level-4); }
+.vo2-widget-panel.level-superior { --vo2-tone: var(--vo2-level-5); }
 
-.vo2-widget-panel::after {
-  position: absolute;
-  inset: 1px;
-  border: 1px solid color-mix(in srgb, var(--vo2-tone) 16%, transparent);
-  border-radius: calc(var(--radius-lg) - 1px);
-  content: "";
-  opacity: 0;
-  pointer-events: none;
-  /* Part of a staged reveal on load: a designed length, not a reaction time. */
-  transition: opacity 0.75s var(--ease) 0.22s;
-}
+.vo2-widget-panel .segmented-dial-segment[data-level="1"] { stroke: var(--vo2-level-1); }
+.vo2-widget-panel .segmented-dial-segment[data-level="2"] { stroke: var(--vo2-level-2); }
+.vo2-widget-panel .segmented-dial-segment[data-level="3"] { stroke: var(--vo2-level-3); }
+.vo2-widget-panel .segmented-dial-segment[data-level="4"] { stroke: var(--vo2-level-4); }
+.vo2-widget-panel .segmented-dial-segment[data-level="5"] { stroke: var(--vo2-level-5); }
 
-.vo2-widget-panel.is-ready::before {
-  opacity: 1;
-}
-
-.vo2-widget-panel.is-ready::after {
-  opacity: 0.62;
-}
-
-.vo2-widget-panel > * {
-  position: relative;
-  z-index: 1;
-}
-
-.vo2-widget-panel.tone-low {
-  --vo2-tone: #f87171;
-}
-
-.vo2-widget-panel.tone-mid {
-  --vo2-tone: #fbbf24;
-}
-
-.vo2-widget-panel.tone-good {
-  --vo2-tone: var(--success-text);
-}
-
-.vo2-widget-panel.tone-high {
-  --vo2-tone: #60a5fa;
-}
-
-.vo2-widget-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.vo2-widget-header .eyebrow {
-  margin: 0;
-}
-
-.vo2-widget-header h2 {
-  margin: 4px 0 0;
-  color: var(--text-primary);
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: 0;
-}
-
-.vo2-widget-icon {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  flex: 0 0 auto;
-  place-items: center;
-  border: 1px solid color-mix(in srgb, var(--vo2-tone) 28%, transparent);
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--vo2-tone) 14%, transparent);
-  box-shadow: none;
-  color: var(--vo2-tone);
-}
-
-.vo2-gauge {
-  position: relative;
-  display: grid;
-  min-height: 150px;
-  place-items: center;
-}
-
-.vo2-gauge::before {
-  position: absolute;
-  width: min(82%, 232px);
-  aspect-ratio: 1.65;
-  border-radius: 50%;
-  background: radial-gradient(
-    50% 50% at 50% 48%,
-    color-mix(in srgb, var(--vo2-tone) 22%, transparent),
-    transparent 72%
-  );
-  content: "";
-  filter: blur(18px);
-  opacity: 0;
-  transform: translateY(10px) scale(0.88);
-  /* Part of a staged reveal on load: a designed length, not a reaction time. */
-  transition:
-    opacity 0.8s var(--ease) 0.22s,
-    transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.22s;
-}
-
-.vo2-widget-panel.is-ready .vo2-gauge::before {
-  opacity: 0.78;
-  transform: translateY(0) scale(1);
-}
-
-.vo2-gauge svg {
-  position: relative;
-  width: min(100%, 260px);
-  overflow: visible;
-}
-
-.vo2-gauge-track,
-.vo2-gauge-band {
-  fill: none;
-  stroke-linecap: butt;
-  stroke-width: 18;
-}
-
-.vo2-gauge-track {
-  stroke: rgba(255, 255, 255, 0.08);
-}
-
-.vo2-gauge-band {
-  opacity: 0;
-  stroke-dasharray: 100;
-  stroke-dashoffset: 100;
-  filter: none;
-}
-
-.vo2-widget-panel.is-ready .vo2-gauge-band {
-  animation: vo2-band-reveal 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-  animation-delay: 0.22s;
-  filter: none;
-}
-
-.vo2-widget-panel.is-ready .vo2-gauge-band.is-focused {
-  animation: vo2-band-reveal 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-  animation-delay: 0.22s;
-  filter: none;
-  stroke-linecap: butt;
-  stroke-width: 21;
-}
-
-.vo2-gauge-needle {
-  stroke: var(--text-primary);
-  stroke-linecap: round;
-  stroke-width: 4;
-  filter:
-    drop-shadow(0 3px 8px rgba(0, 0, 0, 0.45))
-    drop-shadow(0 0 10px color-mix(in srgb, var(--vo2-tone) 34%, transparent));
-  opacity: 0;
-  transform: scale(0.28);
-  transform-origin: 120px 118px;
-  /* Part of a staged reveal on load: a designed length, not a reaction time. */
-  transition:
-    opacity 0.36s var(--ease) 0.22s,
-    transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.22s,
-    stroke var(--dur-fast) var(--ease);
-}
-
-.vo2-widget-panel.is-ready .vo2-gauge-needle {
-  opacity: 1;
-  transform: scale(1);
-}
-
-.vo2-gauge-pin {
-  fill: var(--vo2-tone);
-  stroke: rgba(255, 255, 255, 0.82);
-  stroke-width: 2;
-  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--vo2-tone) 56%, transparent));
-  opacity: 1;
-  transform: scale(1);
-  transform-origin: 120px 118px;
-}
-
-.vo2-gauge-value {
-  position: absolute;
-  top: 58%;
-  left: 50%;
-  display: grid;
-  justify-items: center;
-  opacity: 1;
-  transform: translate(-50%, -50%) scale(1);
-}
-
-.vo2-gauge-value strong {
-  display: block;
-  color: var(--text-primary);
-  font-size: clamp(36px, 3.2vw, 36px);
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1;
-}
-
-.vo2-gauge-value.has-value strong {
-  text-shadow:
-    0 0 16px color-mix(in srgb, var(--vo2-tone) 38%, transparent),
-    0 2px 18px rgba(0, 0, 0, 0.34);
-}
-
-.vo2-gauge-value span {
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 700;
+/* The footer follows the dial, its rule level with the one over Running
+   Fitness's abilities; the plateau bar keeps to the card's foot. */
+.vo2-widget-footer + .vo2-plateaus {
+  margin-top: auto;
 }
 
 .vo2-widget-footer {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
-  opacity: 1;
-  padding-top: 12px;
-  transform: translateY(0);
+  border-top: 1px solid var(--glass-border);
+  padding-top: 16px;
 }
 
 .vo2-widget-footer div {
@@ -4048,7 +3825,7 @@ td span {
 .vo2-plateaus {
   display: grid;
   gap: 6px;
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-top: 1px solid var(--glass-border);
   padding-top: 12px;
 }
 
@@ -4455,18 +4232,6 @@ td span {
 .sleep-detail-metric dd.has-note:focus-visible {
   outline: var(--focus-ring);
   outline-offset: 2px;
-}
-
-@keyframes vo2-band-reveal {
-  0% {
-    opacity: 0;
-    stroke-dashoffset: 100;
-  }
-
-  100% {
-    opacity: 1;
-    stroke-dashoffset: 0;
-  }
 }
 
 /* ── Training heatmap ───────────────────────────────────────────────── */
@@ -5477,9 +5242,12 @@ td span {
 }
 
 .training-scores-panel {
-  display: grid;
-  gap: 12px;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  /* Header, dial, then what sits under it, the same rows in both fitness
+     cards so the two side by side line up. */
+  padding: clamp(16px, 1.55vw, 21px);
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: var(--radius-md);
   background:
@@ -5512,80 +5280,144 @@ td span {
   margin: 0;
 }
 
-.score-bar-list {
-  display: grid;
-  gap: 13px;
+/*
+ * Running Fitness: COROS's six levels (0–40–60–75–85–95–100) in the colours
+ * its Training Hub draws them in, peach to dark rust. The colours are data,
+ * the same on both themes.
+ */
+.running-fitness-panel {
+  --fitness-level-1: #ffb357;
+  --fitness-level-2: #ff9627;
+  --fitness-level-3: #ff8e1f;
+  --fitness-level-4: #d36914;
+  --fitness-level-5: #a64b0a;
+  --fitness-level-6: #793004;
 }
 
-.score-bar {
+/* The dial both fitness cards share (SegmentedDial.tsx). */
+.segmented-dial {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.segmented-dial svg {
+  width: min(100%, 260px);
+  overflow: visible;
+}
+
+.segmented-dial-segment {
+  fill: none;
+  stroke-linecap: butt;
+  stroke-width: 5;
+}
+
+.segmented-dial-segment.is-cap {
+  stroke-linecap: round;
+}
+
+.segmented-dial-track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.05);
+  stroke-width: 1;
+}
+
+.segmented-dial-needle {
+  fill: var(--text-primary);
+}
+
+/* Standing on the dial's centre line, where COROS sets its figure. */
+.segmented-dial-value {
+  position: absolute;
+  bottom: 2%;
+  left: 50%;
+  color: var(--text-primary);
+  font-size: 36px;
+  line-height: 1;
+  transform: translateX(-50%);
+}
+
+.running-fitness-panel .segmented-dial-segment[data-level="1"] { stroke: var(--fitness-level-1); }
+.running-fitness-panel .segmented-dial-segment[data-level="2"] { stroke: var(--fitness-level-2); }
+.running-fitness-panel .segmented-dial-segment[data-level="3"] { stroke: var(--fitness-level-3); }
+.running-fitness-panel .segmented-dial-segment[data-level="4"] { stroke: var(--fitness-level-4); }
+.running-fitness-panel .segmented-dial-segment[data-level="5"] { stroke: var(--fitness-level-5); }
+.running-fitness-panel .segmented-dial-segment[data-level="6"] { stroke: var(--fitness-level-6); }
+
+/* The four abilities, two by two under the dial. */
+.running-fitness-abilities {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 28px;
+  border-top: 1px solid var(--glass-border);
+  padding-top: 16px;
+}
+
+.running-fitness-ability {
   display: grid;
   gap: 7px;
+  min-width: 0;
 }
 
-.score-bar-header {
+.running-fitness-ability-head {
   display: flex;
-  align-items: flex-start;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 500;
 }
 
-.score-bar-label-group {
-  display: grid;
-  gap: 2px;
+.running-fitness-ability-head strong {
+  color: var(--text-primary);
+  font-size: 18px;
+  line-height: 1;
 }
 
-.score-bar-pace {
+.running-fitness-ability-pace {
+  overflow: hidden;
   color: var(--text-muted);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.score-bar-header strong {
-  color: var(--text-primary);
-  font-size: 14px;
+/* The six levels as a bar, each as long as its range, filled to the score
+   in its own colour. */
+.running-fitness-levels {
+  display: flex;
+  gap: 2px;
+  height: 4px;
 }
 
-.score-bar-track {
+.running-fitness-level {
   overflow: hidden;
-  height: 9px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.07);
+  flex: 1 1 0;
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.1);
 }
 
-.score-bar-fill {
+.running-fitness-level:first-child {
+  border-radius: var(--radius-xs) 0 0 var(--radius-xs);
+}
+
+.running-fitness-level:last-child {
+  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+}
+
+.running-fitness-level-fill {
   display: block;
   height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
-  transform-origin: left center;
-  animation: training-fill 0.85s var(--ease) both;
 }
 
-.training-threshold-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  border-top: 1px solid var(--glass-border);
-  padding-top: 14px;
-}
-
-.training-threshold-grid span {
-  display: block;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.training-threshold-grid strong {
-  display: block;
-  margin-top: 4px;
-  color: var(--text-primary);
-  font-size: 22px;
-  font-weight: 600;
-}
+.running-fitness-level:nth-child(1) .running-fitness-level-fill { background: var(--fitness-level-1); }
+.running-fitness-level:nth-child(2) .running-fitness-level-fill { background: var(--fitness-level-2); }
+.running-fitness-level:nth-child(3) .running-fitness-level-fill { background: var(--fitness-level-3); }
+.running-fitness-level:nth-child(4) .running-fitness-level-fill { background: var(--fitness-level-4); }
+.running-fitness-level:nth-child(5) .running-fitness-level-fill { background: var(--fitness-level-5); }
+.running-fitness-level:nth-child(6) .running-fitness-level-fill { background: var(--fitness-level-6); }
 
 .training-activities-split-panel {
   --training-activities-pane-height: clamp(460px, 58vh, 760px);
@@ -6569,16 +6401,6 @@ td span {
   }
 }
 
-@keyframes training-fill {
-  from {
-    transform: scaleX(0);
-  }
-
-  to {
-    transform: scaleX(1);
-  }
-}
-
 .icon-button.compact {
   width: 26px;
   height: 26px;
@@ -6604,27 +6426,15 @@ td span {
   .training-chart-panel,
   .training-heatmap-panel,
   .training-chart-shell .recharts-wrapper,
-  .training-chart-tooltip,
-  .vo2-widget-panel.is-ready,
-  .vo2-gauge-band,
-  .vo2-widget-panel.is-ready .vo2-gauge-value.has-value strong,
-  .score-bar-fill {
+  .training-chart-tooltip {
     animation: none;
   }
 
   .training-heatmap-panel,
   .training-heatmap-cell,
   .training-heatmap-cell::before,
-  .vo2-widget-panel::before,
-  .vo2-widget-panel::after,
-  .vo2-widget-icon,
-  .vo2-gauge::before,
-  .vo2-gauge-needle,
-  .vo2-gauge-pin,
-  .vo2-gauge-value,
   .vo2-plateau::before,
-  .vo2-plateau-tip,
-  .vo2-widget-footer {
+  .vo2-plateau-tip {
     transition: none;
   }
 
@@ -6643,52 +6453,6 @@ td span {
   .training-heatmap-cell:not(.is-empty):hover,
   .training-heatmap-cell:not(.is-empty):focus-visible {
     scale: 1;
-  }
-
-  .score-bar-fill {
-    transform: none;
-  }
-
-  .vo2-widget-panel::before {
-    opacity: 1;
-  }
-
-  .vo2-widget-panel::after {
-    opacity: 0.62;
-  }
-
-  .vo2-gauge::before {
-    opacity: 0.78;
-    transform: translateY(0) scale(1);
-  }
-
-  .vo2-gauge-band {
-    filter: none;
-    opacity: 1;
-    stroke-dashoffset: 0;
-  }
-
-  .vo2-gauge-band.is-focused {
-    filter: none;
-    stroke-linecap: butt;
-    stroke-width: 21;
-  }
-
-  .vo2-widget-icon,
-  .vo2-gauge-needle,
-  .vo2-gauge-pin,
-  .vo2-widget-footer {
-    opacity: 1;
-    transform: none;
-  }
-
-  .vo2-gauge-value {
-    opacity: 1;
-    transform: translate(-50%, -50%);
-  }
-
-  .vo2-gauge-value strong {
-    transform: none;
   }
 }
 
@@ -14885,83 +14649,6 @@ button.chat-change-diff-more:focus-visible {
   box-shadow: var(--shadow-card);
 }
 
-/* VO2 widget — it sits on Personal now, beside the fitness scores, so it takes
- * the raised white card those siblings get rather than the recessed fill it
- * wore inside Training Intelligence. The arrive animation keyframes a heavy
- * outer shadow that wins over static rules, which is what is-ready is for. */
-:root[data-theme="paper"] .profile-fitness-grid > .vo2-widget-panel {
-  border-color: rgba(19, 26, 40, 0.15);
-  box-shadow: var(--shadow-card);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-
-:root[data-theme="paper"] .profile-fitness-grid > .vo2-widget-panel.is-ready {
-  animation: none;
-  box-shadow: var(--shadow-card);
-}
-
-:root[data-theme="paper"] .vo2-widget-panel::before,
-:root[data-theme="paper"] .vo2-widget-panel::after,
-:root[data-theme="paper"] .vo2-widget-panel.is-ready::before,
-:root[data-theme="paper"] .vo2-widget-panel.is-ready::after {
-  opacity: 0;
-  content: none;
-}
-
-/* Gauge internals lean on white-alpha strokes and black drop-shadows that
- * either vanish or look muddy on paper — swap to a warm-ink track, softened
- * lifts, and a light pin ring that reads against the card. */
-:root[data-theme="paper"] .vo2-gauge-track {
-  stroke: rgba(19, 26, 40, 0.12);
-}
-
-:root[data-theme="paper"] .vo2-gauge-needle {
-  filter: drop-shadow(0 1px 2px rgba(19, 26, 40, 0.23));
-}
-
-:root[data-theme="paper"] .vo2-gauge-pin {
-  stroke: var(--glass-bg-elevated);
-}
-
-:root[data-theme="paper"] .vo2-gauge-value.has-value strong,
-:root[data-theme="paper"] .vo2-widget-panel.is-ready .vo2-gauge-value.has-value strong {
-  text-shadow: none;
-  animation: none;
-}
-
-:root[data-theme="paper"] .vo2-widget-icon {
-  box-shadow: none;
-}
-
-:root[data-theme="paper"] .vo2-widget-panel.is-ready .vo2-widget-icon {
-  box-shadow: none;
-}
-
-:root[data-theme="paper"] .vo2-widget-panel.is-ready .vo2-gauge::before {
-  opacity: 0;
-}
-
-:root[data-theme="paper"] .vo2-widget-panel.is-ready .vo2-gauge-band,
-:root[data-theme="paper"] .vo2-widget-panel.is-ready .vo2-gauge-band.is-focused {
-  animation: none;
-  filter: none;
-  opacity: 1;
-  stroke-dashoffset: 0;
-}
-
-:root[data-theme="paper"] .vo2-widget-panel.is-ready .vo2-gauge-pin {
-  filter: none;
-}
-
-:root[data-theme="paper"] .vo2-widget-footer {
-  border-top-color: var(--glass-border);
-}
-
-:root[data-theme="paper"] .vo2-plateaus {
-  border-top-color: var(--glass-border);
-}
-
 :root[data-theme="paper"] .vo2-plateau.is-current::before {
   box-shadow: none;
 }
@@ -15155,16 +14842,12 @@ button.chat-change-diff-more:focus-visible {
   box-shadow: var(--shadow-card);
 }
 
-:root[data-theme="paper"] .score-bar-track {
-  border-color: rgba(19, 26, 40, 0.1);
+:root[data-theme="paper"] .running-fitness-level {
   background: rgba(19, 26, 40, 0.09);
 }
 
-/* The accent and its strong step are colours for words on paper, and as a
-   fill they ran a muddy brown; the bars take the bright gold the hall fills
-   with (recordsNotices.css), which follows another palette the same way. */
-:root[data-theme="paper"] .score-bar-fill {
-  background: var(--hall-gold-fill);
+:root[data-theme="paper"] .segmented-dial-track {
+  stroke: rgba(19, 26, 40, 0.08);
 }
 
 :root[data-theme="paper"] .data-connect-panel {

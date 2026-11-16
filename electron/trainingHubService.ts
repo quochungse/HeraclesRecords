@@ -5109,7 +5109,7 @@ function parseTrainingDashboard(
     fitnessMaxHr: toOptionalNumber(summary.fitnessMaxHr),
     runningLevelHr: toOptionalNumber(summary.runningLevelHr),
     lthrZones: parseThresholdZones(summary.lthrZone),
-    ltspZones: parseThresholdZones(summary.ltspZone),
+    ltspZonesDefault: parseThresholdZones(summary.ltspZoneDefault),
     personalRecords: parsePersonalRecordGroups(summary.recordDetailList),
     sleepHrv: parseSleepHrvSummary(summary.sleepHrvData),
     sportDataCount: toOptionalNumber(dashboard.sportDataSummary?.count),

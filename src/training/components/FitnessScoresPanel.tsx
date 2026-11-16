@@ -3,60 +3,75 @@ import type {
   TrainingHubDashboard,
   TrainingHubRacePredictor
 } from "../../../electron/types";
-import {
-  buildRunningFitnessPaceLabels,
-  formatOptionalNumber,
-  formatPaceSecondsPerKm
-} from "../formatters";
+import { buildRunningFitnessPaceLabels, formatOptionalNumber } from "../formatters";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import { t } from "../../i18n/core";
+import { SegmentedDial } from "./SegmentedDial";
 
 interface FitnessScoresPanelProps {
   dashboard: TrainingHubDashboard | null;
   racePredictor: TrainingHubRacePredictor | null;
 }
 
-interface ScoreItem {
+interface AbilityItem {
   label: string;
   value?: number;
   paceLabel?: string;
 }
 
-interface MetricItem {
-  label: string;
-  value?: number;
-  format: (value?: number) => string;
-}
+/**
+ * COROS's six Running Fitness levels, as the upper bound of each — its
+ * Training Hub's `RunningAbility` card cuts both the dial and the bars at
+ * [0, 40, 60, 75, 85, 95, 100], each part as long as its range.
+ */
+const FITNESS_LEVEL_BOUNDS = [40, 60, 75, 85, 95, 100];
+const FITNESS_LEVELS = FITNESS_LEVEL_BOUNDS.map((to, index) => ({
+  from: index === 0 ? 0 : FITNESS_LEVEL_BOUNDS[index - 1],
+  to
+}));
 
 function hasValue(value?: number): value is number {
   return value !== undefined && Number.isFinite(value);
 }
 
-function ScoreBar({ label, value, paceLabel }: ScoreItem) {
-  const percent =
-    value !== undefined ? Math.max(0, Math.min(100, value)) : undefined;
+function clampScore(value: number): number {
+  return Math.max(0, Math.min(100, value));
+}
+
+/** A score on the six levels: each level filled as far as the score reaches into it. */
+function LevelBar({ value }: { value?: number }) {
+  const score = hasValue(value) ? clampScore(value) : 0;
 
   return (
-    <div className="score-bar">
-      <div className="score-bar-header">
-        <div className="score-bar-label-group">
-          <span>{label}</span>
-          {paceLabel ? <span className="score-bar-pace">{paceLabel}</span> : null}
-        </div>
-        <strong>{formatOptionalNumber(value)}</strong>
-      </div>
-      <div className="score-bar-track">
-        <span
-          className="score-bar-fill"
-          style={{ width: percent !== undefined ? `${percent}%` : "0%" }}
-        />
-      </div>
+    <div className="running-fitness-levels" aria-hidden="true">
+      {FITNESS_LEVELS.map((level) => {
+        const share = Math.max(0, Math.min(1, (score - level.from) / (level.to - level.from)));
+
+        return (
+          <span
+            key={level.to}
+            className="running-fitness-level"
+            style={{ flexGrow: level.to - level.from }}
+          >
+            <span className="running-fitness-level-fill" style={{ width: `${share * 100}%` }} />
+          </span>
+        );
+      })}
     </div>
   );
 }
 
-function formatBpm(value?: number): string {
-  return hasValue(value) ? `${Math.round(value)} bpm` : "-";
+function Ability({ label, value, paceLabel }: AbilityItem) {
+  return (
+    <div className="running-fitness-ability">
+      <div className="running-fitness-ability-head">
+        <span>{label}</span>
+        <strong className="figure">{formatOptionalNumber(value)}</strong>
+      </div>
+      <LevelBar value={value} />
+      {paceLabel ? <span className="running-fitness-ability-pace">{paceLabel}</span> : null}
+    </div>
+  );
 }
 
 export function FitnessScoresPanel({
@@ -65,27 +80,11 @@ export function FitnessScoresPanel({
 }: FitnessScoresPanelProps) {
   const { unitSystem } = useUnitSystem();
   const predictor = racePredictor ?? dashboard?.racePredictor ?? null;
-
-  if (!dashboard && !predictor) {
-    return (
-      <section className="panel training-scores-panel">
-        <header className="training-scores-header">
-          <div className="training-scores-heading">
-            <p className="eyebrow">{t("activity.scores.eyebrow")}</p>
-            <h2>{t("activity.scores.notLoaded")}</h2>
-          </div>
-          <BarChart3 size={22} aria-hidden="true" />
-        </header>
-        <p className="training-empty-chart">{t("activity.scores.failed")}</p>
-      </section>
-    );
-  }
-
   const paceLabels = buildRunningFitnessPaceLabels(
-    dashboard?.ltspZones ?? [],
+    dashboard?.ltspZonesDefault ?? [],
     unitSystem
   );
-  const scores: ScoreItem[] = [
+  const abilities: AbilityItem[] = [
     {
       label: t("activity.scores.endurance"),
       value: predictor?.aerobicEnduranceScore,
@@ -106,45 +105,42 @@ export function FitnessScoresPanel({
       value: predictor?.anaerobicCapacityScore,
       paceLabel: paceLabels.Sprint
     }
-  ].filter((score) => hasValue(score.value));
-
-  const metrics: MetricItem[] = [
-    { label: "LTHR", value: predictor?.lthr, format: formatBpm },
-    {
-      label: t("activity.scores.ltPace"),
-      value: predictor?.ltsp,
-      format: (value) => formatPaceSecondsPerKm(value, unitSystem)
-    },
-    { label: t("activity.m.maxHr"), value: dashboard?.fitnessMaxHr, format: formatBpm },
-    { label: t("activity.scores.runLevelHr"), value: dashboard?.runningLevelHr, format: formatBpm }
-  ];
+  ].filter((ability) => hasValue(ability.value));
+  // COROS's Running Fitness score is `staminaLevel`; it sends no other total.
+  const total = predictor?.staminaLevel;
+  const loaded = Boolean(dashboard || predictor);
+  const hasFitness = abilities.length > 0 || hasValue(total);
 
   return (
-    <section className="panel training-scores-panel">
+    <section className="panel training-scores-panel running-fitness-panel">
       <header className="training-scores-header">
         <div className="training-scores-heading">
           <p className="eyebrow">{t("activity.scores.eyebrow")}</p>
-          <h2>{scores.length > 0 ? t("activity.scores.running") : t("activity.scores.threshold.title")}</h2>
+          <h2>{loaded ? t("activity.scores.running") : t("activity.scores.notLoaded")}</h2>
         </div>
         <BarChart3 size={22} aria-hidden="true" />
       </header>
 
-      {scores.length > 0 ? (
-        <div className="score-bar-list">
-          {scores.map((score) => (
-            <ScoreBar key={score.label} label={score.label} value={score.value} />
+      {hasValue(total) ? (
+        <SegmentedDial
+          weights={FITNESS_LEVELS.map((level) => level.to - level.from)}
+          position={clampScore(total) / 100}
+          value={formatOptionalNumber(total)}
+          label={t("activity.scores.total", { value: formatOptionalNumber(total) })}
+        />
+      ) : null}
+
+      {abilities.length > 0 ? (
+        <div className="running-fitness-abilities">
+          {abilities.map((ability) => (
+            <Ability key={ability.label} {...ability} />
           ))}
         </div>
       ) : null}
 
-      <div className="training-threshold-grid">
-        {metrics.map((metric) => (
-          <div key={metric.label}>
-            <span>{metric.label}</span>
-            <strong>{metric.format(metric.value)}</strong>
-          </div>
-        ))}
-      </div>
+      {hasFitness ? null : (
+        <p className="training-empty-chart">{t("activity.scores.failed")}</p>
+      )}
     </section>
   );
 }

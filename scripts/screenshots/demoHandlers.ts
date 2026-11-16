@@ -154,7 +154,8 @@ function dashboard(): TrainingHubDashboard {
   const last = metrics().slice(-14);
   return {
     racePredictor: {
-      staminaLevel: 72,
+      // The live dashboard probed sent a total equal to its Aerobic Endurance score.
+      staminaLevel: 78,
       recoveryPct: 58,
       aerobicEnduranceScore: 78,
       lactateThresholdCapacityScore: 71,
@@ -176,7 +177,8 @@ function dashboard(): TrainingHubDashboard {
     fitnessMaxHr: 188,
     runningLevelHr: 171,
     lthrZones: [146, 157, 166, 171, 181].map((hr, index) => ({ index, hr })),
-    ltspZones: [339, 305, 280, 263, 247].map((pace, index) => ({ index, pace })),
+    // COROS's seven fast edges (the last a sentinel) at its own ratios of ltsp 262.
+    ltspZonesDefault: [376, 315, 286, 262, 256, 233, 131].map((pace, index) => ({ index, pace })),
     personalRecords: realisticInput.personalRecords ?? [],
     sleepHrv: {
       happenDay: TODAY,

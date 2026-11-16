@@ -1423,7 +1423,11 @@ export interface TrainingHubDashboard {
   fitnessMaxHr?: number;
   runningLevelHr?: number;
   lthrZones: TrainingHubThresholdZone[];
-  ltspZones: TrainingHubThresholdZone[];
+  /**
+   * COROS's default pace zones (`ltspZoneDefault`), which its Running Fitness card
+   * prints each ability's pace range from — not the athlete's own `ltspZone`.
+   */
+  ltspZonesDefault: TrainingHubThresholdZone[];
   personalRecords: TrainingHubPersonalRecordGroup[];
   sleepHrv?: TrainingHubSleepHrvSummary;
   sportDataCount?: number;

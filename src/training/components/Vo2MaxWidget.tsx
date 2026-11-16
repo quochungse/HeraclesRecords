@@ -1,9 +1,7 @@
-import { useEffect, useState } from "react";
 import { Activity } from "lucide-react";
 import {
   formatHappenDayLabel,
-  formatSignedDelta,
-  getLocalHappenDayKey
+  formatSignedDelta
 } from "../formatters";
 import { mergeTrainingDayLists } from "../parsers";
 import {
@@ -15,30 +13,25 @@ import {
   type Vo2Trend
 } from "../vo2Trend";
 import type { TrainingHubSnapshot } from "../types";
-import { t } from "../../i18n/core";
+import { messageRecord, t } from "../../i18n/core";
+import { ageOnDay, athleteSex } from "../../records/fitnessStandards";
+import { useTodayKey } from "../useTodayKey";
+import { VO2_LEVELS, vo2DialPosition, vo2LevelEdges, vo2LevelOf, type Vo2Level } from "../vo2Level";
+import { SegmentedDial } from "./SegmentedDial";
 
 interface Vo2MaxWidgetProps {
   snapshot: TrainingHubSnapshot | null;
+  /** Whose ratings: VO2max is rated for age and sex. */
+  profile: { birthday?: number; sex?: number } | null;
 }
 
-interface Vo2Band {
-  min: number;
-  max: number;
-  color: string;
-}
-
-const VO2_MIN = 20;
-const VO2_MAX = 60;
-const VO2_CENTER_X = 120;
-const VO2_CENTER_Y = 118;
-const VO2_RADIUS = 84;
-
-const VO2_BANDS: Vo2Band[] = [
-  { min: 20, max: 30, color: "#ff4f5f" },
-  { min: 30, max: 35, color: "#ffb23f" },
-  { min: 35, max: 45, color: "#3ee88e" },
-  { min: 45, max: 60, color: "#4aa3ff" }
-];
+const VO2_LEVEL_NAMES = messageRecord<Vo2Level>({
+  poor: "activity.vo2.poor",
+  fair: "activity.vo2.fair",
+  good: "activity.vo2.good",
+  excellent: "activity.vo2.excellent",
+  superior: "activity.vo2.superior"
+});
 
 /**
  * Smallest share of the bar that still fits "47 · 33d" under a segment. A
@@ -58,66 +51,6 @@ const PLATEAU_DIM = 0.32;
  * which covers only the outermost two however many plateaus there are.
  */
 const PLATEAU_TIP_EDGE = 0.28;
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-function valueToAngle(value: number): number {
-  const percent = (clamp(value, VO2_MIN, VO2_MAX) - VO2_MIN) / (VO2_MAX - VO2_MIN);
-  return 180 - percent * 180;
-}
-
-function pointOnArc(value: number, radius = VO2_RADIUS) {
-  const angle = (valueToAngle(value) * Math.PI) / 180;
-
-  return {
-    x: VO2_CENTER_X + radius * Math.cos(angle),
-    y: VO2_CENTER_Y - radius * Math.sin(angle)
-  };
-}
-
-function describeArc(min: number, max: number): string {
-  const start = pointOnArc(min);
-  const end = pointOnArc(max);
-
-  return [
-    `M ${start.x.toFixed(2)} ${start.y.toFixed(2)}`, // i18n-ignore: an SVG path
-    `A ${VO2_RADIUS} ${VO2_RADIUS} 0 0 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}` // i18n-ignore: an SVG path
-  ].join(" ");
-}
-
-function vo2Status(value?: number): { label: string; tone: string } {
-  if (value === undefined) {
-    return { label: t("activity.vo2.waiting"), tone: "neutral" };
-  }
-
-  if (value < 30) {
-    return { label: t("activity.vo2.base"), tone: "low" };
-  }
-
-  if (value < 35) {
-    return { label: t("activity.vo2.building"), tone: "mid" };
-  }
-
-  if (value < 45) {
-    return { label: t("activity.vo2.strong"), tone: "good" };
-  }
-
-  return { label: t("activity.vo2.peak"), tone: "high" };
-}
-
-function isFocusedBand(value: number | undefined, band: Vo2Band): boolean {
-  if (value === undefined) {
-    return false;
-  }
-
-  const clampedValue = clamp(value, VO2_MIN, VO2_MAX);
-  return (
-    clampedValue >= band.min &&
-    (clampedValue < band.max || (band.max === VO2_MAX && clampedValue === band.max))
-  );
-}
 
 function latestVo2Readings(snapshot: TrainingHubSnapshot | null): Vo2Reading[] {
   return mergeTrainingDayLists(
@@ -215,78 +148,38 @@ function Vo2PlateauBar({ trend }: { trend: Vo2Trend }) {
   );
 }
 
-export function Vo2MaxWidget({ snapshot }: Vo2MaxWidgetProps) {
-  const [isReady, setIsReady] = useState(false);
+export function Vo2MaxWidget({ snapshot, profile }: Vo2MaxWidgetProps) {
+  const today = useTodayKey();
   const readings = latestVo2Readings(snapshot);
   const latest = readings.at(-1);
-  const trend = buildVo2Trend(readings, getLocalHappenDayKey());
+  const trend = buildVo2Trend(readings, today);
   const displayValue = latest?.value;
-  const needle = pointOnArc(displayValue ?? VO2_MIN, VO2_RADIUS - 18);
-  const status = vo2Status(displayValue);
-
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(() => setIsReady(true));
-
-    return () => window.cancelAnimationFrame(frame);
-  }, []);
+  const edges = vo2LevelEdges(ageOnDay(profile?.birthday, today), athleteSex(profile?.sex));
+  const level = displayValue !== undefined ? vo2LevelOf(displayValue, edges) : undefined;
 
   return (
     <section
-      className={`panel vo2-widget-panel tone-${status.tone}${isReady ? " is-ready" : ""}`}
+      className={`panel training-scores-panel vo2-widget-panel${level ? ` level-${level}` : ""}`}
     >
-      <div className="vo2-widget-header">
-        <div>
+      <header className="training-scores-header">
+        <div className="training-scores-heading">
           <p className="eyebrow">VO2 Max</p>
           <h2>{t("activity.vo2.title")}</h2>
         </div>
-        <span className="vo2-widget-icon" aria-hidden="true">
-          <Activity size={16} />
-        </span>
-      </div>
+        <Activity size={22} aria-hidden="true" />
+      </header>
 
-      <div className="vo2-gauge" aria-label={t("activity.vo2.gauge")}>
-        <svg viewBox="0 0 240 144" aria-hidden="true">
-          <path
-            className="vo2-gauge-track"
-            d={describeArc(VO2_MIN, VO2_MAX)}
-          />
-          {VO2_BANDS.map((band) => {
-            const isFocused = isFocusedBand(displayValue, band);
-
-            return (
-              <path
-                key={`${band.min}-${band.max}`}
-                className={`vo2-gauge-band${isFocused ? " is-focused" : ""}`}
-                d={describeArc(band.min, band.max)}
-                pathLength={100}
-                stroke={band.color}
-              />
-            );
-          })}
-          <line
-            className="vo2-gauge-needle"
-            x1={VO2_CENTER_X}
-            y1={VO2_CENTER_Y}
-            x2={needle.x}
-            y2={needle.y}
-          />
-          <circle
-            className="vo2-gauge-pin"
-            cx={VO2_CENTER_X}
-            cy={VO2_CENTER_Y}
-            r="5"
-          />
-        </svg>
-
-        <div className={`vo2-gauge-value${displayValue !== undefined ? " has-value" : ""}`}>
-          <strong>{displayValue !== undefined ? Math.round(displayValue) : "-"}</strong>
-        </div>
-      </div>
+      <SegmentedDial
+        weights={VO2_LEVELS.map(() => 1)}
+        position={displayValue !== undefined ? vo2DialPosition(displayValue, edges) : undefined}
+        value={displayValue !== undefined ? String(Math.round(displayValue)) : "-"}
+        label={t("activity.vo2.gauge")}
+      />
 
       <div className="vo2-widget-footer">
         <div>
           <span>{t("activity.vo2.level")}</span>
-          <strong>{status.label}</strong>
+          <strong>{level ? VO2_LEVEL_NAMES[level] : t("activity.vo2.waiting")}</strong>
         </div>
         <div>
           <span>{t("activity.vo2.lastStep")}</span>

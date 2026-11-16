@@ -158,76 +158,37 @@ export function formatRunningFitnessPaceRange(
   return undefined;
 }
 
-const RUNNING_FITNESS_ZONE_SLOTS = {
-  Endurance: 1,
-  Threshold: 3,
-  Speed: 4,
-  Sprint: 5
-} as const;
+type RunningFitnessAbility = "Endurance" | "Threshold" | "Speed" | "Sprint"; // i18n-ignore: keys, not words
 
-const RUNNING_FITNESS_ZONE_SLOTS_BY_COUNT: Record<
-  number,
-  Record<keyof typeof RUNNING_FITNESS_ZONE_SLOTS, number>
-> = {
-  6: {
-    Endurance: 1,
-    Threshold: 3,
-    Speed: 4,
-    Sprint: 5
-  },
-  5: {
-    Endurance: 0,
-    Threshold: 2,
-    Speed: 3,
-    Sprint: 4
-  }
-};
-
+/**
+ * The pace range COROS prints under each Running Fitness ability, from the
+ * account's `ltspZoneDefault` (its Training Hub's `RunningAbility` card reads
+ * that, not the athlete's own `ltspZone`): seven entries, each the fast edge
+ * of its zone, the last a sentinel. Endurance is zone 1 and keeps zone 0's
+ * edge as it is, Threshold spans zones 3 and 4, Speed is zone 5, Sprint is
+ * faster than zone 5 (checked against the COROS app: 461/386/350/321/314/285/161
+ * → 06'26"–07'41", 05'14"–05'49", 04'45"–05'13", < 04'45").
+ */
 export function buildRunningFitnessPaceLabels(
-  ltspZones: PaceZoneBoundary[],
+  ltspZonesDefault: PaceZoneBoundary[],
   unitSystem: UnitSystem
-): Partial<Record<keyof typeof RUNNING_FITNESS_ZONE_SLOTS, string>> {
-  const zones = ltspZones
-    .filter((zone) => zone.pace !== undefined && Number.isFinite(zone.pace))
-    .sort((left, right) => left.index - right.index);
+): Partial<Record<RunningFitnessAbility, string>> {
+  const edges = [...ltspZonesDefault]
+    .sort((left, right) => left.index - right.index)
+    .map((zone) => zone.pace);
 
-  const slotMap = RUNNING_FITNESS_ZONE_SLOTS_BY_COUNT[zones.length];
-
-  if (!slotMap) {
+  if (edges.length !== 7 || edges.some((pace) => !pace || !Number.isFinite(pace))) {
     return {};
   }
 
-  const labels: Partial<Record<keyof typeof RUNNING_FITNESS_ZONE_SLOTS, string>> =
-    {};
+  const pace = edges as number[];
 
-  for (const [label, slotIndex] of Object.entries(slotMap)) {
-    if (label === "Sprint") {
-      const sprintZone = zones[slotIndex];
-
-      if (sprintZone?.pace) {
-        labels.Sprint = formatRunningFitnessPaceRange(undefined, sprintZone.pace, unitSystem);
-      }
-
-      continue;
-    }
-
-    const zone = zones[slotIndex];
-    const fasterZone = zones[slotIndex + 1];
-
-    if (!zone?.pace || !fasterZone?.pace) {
-      continue;
-    }
-
-    const minPace =
-      slotIndex + 1 === zones.length - 1
-        ? fasterZone.pace
-        : fasterZone.pace + 1;
-
-    labels[label as keyof typeof RUNNING_FITNESS_ZONE_SLOTS] =
-      formatRunningFitnessPaceRange(minPace, zone.pace, unitSystem);
-  }
-
-  return labels;
+  return {
+    Endurance: formatRunningFitnessPaceRange(pace[1], pace[0], unitSystem),
+    Threshold: formatRunningFitnessPaceRange(pace[4], pace[2] - 1, unitSystem),
+    Speed: formatRunningFitnessPaceRange(pace[5], pace[4] - 1, unitSystem),
+    Sprint: formatRunningFitnessPaceRange(undefined, pace[5], unitSystem)
+  };
 }
 
 export function formatHappenDayLabel(value: string): string {

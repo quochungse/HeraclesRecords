@@ -185,8 +185,26 @@ const VO2_NORMS: Readonly<Record<"male" | "female", Readonly<Record<Vo2Rating, r
   }
 };
 
+/**
+ * The 40th percentile, where the same table starts "Fair" (below it is "Poor"),
+ * by decade as above. Garmin prints it beside the others ("VO2 Max. Standard
+ * Ratings" in its watch manuals); the labours do not grade on it.
+ */
+const VO2_FAIR_NORMS: Readonly<Record<"male" | "female", readonly number[]>> = {
+  male: [41.7, 40.5, 38.5, 35.6, 32.3, 29.4],
+  female: [36.1, 34.4, 33.0, 30.1, 27.5, 25.9]
+};
+
+function vo2Decade(age: number): number {
+  return Math.min(5, Math.max(0, Math.floor(age / 10) - 2));
+}
+
 /** The VO2max a rating starts at, for this age and sex. */
 export function vo2RatingThreshold(rating: Vo2Rating, age: number, sex: AthleteSex): number {
-  const decade = Math.min(5, Math.max(0, Math.floor(age / 10) - 2));
-  return VO2_NORMS[sex === 1 ? "female" : "male"][rating][decade]; // i18n-ignore
+  return VO2_NORMS[sex === 1 ? "female" : "male"][rating][vo2Decade(age)]; // i18n-ignore
+}
+
+/** The VO2max "Fair" starts at, for this age and sex. */
+export function vo2FairThreshold(age: number, sex: AthleteSex): number {
+  return VO2_FAIR_NORMS[sex === 1 ? "female" : "male"][vo2Decade(age)]; // i18n-ignore
 }

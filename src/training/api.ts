@@ -11,7 +11,7 @@ function fallbackDashboard(
     racePredictor,
     recoveryPct: racePredictor.recoveryPct,
     lthrZones: [],
-    ltspZones: [],
+    ltspZonesDefault: [],
     personalRecords: []
   };
 }

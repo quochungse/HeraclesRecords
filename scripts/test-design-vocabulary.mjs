@@ -138,12 +138,6 @@ const DESIGNED_LENGTHS = [
   ["src/strength/strength.css", ".strength-mix-bar > span", "flex-grow"],
   // Staged reveals on load, most of them behind a 220ms delay.
   ["src/strength/strength.css", ".anatomy-body-map::after", "opacity"],
-  ["src/styles.css", ".vo2-widget-panel::before", "opacity"],
-  ["src/styles.css", ".vo2-widget-panel::after", "opacity"],
-  ["src/styles.css", ".vo2-gauge::before", "opacity"],
-  ["src/styles.css", ".vo2-gauge::before", "transform"],
-  ["src/styles.css", ".vo2-gauge-needle", "opacity"],
-  ["src/styles.css", ".vo2-gauge-needle", "transform"],
 ];
 
 function cssFiles(dir) {
