@@ -363,7 +363,7 @@ const scheduled = [
   { planId: "schedule", idInPlan: "two", planProgramId: "pp2", happenDay: "20991202", name: "Restored", sportType: 1, trainingLoad: 30 }
 ];
 const activities = [
-  { activityId: "activity-1", name: "Easy", sportType: 1, startTime: day, duration: 1_800, distance: 5_000, trainingLoad: 38 }
+  { activityId: "activity-1", name: "Easy", sportType: 100, startTime: day, duration: 1_800, distance: 5_000, trainingLoad: 38 }
 ];
 const matches = library.buildTrainingActivityMatches(scheduled, activities, [], "20991202");
 assert.equal(matches[0].status, "completed");
@@ -387,7 +387,7 @@ assert.equal(rebuilt[1].manual, false);
 {
   const heracles = (value) => ({ value, muscular: value, quality: "sets" });
   const gymPlan = [{ planId: "schedule", idInPlan: "gym", planProgramId: "pp3", happenDay: "20991201", name: "Gym", sportType: 4, trainingLoad: 40, heraclesLoad: heracles(150) }];
-  const lift = [{ activityId: "lift", name: "Gym", sportType: 4, startTime: day, duration: 3_000, trainingLoad: 12, heraclesLoad: heracles(146) }];
+  const lift = [{ activityId: "lift", name: "Gym", sportType: 402, startTime: day, duration: 3_000, trainingLoad: 12, heraclesLoad: heracles(146) }];
   const coros = library.buildTrainingActivityMatches(gymPlan, lift, [], "20991202");
   assert.equal(coros[0].status, "partial", "12 of a planned 40 in COROS's load");
   const chosen = library.buildTrainingActivityMatches(gymPlan, lift, [], "20991202", "heracles");
@@ -395,6 +395,64 @@ assert.equal(rebuilt[1].manual, false);
   assert.equal(chosen[0].plannedHeraclesLoad, 150);
   assert.equal(chosen[0].completedHeraclesLoad, 146);
   assert.equal(chosen[0].completedTrainingLoad, 12, "COROS's figure is stored beside it");
+}
+
+// A scheduled entry carries a program sport code (1 Run, 4 Strength) and an
+// activity an activity code (100, 402): the sport is asked of each in its own
+// numbering. Comparing the codes gave the sport nothing, and a session trained
+// on its day came back "missed" whenever it ran past 1.75x its planned load or
+// its name was typed with another space: four real ones below.
+{
+  const at = (hour) => new Date(2099, 11, 1, hour, 0, 0).valueOf();
+  const plan = (idInPlan, name, sportType, trainingLoad) =>
+    ({ planId: "real", idInPlan, planProgramId: idInPlan, happenDay: "20991201", name, sportType, trainingLoad });
+  const done = (activityId, name, sportType, trainingLoad, hour = 18) =>
+    ({ activityId, name, sportType, startTime: at(hour), duration: 3_600, trainingLoad });
+  const cases = [
+    [plan("easy", "Easy 9 km", 1, 106), done("a", "Easy 9 km", 100, 192), "1.8x the planned load"],
+    [plan("test", "Test LTHR 30 phút", 1, 49), done("b", "Test LTHR 30 phút", 100, 148), "3x the planned load"],
+    [plan("long", "Long run 16 km easy (HR ≤156, sáng sớm)", 1, 189), done("c", "Long run 16 km easy (HR ≤156, sáng s ớm)", 100, 284), "a stray space in the name"],
+    [plan("gym", "Core + chân đơn + ngực lưng nhẹ (nhà)", 4, undefined), done("d", "Core + chân đơn + ngực lưng nhẹ  (nhà)", 402, 71), "a doubled space, no planned load"]
+  ];
+  for (const [entry, activity, why] of cases) {
+    const [match] = library.buildTrainingActivityMatches([entry], [activity], [], "21000101");
+    assert.equal(match.status, "completed", why);
+    assert.equal(match.activityId, activity.activityId, why);
+  }
+  assert.equal(
+    library.scheduledActivityScore(cases[0][0], cases[0][1]) >= 0.7,
+    true,
+    "a run planned as a run scores its sport"
+  );
+
+  // Another sport on the day is not the session, however its load compares.
+  const [ride] = library.buildTrainingActivityMatches([plan("r", "Easy", 1, 50)], [done("bike", "Easy", 200, 50)], [], "21000101");
+  assert.equal(ride.status, "missed", "a ride does not answer a planned run");
+
+  // Two sessions on one day each take the activity of their own sport.
+  const pair = library.buildTrainingActivityMatches(
+    [plan("run", "Run", 1, 80), plan("lift", "Lift", 4, 30)],
+    [done("lift-a", "Lift", 402, 30, 7), done("run-a", "Run", 100, 200, 18)],
+    [],
+    "21000101"
+  );
+  assert.deepEqual(pair.map((match) => match.activityId), ["run-a", "lift-a"]);
+
+  // COROS's own link wins over the guess, and its share of the session decides partial.
+  const linkedPlan = [
+    { ...plan("first", "Easy", 1, 50), completedActivityId: "second-run", corosCompleteRate: 0.5 },
+    plan("second", "Easy", 1, 50)
+  ];
+  const linked = library.buildTrainingActivityMatches(
+    linkedPlan,
+    [done("first-run", "Easy", 100, 50, 7), done("second-run", "Easy", 100, 80, 18)],
+    [],
+    "21000101"
+  );
+  assert.equal(linked[0].activityId, "second-run", "the activity COROS linked");
+  assert.equal(linked[0].confidence, 1);
+  assert.equal(linked[0].status, "partial", "COROS says half of it");
+  assert.equal(linked[1].activityId, "first-run", "the linked one is not handed to the other session");
 }
 
 

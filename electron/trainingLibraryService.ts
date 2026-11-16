@@ -40,6 +40,7 @@ import { corosText, loadCorosLocale } from "./corosLocale";
 import { corosCopyName } from "./corosTextLimits";
 import { corosProgramToWorkoutDraft } from "./corosWorkoutEditor";
 import { editorDraftToPlanWorkoutInput } from "./planWorkoutEditor";
+import { activitySportFamily, scheduledSportFamily, sportFamiliesCompatible } from "./sportFamilies";
 import {
   buildCalculatedPlanProgram,
   deleteWorkoutProgram,
@@ -1063,22 +1064,53 @@ function loadsToCompare(
   return { planned: scheduled.trainingLoad, done: activity?.trainingLoad };
 }
 
+/**
+ * A name as the athlete means it: case, Unicode composition and spacing aside.
+ * A name typed again on the watch or in the COROS app comes back with a doubled
+ * space, or a stray one inside a word ("sáng s ớm"), and it is the same session.
+ */
+function comparableName(name: string | undefined): string {
+  return (name ?? "").normalize("NFC").toLowerCase().replace(/\s+/g, "");
+}
+
+/**
+ * How well a same-day activity answers a planned session, 0–1; 0.5 pairs them.
+ *
+ * The sport is asked of each side in its own numbering (`sportFamilies.ts`): a
+ * program code and an activity code are never equal, so comparing them gave
+ * the sport nothing and left the pairing to load and name. Load still ranks
+ * candidates, but a session of the planned sport on its day is the session
+ * however much harder it went: COROS's planned load runs well under what the
+ * same runs score, and a test run at 3× its plan is the test, not a miss.
+ */
 export function scheduledActivityScore(
   scheduled: TrainingHubScheduledWorkoutEntry,
   activity: TrainingHubActivity,
   loadSource: StrengthLoadSource = "coros"
 ): number {
+  const planned = scheduledSportFamily(scheduled.sportType);
+  const actual = activitySportFamily(activity.sportType);
+  if (!sportFamiliesCompatible(planned, actual)) return 0;
   let score = 0.35;
-  if (scheduled.sportType && scheduled.sportType === activity.sportType) score += 0.35;
+  if (planned && actual) score += 0.35;
   const { planned: plannedLoad, done } = loadsToCompare(scheduled, activity, loadSource);
   if (plannedLoad && done !== undefined) {
     score += 0.2 * Math.max(0, 1 - Math.abs(done - plannedLoad) / plannedLoad);
   }
-  const normalizedName = scheduled.name.trim().toLowerCase();
-  if (normalizedName && activity.name?.trim().toLowerCase() === normalizedName) score += 0.1;
+  const name = comparableName(scheduled.name);
+  if (name && comparableName(activity.name) === name) score += 0.1;
   return Math.min(1, score);
 }
 
+/**
+ * Which activity did each planned session, and so whether it was kept.
+ *
+ * COROS's own record comes first: the activity it linked to the session
+ * (`completedActivityId`, its `labelId`) is taken out of the pool before any
+ * guessing, as the Calendar does (`pairPlannedWithActual`), or the session
+ * beside it could be handed that activity and the link quietly lose. Only what
+ * COROS has not linked is paired by `scheduledActivityScore`.
+ */
 export function buildTrainingActivityMatches(
   scheduled: TrainingHubScheduledWorkoutEntry[],
   activities: TrainingHubActivity[],
@@ -1093,28 +1125,42 @@ export function buildTrainingActivityMatches(
     ])
   );
   const usedActivities = new Set<string>();
+  const linked = new Map<TrainingHubScheduledWorkoutEntry, TrainingHubActivity>();
+  for (const entry of scheduled) {
+    if (!entry.completedActivityId || usedActivities.has(entry.completedActivityId)) continue;
+    const activity = activities.find((candidate) => candidate.activityId === entry.completedActivityId);
+    if (!activity) continue;
+    linked.set(entry, activity);
+    usedActivities.add(activity.activityId);
+  }
   const results: TrainingActivityMatch[] = [];
   for (const entry of scheduled) {
     // The row this session already has keeps its identity; what an older
     // build stored as said by hand (`manual`, `skipped`) is not read: nothing
     // in the app says it any more, and the Calendar no longer honours it.
     const held = existing.get(`${entry.planId}:${entry.idInPlan}`);
-    let activity: TrainingHubActivity | undefined;
-    let confidence: number | undefined;
-    const candidates = activities
-      .filter((candidate) => activityDay(candidate) === entry.happenDay)
-      .filter((candidate) => !usedActivities.has(candidate.activityId))
-      .map((candidate) => ({ candidate, score: scheduledActivityScore(entry, candidate, loadSource) }))
-      .sort((left, right) => right.score - left.score);
-    if (candidates[0]?.score >= 0.5) {
-      activity = candidates[0].candidate;
-      confidence = candidates[0].score;
+    const corosLinked = linked.get(entry);
+    let activity = corosLinked;
+    let confidence: number | undefined = corosLinked ? 1 : undefined;
+    if (!activity) {
+      const candidates = activities
+        .filter((candidate) => activityDay(candidate) === entry.happenDay)
+        .filter((candidate) => !usedActivities.has(candidate.activityId))
+        .map((candidate) => ({ candidate, score: scheduledActivityScore(entry, candidate, loadSource) }))
+        .sort((left, right) => right.score - left.score);
+      if (candidates[0]?.score >= 0.5) {
+        activity = candidates[0].candidate;
+        confidence = candidates[0].score;
+      }
     }
     if (activity) usedActivities.add(activity.activityId);
     const compared = loadsToCompare(entry, activity, loadSource);
-    const ratio = compared.planned && compared.done !== undefined
-      ? compared.done / compared.planned
-      : undefined;
+    // COROS's own share of the session where it linked the activity, else the load's.
+    const ratio = corosLinked && entry.corosCompleteRate !== undefined
+      ? entry.corosCompleteRate
+      : compared.planned && compared.done !== undefined
+        ? compared.done / compared.planned
+        : undefined;
     const status: TrainingActivityMatch["status"] = activity
       ? ratio !== undefined && ratio < 0.75 ? "partial" : "completed"
       : entry.happenDay < today ? "missed" : "upcoming";

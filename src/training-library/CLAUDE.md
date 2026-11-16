@@ -70,6 +70,10 @@ ten sessions on a day is an error.
 - Arithmetic lives outside components: `planFilters.ts`, `planCompliance.ts`,
   `planReaderModel.ts`, `planEditorModel.ts`, `planDraft.ts`. Compliance is `undefined`, not
   0%, for a plan not on the calendar; an unmatched session has **no status**, not "upcoming".
+  **The matcher** (`buildTrainingActivityMatches`) takes COROS's own link (`completedActivityId`)
+  first, then pairs by sport *family* (`electron/sportFamilies.ts`, shared with the Calendar):
+  a program code (1, 4) and an activity code (100, 402) never compare equal. A same-day activity
+  of the planned sport is the session whatever its load or spacing of its name.
   `test:plan-editor-model`, `test:plan-editor-renderer`.
 
 ## The calendar is COROS's running copy
