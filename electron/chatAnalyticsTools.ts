@@ -120,7 +120,7 @@ export function getChatAnalyticsTools(): CorosMcpTool[] {
           chart: {
             type: "boolean",
             description:
-              "true to also show the athlete a chart of the last 4 weeks across the HR zones — when the question is about that spread. Leave it out when reading the tables to set a target."
+              "true to also show the athlete a chart of the last 4 weeks across the HR zones — when the question is about that spread. false when reading the tables to set a target."
           },
           metric: {
             type: "string",
@@ -128,7 +128,9 @@ export function getChatAnalyticsTools(): CorosMcpTool[] {
             description:
               "Which measure that chart shows (default trainingLoad). The text always carries all three."
           }
-        }
+        },
+        // Asked of every call, as on get_activity_details and get_fitness_trends.
+        required: ["chart"]
       }
     }
   ];
