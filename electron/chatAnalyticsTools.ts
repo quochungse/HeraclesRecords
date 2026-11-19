@@ -90,8 +90,19 @@ export function getChatAnalyticsTools(): CorosMcpTool[] {
             minimum: 1,
             maximum: MAX_TREND_DAYS,
             description: `Days back from today (default ${DEFAULT_TREND_DAYS}, max ${MAX_TREND_DAYS}).`
+          },
+          chart: {
+            type: "boolean",
+            description:
+              "true to also show the athlete a recovery chart (overnight HRV against its baseline and the heart " +
+              "rate slept at) — when the answer is about recovery, fatigue or how the body is coping. false when " +
+              "the trends are only evidence for something else, such as setting a load or writing a workout."
           }
-        }
+        },
+        // Asked of every call, as on get_activity_details: the model says
+        // whether this answer is about recovery rather than the chart
+        // standing above every answer that read the trends.
+        required: ["chart"]
       }
     },
     {
@@ -168,11 +179,16 @@ async function handleGetFitnessTrends(
         )
       : mergeTrainingDayLists(dailyMetrics, analytics);
     const window = trendWindow(merged, days);
-    const preview = buildFitnessTrendPreview(
-      withSleepHeartRate(buildTrendPoints(window, window.length), nights),
-      callbacks?.requestId,
-      days
-    );
+    // Only when asked for: trends read as evidence — the load behind a
+    // workout — drew a recovery chart above an answer about something else.
+    const preview =
+      args.chart === true
+        ? buildFitnessTrendPreview(
+            withSleepHeartRate(buildTrendPoints(window, window.length), nights),
+            callbacks?.requestId,
+            days
+          )
+        : null;
 
     if (preview && callbacks?.onFitnessTrend) {
       callbacks.onFitnessTrend(preview);
