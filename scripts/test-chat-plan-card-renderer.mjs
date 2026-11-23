@@ -1079,7 +1079,11 @@ async function main() {
   await harness("setValue", ".chat-composer textarea", "Looks right");
   await harness("click", ".chat-send");
   const withBrief = await waitFor(async () => (await harness("calls", "sendChat"))[0], "the turn goes");
-  assert.match(withBrief.args[1].at(-1).content, /- Brief · brief_id brief-1 · race \(Half\) "Hanoi Half" on 2031-05-18/);
+  // What Mentor has made goes beside the wire (`sendChat`'s sixth argument) and
+  // closes the system prompt; in the question it changed a message already
+  // sent, and the provider read the whole conversation into its cache again.
+  assert.equal(withBrief.args[1].at(-1).content, "Looks right", "the question is the athlete's words alone");
+  assert.match(withBrief.args[5], /- Brief · brief_id brief-1 · race \(Half\) "Hanoi Half" on 2031-05-18/);
 
   // -------------------------------------------------------------------------
   // An outline: asked for from the brief, read on its card, adjusted by hand,
