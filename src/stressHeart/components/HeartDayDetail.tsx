@@ -221,7 +221,7 @@ export function HeartDayDetail({
 
         <dl className="stress-day-figures">
           {/* Daily and sleep heart rate, alike: lowest to highest, the average under it. */}
-          <div className="stress-day-figure">
+          <div className="stress-day-figure is-day">
             <dt>{t("heart.figure.dailyHr")}</dt>
             <dd>
               <strong>

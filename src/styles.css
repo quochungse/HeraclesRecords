@@ -27,6 +27,10 @@
   --stress-high: #e5534b;
   --heart-rate: #ff6b81;
   --heart-rate-resting: #8cc8f0;
+  /* The day's lowest–highest, in the list and the day's cell alike: the
+     plain ink on dark; on paper the secondary one, where black at that weight
+     outshouted the date beside it. */
+  --heart-range-ink: var(--text-primary);
   /* What a heart-rate wash is mixed into: nothing on dark's glass, where the
      washes may overlap and read as layers; the card's white on paper, where
      two translucent washes overlapping went muddy (lavender on pink, mint on
@@ -329,6 +333,7 @@ svg:focus-visible {
   --stress-high: #c8333a;
   --heart-rate: #d23f5a;
   --heart-rate-resting: #3b86c4;
+  --heart-range-ink: var(--text-secondary);
   --heart-wash-ground: #ffffff;
 
   --bg-base: #e9ecf2; /* cool paper */

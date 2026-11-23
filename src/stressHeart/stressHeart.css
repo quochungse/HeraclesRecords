@@ -258,13 +258,19 @@
   color: var(--heart-rate-resting);
 }
 
-/* Heart rate's rows lead with a range in the quieter ink: the strip under it
-   carries the colour, and full white or black there shouted down the date. */
+/* The day's lowest–highest is one figure in one ink wherever it stands — the
+   list's row and the day's own cell (`--heart-range-ink`) — and small in the
+   row, where it sits beside the date rather than over it. */
 .stress-day-row-figure.is-plain {
-  color: var(--text-secondary);
+  color: var(--heart-range-ink);
+  font-size: 14px;
 }
 
-/* A preview of the day's ladder, on one scale for every row (30–200 bpm): the
+.stress-day-figure.is-day strong {
+  color: var(--heart-range-ink);
+}
+
+/* A preview of the day's ladder, on one scale for every row (30–210 bpm): the
    day's range, the night's within it in the sleep's lavender and each session
    at its average in its sport's colour — washed as the ladder's ranges are. */
 .heart-day-row-range {
@@ -283,7 +289,7 @@
 }
 
 .heart-day-row-range i.is-day {
-  background: color-mix(in srgb, var(--heart-rate) 40%, var(--heart-wash-ground));
+  background: color-mix(in srgb, var(--heart-rate) 45%, var(--heart-wash-ground));
 }
 
 .heart-day-row-range i.is-sleep {
