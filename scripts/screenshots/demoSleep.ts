@@ -62,7 +62,8 @@ function night(daysAgo: number): Night {
     maxHr: Math.round(68 + r() * 14),
     sleepStart: clock(startMin),
     sleepEnd: clock(endMin),
-    sleepStartDay: prev,
+    // A night begun after midnight began on its own wake day.
+    sleepStartDay: startMin >= 1440 ? day : prev,
     sleepEndDay: day
   };
   if (r() < 0.1 && daysAgo > 0) {

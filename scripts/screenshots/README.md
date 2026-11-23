@@ -1,7 +1,7 @@
 # Screenshots
 
-Every screenshot in `docs/readme/` comes from here: the README uses `01`–`18` and
-`27`–`30`, the website `01`–`33`. They are taken of the real renderer (`src/main.tsx`) running on demo data, so no
+Every screenshot in `docs/readme/` comes from here: the README uses `01`–`18`,
+`27`–`30` and `34`–`35`, the website `01`–`35`. They are taken of the real renderer (`src/main.tsx`) running on demo data, so no
 athlete's own training ever appears in them.
 
 ```sh
@@ -22,7 +22,8 @@ Shots are 1512 × 982 at 2×, with the macOS window corners, written as WebP int
   app's own `src/main.tsx`.
 - **The demo data** is one believable athlete, Alex Pham in Hà Nội: runs (`sampleRoadRuns.ts`),
   and the rides, hikes, trail runs and swims of `electron/sample*.ts`; sleep (`demoSleep.ts`); a
-  12-week marathon plan and a workout library (`demoPlan.ts`, `demoLibrary.ts`); Coach
+  12-week marathon plan and a workout library (`demoPlan.ts`, `demoLibrary.ts`); a year of
+  stress and heart rate worked out from those nights and sessions (`demoStressHeart.ts`); Coach
   conversations in English (`demoCoach.ts`); and the Hall of Records' realistic history.
   Emails are `example.com`. Its today is always the last Saturday (`clock.ts`, imported first):
   the sample sets are each dated back from today and the demo keeps one outdoor session a day, so

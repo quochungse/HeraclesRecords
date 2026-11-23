@@ -15,6 +15,7 @@ import { librarySnapshot, workoutForEdit, planById, EDITOR_CONTEXT } from "./dem
 import { exerciseOptions } from "./demoExercises";
 import { version as APP_VERSION } from "../../package.json";
 import { sleepHistory, sleepSummary, dailyHealth, nightSeries } from "./demoSleep";
+import { stressHeartDays, stressSeries } from "./demoStressHeart";
 import { buildSampleStrengthSessions } from "../../src/strength/sampleSessions";
 import { runHeraclesLoads } from "../../electron/heraclesLoad";
 import { allActivities, dayKey, daysAgoDate, realisticInput, TODAY } from "./demoData";
@@ -298,6 +299,8 @@ export function demoHandlers(): Record<string, unknown> {
     getTrainingSleepData: async (days?: number) => sleepSummary(days ?? 28),
     getTrainingDailyHealthData: async (days?: number) => dailyHealth(days ?? 30),
     getSleepNightSeries: async (req: { happenDay: string }) => nightSeries(req.happenDay),
+    getStressHeartDays: async () => stressHeartDays(),
+    getStressSeries: async (req: { fromDay: string; toDay: string }) => stressSeries(req),
     syncStrengthHistory: async (req?: { days?: number }) => { const days = req?.days ?? 90; const sessions = strengthHistory(days); return { sessions, pending: 0, fetched: sessions.length, days, source: "coros" }; },
     listCoachAnalysisRuns: async () => [],
     getChatSettings: async () => CHAT_SETTINGS,

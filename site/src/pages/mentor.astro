@@ -1,14 +1,15 @@
 ---
 import Base from "../layouts/Base.astro";
 import Shot from "../components/Shot.astro";
+import { MENTOR_PORTRAIT_PATH } from "../../../src/chat/mentorPortrait";
 
 const reads = [
-  { title: "Activities", text: "Every session, its laps, zones and every channel, down to one stretch of it: the last 5 km, the third interval." },
-  { title: "Trends", text: "Training load and where it is heading, steps, exercise minutes and stress, week by week." },
+  { title: "Activities", text: "Every session, its laps, zones, how you rated it on the watch and every channel it recorded, down to one stretch of it: the last 5 km, the third interval." },
+  { title: "Load and recovery", text: "Training load and where it is heading, overnight HRV and the heart rate you slept at, steps, exercise minutes and stress, day by day and week by week." },
   { title: "Sleep", text: "Nights, naps, stages, HRV across the night and stress by the hour." },
   { title: "Plans and workouts", text: "Your COROS workout library, your plans and how well you are keeping to them." },
   { title: "Zones and profile", text: "Your own heart-rate, pace and power zones, thresholds and personal records." },
-  { title: "The conversation", text: "Earlier turns of a long conversation, searched when they matter again." },
+  { title: "The web", text: "Races, events and anything else your data does not hold, when a conversation allows it. Never in an analysis, and a local model does without." },
 ];
 
 const does = [
@@ -16,8 +17,8 @@ const does = [
   { title: "Drafts workouts", text: "One session, built to your zones, saved to your COROS library or straight onto your calendar." },
   { title: "Writes plans with you", text: "A plan longer than two weeks starts as a brief you can edit, then an outline, then every session. Read it in the Workbench beside the conversation, change what you like, and save it to COROS." },
   { title: "Rearranges your week", text: "Moves, swaps, removals and additions arrive as a list. Apply them one line at a time, or all at once." },
-  { title: "Checks in on its own", text: "An auto analysis debriefs each new activity, briefs you in the morning or reviews the week, without being asked. More below." },
-  { title: "Speaks your way", text: "Friendly, Motivating, Neutral, Straight talk or No filter. Your own instructions go on top." },
+  { title: "Asks before it guesses", text: "What only you know, a race date or the days you can train, Mentor asks with a card of choices rather than assuming." },
+  { title: "Speaks your way", text: "Friendly, Motivating, Neutral, Straight talk or No filter, in whatever language you write to it. Your own instructions go on top." },
 ];
 
 const providers = [
@@ -31,15 +32,16 @@ const providers = [
 
 <Base og="coach"
   title="Mentor"
-  description="An AI mentor that has read your COROS training: answers with charts, drafts workouts and plans, and proposes changes you apply one line at a time."
+  description="Mentor, the AI trainer in Heracles Records, named for the counsellor of the Odyssey: it reads your COROS training, answers with charts, drafts workouts and plans, and changes nothing without you."
 >
   <section class="wrap page-hero">
     <p class="eyebrow">Mentor</p>
-    <h1>A mentor that has read your training.</h1>
+    <h1>A trainer named Mentor.</h1>
     <p class="lede">
-      Ask about a session, a week or how well you are recovering. Mentor reads your COROS data
-      and answers with the numbers and the charts behind them. It drafts what you ask for, and
-      changes nothing until you say so.
+      Mentor is the trainer in Heracles Records, and the name it answers to. Ask about a
+      session, a week or how well you are recovering: it reads your COROS data and answers with
+      the numbers and the charts behind them. It drafts what you ask for, and changes nothing
+      until you say so.
     </p>
   </section>
 
@@ -47,12 +49,34 @@ const providers = [
     <Shot name="11-coach" alt="Mentor: an interval session analysed, with heart-rate and pace charts" eager />
   </section>
 
+  <section class="wrap section the-name" id="the-name">
+    <svg class="portrait" viewBox="0 0 24 24" aria-hidden="true">
+      <path d={MENTOR_PORTRAIT_PATH} fill="currentColor" fill-rule="evenodd" />
+    </svg>
+    <div>
+      <p class="eyebrow">The name</p>
+      <h2 class="section-title">Named for the counsellor of the Odyssey.</h2>
+      <p class="lede">
+        In the Odyssey, Mentor is the friend Odysseus leaves in charge of his house and his son
+        when he sails for Troy. When Telemachus sets out to find his father, Athena comes to him
+        in Mentor's shape and shows him the way. The name outlived the story: a mentor is now
+        anyone who has gone further down the road and helps you along it.
+      </p>
+      <p class="lede">
+        Here it is both. A name, with the old counsellor's portrait on the rail, on every
+        <strong>Ask Mentor</strong> button and beside each answer. And the counsellor's job: it
+        keeps watch over every session, night and plan your COROS account holds, and it advises.
+        The decisions stay yours.
+      </p>
+    </div>
+  </section>
+
   <section class="wrap section">
     <div class="section-head">
       <h2 class="section-title">What Mentor reads</h2>
       <p class="lede">
-        Mentor fetches what a question is about, not everything at once, and every figure it
-        quotes comes from your COROS account.
+        Mentor fetches what a question is about, not everything at once, and every figure about
+        your training comes from your COROS account.
       </p>
     </div>
     <ul class="cards">
@@ -121,7 +145,7 @@ const providers = [
         <ul class="plain">
           <li><strong>After a new activity</strong>: for the sports you pick, over a length or a distance. A debrief also reads the 72 hours before, so yesterday's leg day is part of today's run.</li>
           <li><strong>On a schedule</strong>: every day or every week, at the time you set.</li>
-          <li><strong>When a metric turns</strong>: training load ramping, resting heart rate drifting up, a planned workout missed, or sleep debt building.</li>
+          <li><strong>When a metric turns</strong>: training load ramping, your sleeping heart rate drifting up, a planned workout missed, or sleep debt building.</li>
           <li><strong>Only when you ask</strong>: a playbook you run by hand.</li>
         </ul>
       </div>
@@ -139,12 +163,27 @@ const providers = [
 
   <section class="wrap section">
     <div class="section-head">
-      <h2 class="section-title">Ask from anywhere</h2>
-      <p class="lede">
-        Ask Mentor sits on every session's page, on a calendar day or week, and on a plan in the
-        Training Library. The question arrives in Mentor already pointing at what it is about.
-      </p>
+      <h2 class="section-title">A conversation is yours to shape</h2>
     </div>
+    <ul class="ticks">
+      <li>
+        <strong>Ask from anywhere.</strong> Ask Mentor sits on every session's page, on a
+        calendar day or week, and on a plan and its sessions in the Training Library. The
+        question arrives already pointing at what it is about.
+      </li>
+      <li>
+        <strong>Edit, delete or hide.</strong> Edit your last question and ask again, delete one
+        you regret, or hide a turn from Mentor without losing it.
+      </li>
+      <li>
+        <strong>Branch.</strong> Start a new conversation from any answer to try another idea.
+        What Mentor made in the first one stays there.
+      </li>
+      <li>
+        <strong>Long threads.</strong> A rail of your questions takes you back to any of them,
+        and Mentor searches its earlier turns when they matter again.
+      </li>
+    </ul>
   </section>
 
   <section class="wrap section">
@@ -208,6 +247,37 @@ const providers = [
 <style>
   .section-tight {
     padding-top: 40px;
+  }
+
+  .the-name {
+    display: grid;
+    grid-template-columns: 168px minmax(0, 1fr);
+    gap: 48px;
+    align-items: start;
+  }
+
+  .portrait {
+    display: block;
+    width: 168px;
+    height: 168px;
+    padding: 30px;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  @media (max-width: 760px) {
+    .the-name {
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+
+    .portrait {
+      width: 104px;
+      height: 104px;
+      padding: 18px;
+    }
   }
 
   .workbench {

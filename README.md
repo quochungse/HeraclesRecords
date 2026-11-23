@@ -69,7 +69,7 @@ You sign in with your COROS account. Mentor also needs an AI: your ChatGPT accou
 
 ## What's inside
 
-A tour of the main screens. [heraclesrecords.com](https://heraclesrecords.com) goes further into [each sport](https://heraclesrecords.com/activities/), [strength](https://heraclesrecords.com/activities/strength/), [plans and the library](https://heraclesrecords.com/plan/), [Mentor](https://heraclesrecords.com/mentor) and the [Twelve Labours](https://heraclesrecords.com/labours), and the [guide](https://heraclesrecords.com/guide/) walks through setting up COROS, Mentor, sync and backups.
+A tour of the main screens. [heraclesrecords.com](https://heraclesrecords.com) goes further into [each sport](https://heraclesrecords.com/activities/), [strength](https://heraclesrecords.com/activities/strength/), [your health](https://heraclesrecords.com/health), [plans and the library](https://heraclesrecords.com/plan/), [Mentor](https://heraclesrecords.com/mentor) and the [Twelve Labours](https://heraclesrecords.com/labours), and the [guide](https://heraclesrecords.com/guide/) walks through setting up COROS, Mentor, sync and backups.
 
 ### Today at a glance
 
@@ -82,6 +82,21 @@ Recovery, last night's sleep and the week's training status side by side, what i
 Nights and naps, stages, HRV and stress across the night, kept long after the nine weeks COROS holds.
 
 <img src="docs/readme/08-sleep.webp" alt="Sleep: stages, HRV and stress across the night" />
+
+### Heart rate and stress
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/readme/34-heart-rate.webp" alt="Heart rate: the day's resting heart rate, its range, asleep and in each session, on one scale" />
+      <p><strong>Heart rate</strong>: your resting heart rate against the week before, and where the day sat on one scale: the whole day, asleep and each session, with each session's own time in its zones. Below, daily heart rate and your exercise time in your own heart-rate zones.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/readme/35-stress-level.webp" alt="Stress level: a reading every five minutes over the day's sleep and sessions, and stress by day" />
+      <p><strong>Stress level</strong>: COROS's reading every five minutes over a line of the day's sleep and sessions, its peak and its time at High and Relaxed. Below, the hours in each level, day by day.</p>
+    </td>
+  </tr>
+</table>
 
 ### Every session, read in depth
 

@@ -1,6 +1,6 @@
 // A stand-in for the preload bridge, answering from demo data.
 import type { HeraclesRecordsApi } from "../../src/heraclesrecords-api";
-import { activityDetail, activitySummaries, listPage, realisticInput } from "./demoData";
+import { activityDetail, activitySummaries, heartRateSweep, listPage, realisticInput } from "./demoData";
 import { demoHandlers } from "./demoHandlers";
 
 const unhandled = new Set<string>();
@@ -13,7 +13,8 @@ export function installDemoApi(): void {
       listPage(page, size, startDay, endDay),
     getTrainingHubActivityDetail: async (id: string) => activityDetail(id),
     getActivityDetailSummaries: async (ids: string[]) => activitySummaries(ids),
-    syncActivityDetailSummaries: async () => ({ computed: 0, remaining: 0, failed: 0 }),
+    syncActivityDetailSummaries: async (ids: string[], _limit?: number, options?: { requireHeartRate?: boolean }) =>
+      options?.requireHeartRate ? heartRateSweep(ids) : { computed: 0, remaining: 0, failed: 0 },
     listRememberedMilestones: async () => realisticInput.remembered ?? [],
     ...demoHandlers()
   };

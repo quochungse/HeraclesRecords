@@ -34,7 +34,7 @@ COROS keeps one Training Hub session per account, so signing in elsewhere (the T
 
 ## Sleep says "Sleep needs MCP"
 
-Sleep comes through COROS MCP, a separate connection. See [Sleep and health data](/guide/sleep-and-health).
+Sleep comes through COROS MCP, a separate connection. Stress level and Heart rate read the same one: until it is made, they say the COROS MCP server is not connected. See [Sleep and health data](/guide/sleep-and-health).
 
 ## Mentor says it is not set up
 

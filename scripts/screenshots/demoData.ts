@@ -1,9 +1,11 @@
 // Demo data for README screenshots.
 import type {
   ActivityDetailSummary,
+  ActivityDetailSummarySync,
   TrainingHubActivity,
   TrainingHubActivityDetail
 } from "../../electron/types";
+import { ACTIVITY_SUMMARY_VERSION, HEART_RATE_SUMMARY_VERSION } from "../../electron/activityMetrics";
 import { seededRandom } from "../../electron/sampleActivityKit";
 import { withSampleRides, sampleRideDetail, withSampleRideSummaries, isSampleRideId } from "../../electron/sampleRides";
 import { withSampleHikes, sampleHikeDetail, withSampleHikeSummaries, isSampleHikeId } from "../../electron/sampleHikes";
@@ -145,4 +147,21 @@ export function activitySummaries(ids: string[]): ActivityDetailSummary[] {
   out = withSampleSwimSummaries(ids, out);
   // Drift is a road-run figure (see the Activities fix): rides, hikes and trail runs carry none.
   return out.map((s) => (isSampleRoadRunId(s.activityId) ? s : { ...s, decouplingPercent: undefined }));
+}
+
+/**
+ * The Heart rate screen's sweep (`requireHeartRate`): each session's average
+ * and highest heart rate, as its detail gives them. Every other sweep is
+ * answered from the stored summaries alone.
+ */
+export function heartRateSweep(ids: string[]): ActivityDetailSummarySync {
+  const stored = new Map(activitySummaries(ids).map((summary) => [summary.activityId, summary]));
+  const summaries = ids.flatMap((id): ActivityDetailSummary[] => {
+    const activity = findActivity(id);
+    if (activity?.avgHr === undefined) return [];
+    const base = stored.get(id) ?? { activityId: id, fingerprint: "demo", summaryVersion: ACTIVITY_SUMMARY_VERSION, computedAt: Date.now() };
+    const heartRate = { avg: activity.avgHr, ...(activity.maxHr ? { max: activity.maxHr } : {}) };
+    return [{ ...base, heartRateVersion: HEART_RATE_SUMMARY_VERSION, heartRate }];
+  });
+  return { computed: summaries.length, remaining: 0, failed: 0, fetched: 0, summaries };
 }

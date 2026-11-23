@@ -10,6 +10,7 @@ const PAGES = [
   "/download",
   ...ACTIVITIES_PAGES.map((page) => page.href),
   TRAINING_LOAD_PAGE,
+  "/health",
   "/plan/",
   ...PLAN_PAGES.map((page) => page.href),
   "/mentor",

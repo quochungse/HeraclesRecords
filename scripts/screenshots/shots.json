@@ -319,5 +319,25 @@
    1500
   ],
   "theme": "dark"
+ },
+ {
+  "out": "34-heart-rate",
+  "view": "heartRate",
+  "wait": 4500,
+  "steps": [
+   "(() => { const rows = [...document.querySelectorAll(\".stress-day-row\")].slice(1); const row = rows.find((b) => b.querySelector(\".is-session\")) ?? rows[0]; if (!row) return \"no day\"; row.click(); return true; })()",
+   2000
+  ],
+  "theme": "dark"
+ },
+ {
+  "out": "35-stress-level",
+  "view": "stress",
+  "wait": 4500,
+  "steps": [
+   "(() => { const row = document.querySelectorAll(\".stress-day-row\")[1]; if (!row) return \"no day\"; row.click(); return true; })()",
+   2000
+  ],
+  "theme": "dark"
  }
 ]

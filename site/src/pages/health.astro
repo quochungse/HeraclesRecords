@@ -1,0 +1,94 @@
+---
+import Base from "../layouts/Base.astro";
+import FeatureRow from "../components/FeatureRow.astro";
+import Shot from "../components/Shot.astro";
+---
+
+<Base og="health"
+  title="Health"
+  description="Health in Heracles Records: your resting heart rate and where each day sat, every night and nap kept past COROS's nine weeks, and your stress every five minutes."
+>
+  <section class="wrap page-hero">
+    <p class="eyebrow">Health</p>
+    <h1>The record your body keeps between sessions.</h1>
+    <p class="lede">
+      Under Health in the sidebar: Heart rate, Sleep and Stress level. Each opens on today with
+      the last 30 days beside it, so a hard week shows in the days that followed it. Pick a day
+      to read it, and look further back in the charts below.
+    </p>
+  </section>
+
+  <section class="wrap section-tight">
+    <Shot name="34-heart-rate" alt="Heart rate: the day's resting heart rate, its range, asleep and in each session, on one scale" eager />
+  </section>
+
+  <div class="wrap">
+    <section class="feature-text">
+      <p class="eyebrow">Heart rate</p>
+      <h2>Where the day sat.</h2>
+      <p>
+        COROS sends a day's heart rate as figures, not a curve. So the screen sets them on one
+        scale: the whole day, the night and every session, with your resting rate drawn through
+        them.
+      </p>
+      <ul class="ticks columns">
+        <li><strong>Resting heart rate</strong> against the 7 days before. The night sets it, so today states it too.</li>
+        <li><strong>The day's lowest to highest</strong>, and the heart rate you slept at, from the night's own record.</li>
+        <li><strong>Each session from its average to its highest</strong>, in its sport's colour. Point at a row and it says what it holds.</li>
+        <li><strong>A session's own zones</strong>, folded under it until you press it, on the bounds COROS scored it with.</li>
+        <li><strong>Every day in the list is that scale in small</strong>, 30 to 210 bpm, so a hard day and a rest day compare at a glance.</li>
+        <li><strong>Daily heart rate</strong> over 4 weeks, 3 months or all of your history, and <strong>Exercise heart rate</strong>: your training time in each of your own zones.</li>
+      </ul>
+    </section>
+
+    <FeatureRow shot="08-sleep" alt="Sleep: stages, HRV and stress across the night">
+      <p class="eyebrow">Sleep</p>
+      <h2>Every night, kept.</h2>
+      <ul class="ticks">
+        <li><strong>Nights and naps</strong>, their score, stages, the sleep window, time in bed and wake-ups.</li>
+        <li><strong>Across the night</strong>: HRV against your own baseline, and stress.</li>
+        <li><strong>Sleep length and score</strong> night after night. Press a night's bar to open it.</li>
+        <li><strong>Kept past nine weeks.</strong> COROS holds about nine weeks of sleep; the app keeps every night it has read, and Cerberus, the sleep labour in the Hall of Records, counts nights from that history.</li>
+      </ul>
+    </FeatureRow>
+
+    <FeatureRow shot="35-stress-level" alt="Stress level: a reading every five minutes over the day's sleep and sessions, and stress by day" flip>
+      <p class="eyebrow">Stress level</p>
+      <h2>Five minutes at a time.</h2>
+      <ul class="ticks">
+        <li><strong>COROS's reading every five minutes</strong>, each in its level's colour: Relaxed up to 25, Low to 50, Medium to 75, High above.</li>
+        <li><strong>A line of the day beneath it</strong>: asleep, in a session, or dotted where nothing was read. COROS reads stress only while you are still, so the gaps are your sessions and the hours the watch was off your wrist.</li>
+        <li><strong>The day's peak</strong>, its time at High stress and Relaxed, and one bar of the four levels that names each part when you point at it.</li>
+        <li><strong>Stress by day</strong>: the hours in each level and the day's average, over 4 weeks, 3 months or all of your history.</li>
+      </ul>
+    </FeatureRow>
+  </div>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <h2 class="section-title">Today has no average yet.</h2>
+      <p class="lede">
+        At nine in the morning, the day's average stress or heart rate is mostly the night's. So
+        until a day is over it states none: Stress level leads with the latest reading, Heart
+        rate with the resting rate the night set, and every trend's average stops at yesterday.
+      </p>
+    </div>
+  </section>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <h2 class="section-title">Through COROS MCP, once.</h2>
+      <p class="lede">
+        All three screens read COROS's MCP server, a second connection to your COROS account
+        made once from <strong>Settings → Connections → MCP Servers</strong>. The first read
+        brings in a year of days. After that the app asks only for what is new, and for today and
+        yesterday, which the watch may still be syncing.
+      </p>
+    </div>
+    <ul class="ticks">
+      <li><strong>On your computer.</strong> What the app reads is kept there, and Sync does not carry it: each of your computers reads its own from COROS.</li>
+      <li><strong>For Mentor too.</strong> With COROS MCP connected, Mentor reads your nights, HRV and stress beside your training load.</li>
+    </ul>
+    <a class="more" href="/guide/sleep-and-health">Connect COROS MCP, step by step</a>
+  </section>
+</Base>

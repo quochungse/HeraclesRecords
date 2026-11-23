@@ -26,6 +26,7 @@ const languages = LOCALES.map((locale) => {
   return { name: LOCALE_DETAILS[locale].nativeName, english: LOCALE_DETAILS[locale].englishName, flag: file ? flagFiles[file].default.src : undefined };
 });
 
+// Overview, then the rail's Health screens in the rail's order.
 const today = [
   {
     name: "01-overview",
@@ -33,9 +34,19 @@ const today = [
     label: "Overview",
   },
   {
+    name: "34-heart-rate",
+    alt: "Heart rate: the day's resting heart rate, its range, asleep and in each session, on one scale",
+    label: "Heart rate",
+  },
+  {
     name: "08-sleep",
     alt: "Sleep: stages, HRV and stress across the night",
     label: "Sleep",
+  },
+  {
+    name: "35-stress-level",
+    alt: "Stress level: a reading every five minutes over the day's sleep and sessions, and stress by day",
+    label: "Stress level",
   },
 ];
 
@@ -157,15 +168,16 @@ const faq = [
 
   <section class="wrap section split split-top">
     <div>
-      <p class="eyebrow">Today</p>
+      <p class="eyebrow">Today and your health</p>
       <h2 class="section-title">Start the day knowing where you stand.</h2>
       <p class="lede">
         Recovery, the week's load, last night's sleep and the next session on your plan, on
-        one screen. Sleep keeps every night and nap, its stages, HRV and stress, long after
-        the nine weeks COROS holds.
+        one screen. Under Health: your resting heart rate and where each day sat, every night
+        and nap kept long after the nine weeks COROS holds, and your stress every five minutes.
       </p>
+      <a class="more" href="/health">Heart rate, Sleep and Stress level</a>
     </div>
-    <ShotSlider label="Today and Sleep" slides={today} />
+    <ShotSlider label="Overview and Health" slides={today} />
   </section>
 
   <section class="wrap section">

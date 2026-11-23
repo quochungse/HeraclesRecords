@@ -270,8 +270,9 @@ code {
   color: var(--ink);
 }
 
-/* Header layout: brand, links, the download button. Under 720px the links take
-   a row of their own and scroll sideways rather than wrapping. */
+/* Header layout: brand, links, the download button. Under 900px the links take
+   a row of their own and scroll sideways rather than wrapping: one row of the
+   brand, seven links and the button needs about 860px. */
 
 .site-header .wrap {
   height: auto;
@@ -287,7 +288,7 @@ code {
   font-size: 14px;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 900px) {
   .site-header .wrap {
     flex-wrap: wrap;
     row-gap: 0;
