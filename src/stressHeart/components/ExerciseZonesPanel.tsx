@@ -15,7 +15,7 @@ import {
 } from "../../training/overview/distributionModel";
 import { useI18n } from "../../i18n/useI18n";
 import { PeriodControl, usePeriod } from "./trendParts";
-import { ZoneRows } from "./ZoneRows";
+import { ZoneRows, sharePercent } from "./ZoneRows";
 
 /** Four weeks or three months: each session's detail is read for its zones. */
 const EXERCISE_PERIODS = [28, 90] as const;
@@ -26,10 +26,6 @@ interface ExerciseZonesPanelProps {
   activities: readonly TrainingHubActivity[];
   zoneModel: HeartRateZoneModel | null;
   lthrZones: TrainingHubThresholdZone[];
-}
-
-function percent(share: number): string {
-  return `${Math.round(share * 100)}%`;
 }
 
 /**
@@ -79,7 +75,7 @@ export function ExerciseZonesPanel({ api, activities, zoneModel, lthrZones }: Ex
             <dt>{t(key === "easy" ? "heart.exercise.easy" : "heart.exercise.hard")}</dt>
             <dd>
               <strong>
-                <MotionFigure text={byZone.rows.length > 0 ? percent(split[key]) : "–"} value={split[key]} />
+                <MotionFigure text={byZone.rows.length > 0 ? sharePercent(split[key]) : "–"} value={split[key]} />
               </strong>
               <span>{t(key === "easy" ? "heart.exercise.easyNote" : "heart.exercise.hardNote")}</span>
             </dd>

@@ -155,7 +155,6 @@ export interface SessionDetailsState {
   details: ReadonlyMap<string, TrainingHubActivityDetail | null>;
   /** Counts the answers so far: `details` is one map filled in place. */
   answers: number;
-  loading: boolean;
 }
 
 /**
@@ -198,9 +197,5 @@ export function useSessionDetails(
     // `key` names the sessions; the array itself is rebuilt on every render.
   }, [api, key]);
 
-  return {
-    details: known.current,
-    answers,
-    loading: sessions.some((session) => !known.current.has(session.activityId))
-  };
+  return { details: known.current, answers };
 }

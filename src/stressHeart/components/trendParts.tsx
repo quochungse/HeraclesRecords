@@ -22,6 +22,11 @@ export const CHART_HEIGHT = 220;
 /** A unit symbol, the same in every language. */
 export const BPM = "bpm"; // i18n-ignore
 
+/** "57 bpm". */
+export function bpm(value: number): string {
+  return `${Math.round(value)} ${BPM}`;
+}
+
 /**
  * "a" or "b" while a press here is being answered, alternating so a second
  * press restarts the motion; nothing otherwise, so a redraw nobody pressed for
@@ -133,13 +138,4 @@ export function DayTip({ heading, rows }: { heading: string; rows: TipRow[] }) {
 /** The chart row under the pointer, as the chart was handed it. */
 export function hoveredRow<T>(props: TooltipContentProps): T | undefined {
   return props.active ? (props.payload?.[0]?.payload as T | undefined) : undefined;
-}
-
-/** The heart-rate scale: from 40 bpm (or the decade under a lower reading) up 150 bpm, ticked every 30. */
-export function heartScale(lows: number[], highs: number[]): { domain: [number, number]; ticks: number[] } {
-  const low = Math.min(40, lows.length > 0 ? Math.floor(Math.min(...lows) / 10) * 10 : 40);
-  const high = Math.max(low + 150, highs.length > 0 ? Math.ceil(Math.max(...highs) / 30) * 30 : 0);
-  const ticks: number[] = [];
-  for (let tick = low; tick <= high; tick += 30) ticks.push(tick);
-  return { domain: [low, high], ticks };
 }

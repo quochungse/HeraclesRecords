@@ -2452,8 +2452,8 @@ function parsePerformance(value: string | null): RunPerformanceCurve | undefined
   }
 }
 
-/** A stored swim summary, or nothing when the column is empty or not the shape this build reads. */
-function parseHeartRateSummary(value: string | null): { avg?: number; max?: number } | undefined {
+/** A stored session heart rate (`{}` for a session with none), or nothing when the column is empty or unreadable. */
+function parseHeartRateSummary(value: string | null): ActivityDetailSummary["heartRate"] {
   if (!value) return undefined;
   try {
     const parsed = JSON.parse(value) as { avg?: unknown; max?: unknown };
@@ -2467,6 +2467,7 @@ function parseHeartRateSummary(value: string | null): { avg?: number; max?: numb
   }
 }
 
+/** A stored swim summary, or nothing when the column is empty or not the shape this build reads. */
 function parseSwimSummary(value: string | null): SwimSummary | undefined {
   if (!value) return undefined;
   try {

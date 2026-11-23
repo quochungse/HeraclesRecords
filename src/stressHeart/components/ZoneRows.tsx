@@ -13,7 +13,8 @@ export interface ZoneRowItem {
   share: number;
 }
 
-function percent(share: number): string {
+/** A 0–1 share as "42%". */
+export function sharePercent(share: number): string {
   return `${Math.round(share * 100)}%`;
 }
 
@@ -33,7 +34,7 @@ export function ZoneRows({ rows, label, compact = false }: { rows: ZoneRowItem[]
             style={{ "--zone-fill": `${row.share * 100}%`, "--zone-colour": zoneColor(row.position) } as CSSProperties}
           />
           <span className="heart-zone-time">{formatDurationSpan(row.seconds)}</span>
-          <span className="heart-zone-share">{percent(row.share)}</span>
+          <span className="heart-zone-share">{sharePercent(row.share)}</span>
         </li>
       ))}
     </ul>

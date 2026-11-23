@@ -18,10 +18,9 @@ import {
   DAY_LIST_DAYS,
   dayDate,
   dayHeartRange,
-  daysBetween,
   heartScaleAt,
+  listedDays,
   sessionsOnDay,
-  shiftDay,
   sleepHeartByDay
 } from "./stressHeartModel";
 import { useCachedSleepRecords, useSessionDetails, useStressHeartDays } from "./useStressHeart";
@@ -36,9 +35,6 @@ interface HeartRateViewProps {
   onOpenOverview: () => void;
 }
 
-/** The ladder's scale, so a row's strip is the day's ladder in small. */
-const stripAt = heartScaleAt;
-
 /**
  * Heart rate: the day's resting, average and range from COROS MCP, the heart
  * rate asleep from the nights this machine keeps, and time in the athlete's own
@@ -49,8 +45,9 @@ export function HeartRateView({ api, connected, activities, lthrZones, onOpenOve
   const { t } = useI18n();
   const today = useTodayKey();
   const days = useStressHeartDays(api, connected);
-  // Every night on file: the asleep trend reads as far back as the day trend.
-  const sleepRecords = useCachedSleepRecords(api, connected, 400);
+  // The nights of the listed days: a row's strip and the day's ladder are all
+  // that read them.
+  const sleepRecords = useCachedSleepRecords(api, connected, DAY_LIST_DAYS + 2);
   const { model: zoneModel } = useHeartRateZoneModel({ api, corosConnected: connected });
   const [chosenDay, setChosenDay] = useState<string | null>(null);
 
@@ -58,7 +55,7 @@ export function HeartRateView({ api, connected, activities, lthrZones, onOpenOve
   const byDay = useMemo(() => new Map<string, StressHeartDay>(records.map((record) => [record.day, record])), [records]);
   const nights = useMemo(() => sleepHeartByDay(sleepRecords), [sleepRecords]);
   // The month, as Sleep and Stress level list it.
-  const listDays = useMemo(() => daysBetween(shiftDay(today, -(DAY_LIST_DAYS - 1)), today).reverse(), [today]);
+  const listDays = useMemo(() => listedDays(today), [today]);
   const selectedDay = chosenDay && listDays.includes(chosenDay) ? chosenDay : today;
   const sessions = useMemo(() => sessionsOnDay(selectedDay, activities), [selectedDay, activities]);
   // Every listed day's sessions, newest first, for their highest heart rate:
@@ -71,6 +68,12 @@ export function HeartRateView({ api, connected, activities, lthrZones, onOpenOve
       .filter((activity) => (activityStartTimeMs(activity) ?? 0) >= from && activity.avgHr !== undefined)
       .sort((left, right) => (activityStartTimeMs(right) ?? 0) - (activityStartTimeMs(left) ?? 0));
   }, [activities, listFrom]);
+  // Each listed day's sessions, for its strip: placed once, not again each
+  // time a session's highest heart rate lands.
+  const listSessionsByDay = useMemo(
+    () => new Map(listDays.map((day) => [day, sessionsOnDay(day, listSessions)])),
+    [listDays, listSessions]
+  );
   const { summaries } = useActivityDetailSummariesState({
     api,
     activities: listSessions,
@@ -99,7 +102,6 @@ export function HeartRateView({ api, connected, activities, lthrZones, onOpenOve
         // its detail's once the day is opened); a mark at its average while
         // neither has answered yet.
         const night = nights.get(day);
-        const daySessions = sessionsOnDay(day, activities).filter((session) => session.activity.avgHr !== undefined);
         return {
           day,
           // The day's lowest to highest leads the row; resting and average follow.
@@ -111,20 +113,20 @@ export function HeartRateView({ api, connected, activities, lthrZones, onOpenOve
               <i
                 className="is-day"
                 style={{
-                  left: stripAt(range[0]),
-                  width: `calc(${stripAt(range[1])} - ${stripAt(range[0])})`
+                  left: heartScaleAt(range[0]),
+                  width: `calc(${heartScaleAt(range[1])} - ${heartScaleAt(range[0])})`
                 }}
               />
               {night?.minHr !== undefined && night.maxHr !== undefined ? (
                 <i
                   className="is-sleep"
                   style={{
-                    left: stripAt(night.minHr),
-                    width: `calc(${stripAt(night.maxHr)} - ${stripAt(night.minHr)})`
+                    left: heartScaleAt(night.minHr),
+                    width: `calc(${heartScaleAt(night.maxHr)} - ${heartScaleAt(night.minHr)})`
                   }}
                 />
               ) : null}
-              {daySessions.map((session) => {
+              {(listSessionsByDay.get(day) ?? []).map((session) => {
                 const known = summaries.get(session.activity.activityId)?.heartRate;
                 const average = known?.avg ?? session.activity.avgHr!;
                 const highest = details.get(session.activity.activityId)?.maxHr ?? known?.max;
@@ -135,10 +137,14 @@ export function HeartRateView({ api, connected, activities, lthrZones, onOpenOve
                   <i
                     key={session.activity.activityId}
                     className="is-session"
-                    style={{ ...color, left: stripAt(average), width: `calc(${stripAt(highest)} - ${stripAt(average)})` }}
+                    style={{
+                      ...color,
+                      left: heartScaleAt(average),
+                      width: `calc(${heartScaleAt(highest)} - ${heartScaleAt(average)})`
+                    }}
                   />
                 ) : (
-                  <b key={session.activity.activityId} className="is-session" style={{ ...color, left: stripAt(average) }} />
+                  <b key={session.activity.activityId} className="is-session" style={{ ...color, left: heartScaleAt(average) }} />
                 );
               })}
             </span>
@@ -146,7 +152,7 @@ export function HeartRateView({ api, connected, activities, lthrZones, onOpenOve
         };
       }),
     // `answers`: a session's detail arriving lets its strip reach its highest.
-    [listDays, byDay, nights, activities, today, t, details, answers, summaries]
+    [listDays, byDay, nights, listSessionsByDay, today, t, details, answers, summaries]
   );
 
   if (!connected) {

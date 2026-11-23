@@ -19,7 +19,7 @@ import {
   CHART_HEIGHT,
   DayTip,
   PeriodControl,
-  heartScale,
+  bpm,
   hoveredRow,
   useDeltaLine,
   useLongDate,
@@ -35,8 +35,16 @@ interface TrendProps {
   today: string;
 }
 
-function bpm(value: number): string {
-  return `${Math.round(value)} ${BPM}`;
+/**
+ * The chart's scale: from 40 bpm (or the decade under a lower reading),
+ * spanning at least 150 bpm, ticked every 30.
+ */
+function heartScale(lows: number[], highs: number[]): { domain: [number, number]; ticks: number[] } {
+  const low = Math.min(40, lows.length > 0 ? Math.floor(Math.min(...lows) / 10) * 10 : 40);
+  const high = Math.max(low + 150, highs.length > 0 ? Math.ceil(Math.max(...highs) / 30) * 30 : 0);
+  const ticks: number[] = [];
+  for (let tick = low; tick <= high; tick += 30) ticks.push(tick);
+  return { domain: [low, high], ticks };
 }
 
 function figureText(value: number | undefined): string {

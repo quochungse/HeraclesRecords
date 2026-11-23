@@ -807,18 +807,6 @@
 
 /* --- Trends ---------------------------------------------------------------- */
 
-.stress-trends {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-}
-
-@media (max-width: 1180px) {
-  .stress-trends {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 .stress-trend-panel {
   display: flex;
   flex-direction: column;

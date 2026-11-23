@@ -1,7 +1,9 @@
 import {
   STRESS_LEVELS,
-  STRESS_SLOTS_PER_DAY,
+  dayDate,
+  daysBetween,
   measuredMinutes,
+  shiftDay,
   type StressLevelKey
 } from "../../electron/stressHeartParser";
 import { napWindowsOf } from "../../electron/sleepMetrics";
@@ -26,27 +28,15 @@ import type {
 
 /**
  * The days Stress level and Heart rate list: the Sleep screen's month, so the
- * Today screens list the same days. It is also the run of five-minute readings
+ * Health screens list the same days. It is also the run of five-minute readings
  * Stress level loads, so that picking a day asks for nothing.
  */
 export const DAY_LIST_DAYS = SLEEP_SCREEN_TREND_DAYS;
 export const MINUTES_PER_SLOT = 5;
 
-export function dayDate(day: string): Date {
-  return new Date(Number(day.slice(0, 4)), Number(day.slice(4, 6)) - 1, Number(day.slice(6, 8)));
-}
-
-export function shiftDay(day: string, days: number): string {
-  const date = dayDate(day);
-  date.setDate(date.getDate() + days);
-  return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
-}
-
-/** Every day from `from` to `to`, both included. */
-export function daysBetween(from: string, to: string): string[] {
-  const out: string[] = [];
-  for (let day = from; day <= to; day = shiftDay(day, 1)) out.push(day);
-  return out;
+/** The listed days, newest first, ending today. */
+export function listedDays(today: string): string[] {
+  return daysBetween(shiftDay(today, -(DAY_LIST_DAYS - 1)), today).reverse();
 }
 
 export function average(values: ReadonlyArray<number | undefined>): number | undefined {
@@ -78,21 +68,6 @@ export function lastReadingSlot(series: StressDaySeries | undefined): number {
     if (series.slots[index] !== null) return index;
   }
   return -1;
-}
-
-/** Runs of slots with no reading, `[from, to)`, up to `untilSlot`. */
-export function unmeasuredRuns(series: StressDaySeries, untilSlot = STRESS_SLOTS_PER_DAY): Array<[number, number]> {
-  const runs: Array<[number, number]> = [];
-  let start: number | null = null;
-  for (let index = 0; index <= untilSlot; index += 1) {
-    const empty = index < untilSlot && series.slots[index] === null;
-    if (empty && start === null) start = index;
-    if (!empty && start !== null) {
-      runs.push([start, index]);
-      start = null;
-    }
-  }
-  return runs;
 }
 
 // --- What else happened that day: sleep and sessions -------------------------
@@ -390,5 +365,5 @@ export function sleepHeartByDay(records: readonly TrainingHubSleepRecord[]): Map
   return out;
 }
 
-export { STRESS_LEVELS, measuredMinutes };
+export { STRESS_LEVELS, dayDate, daysBetween, measuredMinutes, shiftDay };
 export type { StressLevelKey };

@@ -21,7 +21,7 @@ import {
   restingAgainstWeek,
   type LaneSession
 } from "../stressHeartModel";
-import { BPM, DayTip, type TipRow } from "./trendParts";
+import { BPM, DayTip, bpm, type TipRow } from "./trendParts";
 import { ZoneRows } from "./ZoneRows";
 
 interface HeartDayDetailProps {
@@ -46,10 +46,6 @@ function zoneRange(row: ZoneTimeRow): string | undefined {
   if (row.hardEdge !== undefined) return `≤ ${Math.round(row.hardEdge)} ${BPM}`;
   if (row.easyEdge !== undefined) return `≥ ${Math.round(row.easyEdge)} ${BPM}`;
   return undefined;
-}
-
-function bpm(value: number): string {
-  return `${Math.round(value)} ${BPM}`;
 }
 
 interface LadderRow {
@@ -178,8 +174,6 @@ export function HeartDayDetail({
     });
   }
 
-  // The list rows' scale, so a row's strip is this ladder in small.
-  const at = heartScaleAt;
   const pointedRow = pointed ? rows.find((row) => row.key === pointed.key) : undefined;
 
   function point(event: PointerEvent<HTMLDivElement>, key: string) {
@@ -279,19 +273,19 @@ export function HeartDayDetail({
                 className="heart-ladder-track"
                 style={row.sportColor ? ({ "--heart-ladder-color": row.sportColor } as CSSProperties) : undefined}
               >
-                {resting !== undefined ? <b className="heart-ladder-resting" style={{ left: at(resting) }} /> : null}
+                {resting !== undefined ? <b className="heart-ladder-resting" style={{ left: heartScaleAt(resting) }} /> : null}
                 {row.low !== undefined && row.high !== undefined ? (
                   <i
                     className="heart-ladder-range"
-                    style={{ left: at(row.low), width: `calc(${at(row.high)} - ${at(row.low)})` }}
+                    style={{ left: heartScaleAt(row.low), width: `calc(${heartScaleAt(row.high)} - ${heartScaleAt(row.low)})` }}
                   />
                 ) : row.average !== undefined && row.high !== undefined ? (
                   <i
                     className="heart-ladder-range"
-                    style={{ left: at(row.average), width: `calc(${at(row.high)} - ${at(row.average)})` }}
+                    style={{ left: heartScaleAt(row.average), width: `calc(${heartScaleAt(row.high)} - ${heartScaleAt(row.average)})` }}
                   />
                 ) : null}
-                {row.average !== undefined ? <em className="heart-ladder-average" style={{ left: at(row.average) }} /> : null}
+                {row.average !== undefined ? <em className="heart-ladder-average" style={{ left: heartScaleAt(row.average) }} /> : null}
               </span>
             </div>
           ))}
@@ -299,7 +293,7 @@ export function HeartDayDetail({
             <span />
             <span className="heart-ladder-track">
               {HEART_DAY_SCALE.ticks.map((tick) => (
-                <small key={tick} style={{ left: at(tick) }}>
+                <small key={tick} style={{ left: heartScaleAt(tick) }}>
                   {tick}
                 </small>
               ))}

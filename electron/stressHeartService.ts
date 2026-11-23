@@ -15,11 +15,15 @@ import {
   type StressDayRow
 } from "./database";
 import {
-  STRESS_SLOTS_PER_DAY,
+  dayDate,
+  dayKeyOf,
+  daysBetween,
+  emptyStressSlots,
   parseAverageHeartRates,
   parseRestingHeartRates,
   parseStressDaySeries,
-  parseStressLevels
+  parseStressLevels,
+  shiftDay
 } from "./stressHeartParser";
 import type {
   McpAvailability,
@@ -120,33 +124,8 @@ export function createDefaultStressHeartDeps(): StressHeartDeps {
 
 // --- Days on the calendar -------------------------------------------------
 
-function pad(value: number): string {
-  return String(value).padStart(2, "0");
-}
-
-function keyOf(date: Date): string {
-  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}`;
-}
-
-function dateOf(day: string, plusDays = 0): Date {
-  return new Date(Number(day.slice(0, 4)), Number(day.slice(4, 6)) - 1, Number(day.slice(6, 8)) + plusDays);
-}
-
 function todayKey(now: number): string {
-  return keyOf(new Date(now));
-}
-
-function shiftDay(day: string, days: number): string {
-  return keyOf(dateOf(day, days));
-}
-
-/** Every day from `from` to `to`, both included. */
-function daysBetween(from: string, to: string): string[] {
-  const out: string[] = [];
-  for (let day = from; day <= to; day = shiftDay(day, 1)) {
-    out.push(day);
-  }
-  return out;
+  return dayKeyOf(new Date(now));
 }
 
 function isDayKey(value: unknown): value is string {
@@ -155,7 +134,7 @@ function isDayKey(value: unknown): value is string {
 
 /** Read a whole day after it ended: local midnight two days on. */
 function isSettled(day: string, fetchedAt: number): boolean {
-  return fetchedAt >= dateOf(day, 2).getTime();
+  return fetchedAt >= dayDate(shiftDay(day, 2)).getTime();
 }
 
 function isFresh(day: string, fetchedAt: number, now: number): boolean {
@@ -432,10 +411,7 @@ export function getStressSeries(
         for (const day of days) {
           // A day COROS sent no block for had no reading: kept as that, so it
           // is not asked for again once it has settled.
-          const value: StressDaySeries = parsed.get(day) ?? {
-            day,
-            slots: Array.from({ length: STRESS_SLOTS_PER_DAY }, () => null)
-          };
+          const value: StressDaySeries = parsed.get(day) ?? { day, slots: emptyStressSlots() };
           seriesCache.set(day, { value, fetchedAt: now });
           rows.push({ day, payload: JSON.stringify(value), fetched_at: now });
         }

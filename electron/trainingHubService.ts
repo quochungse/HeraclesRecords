@@ -24,8 +24,8 @@ import {
   writeCachedActivityDetail
 } from "./activityDetailCache";
 import {
-  HEART_RATE_SUMMARY_VERSION,
   ACTIVITY_SUMMARY_VERSION,
+  HEART_RATE_SUMMARY_VERSION,
   RECORDS_SUMMARY_VERSION,
   summarizeActivityDetail
 } from "./activityMetrics";

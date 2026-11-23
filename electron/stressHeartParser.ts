@@ -25,11 +25,43 @@ import type {
  *   2026-11-17:
  *     timestamp=1794848690, timezone=28, stress=9, score=1, stressHrv=0, stressHr=0
  *
- * Node-free: the renderer reads the level bands from here.
+ * Node-free: the renderer reads the level bands and the day keys from here.
  */
 
 /** How many five-minute slots a day of stress readings has. */
 export const STRESS_SLOTS_PER_DAY = 288;
+
+/** A day with no reading yet: every slot `null`. */
+export function emptyStressSlots(): Array<number | null> {
+  return Array.from({ length: STRESS_SLOTS_PER_DAY }, () => null);
+}
+
+// --- Day keys: local calendar days, written `YYYYMMDD` ----------------------
+
+export function dayKeyOf(date: Date): string {
+  return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
+}
+
+/** A day key's local midnight. */
+export function dayDate(day: string): Date {
+  return new Date(Number(day.slice(0, 4)), Number(day.slice(4, 6)) - 1, Number(day.slice(6, 8)));
+}
+
+/** The day `days` calendar days after `day` (before it when negative). */
+export function shiftDay(day: string, days: number): string {
+  const date = dayDate(day);
+  date.setDate(date.getDate() + days);
+  return dayKeyOf(date);
+}
+
+/** Every day from `from` to `to`, both included. */
+export function daysBetween(from: string, to: string): string[] {
+  const out: string[] = [];
+  for (let day = from; day <= to; day = shiftDay(day, 1)) {
+    out.push(day);
+  }
+  return out;
+}
 
 export type StressLevelKey = keyof StressLevelMinutes;
 
@@ -68,7 +100,7 @@ function unwrap(text: string): string {
   }
 }
 
-function dayKey(iso: string): string {
+function keyOfIso(iso: string): string {
   return iso.replace(/-/g, "");
 }
 
@@ -90,7 +122,7 @@ function dayBlocks(response: string): Map<string, string> {
 
   for (const match of text.matchAll(heading)) {
     const at = match.index ?? 0;
-    starts.push({ day: dayKey(match[1]), at, from: at + match[0].length, rest: match[2] });
+    starts.push({ day: keyOfIso(match[1]), at, from: at + match[0].length, rest: match[2] });
   }
 
   starts.forEach((start, index) => {
@@ -184,10 +216,6 @@ export function parseRestingHeartRates(response: string): Map<string, number> {
   return out;
 }
 
-function emptySlots(): Array<number | null> {
-  return Array.from({ length: STRESS_SLOTS_PER_DAY }, () => null);
-}
-
 /**
  * `queryStressTimeSeries`: each day block's readings on its five-minute grid.
  *
@@ -203,7 +231,7 @@ export function parseStressDaySeries(response: string): StressDaySeries[] {
 
   for (const [day, block] of dayBlocks(response)) {
     const midnight = Date.UTC(Number(day.slice(0, 4)), Number(day.slice(4, 6)) - 1, Number(day.slice(6, 8)));
-    const slots = emptySlots();
+    const slots = emptyStressSlots();
 
     for (const match of block.matchAll(point)) {
       const value = Number(match[3]);

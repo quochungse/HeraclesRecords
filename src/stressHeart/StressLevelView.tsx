@@ -16,11 +16,10 @@ import {
   MINUTES_PER_SLOT,
   STRESS_LEVELS,
   clockOf,
-  daysBetween,
   lastReadingSlot,
+  listedDays,
   measuredMinutes,
   sessionsOnDay,
-  shiftDay,
   sleepOnDay
 } from "./stressHeartModel";
 import { useCachedSleepRecords, useStressHeartDays, useStressSeries } from "./useStressHeart";
@@ -43,15 +42,15 @@ interface StressLevelViewProps {
 export function StressLevelView({ api, connected, activities, onOpenOverview }: StressLevelViewProps) {
   const { t } = useI18n();
   const today = useTodayKey();
+  const listDays = useMemo(() => listedDays(today), [today]);
   const days = useStressHeartDays(api, connected);
   // One read for the month the list offers: picking a day costs no round trip.
-  const series = useStressSeries(api, connected, shiftDay(today, -(DAY_LIST_DAYS - 1)), today);
+  const series = useStressSeries(api, connected, listDays[listDays.length - 1], today);
   const sleepRecords = useCachedSleepRecords(api, connected, DAY_LIST_DAYS + 2);
   const [chosenDay, setChosenDay] = useState<string | null>(null);
 
   const records = useMemo(() => days.snapshot?.days ?? [], [days.snapshot]);
   const byDay = useMemo(() => new Map<string, StressHeartDay>(records.map((record) => [record.day, record])), [records]);
-  const listDays = useMemo(() => daysBetween(shiftDay(today, -(DAY_LIST_DAYS - 1)), today).reverse(), [today]);
   const selectedDay = chosenDay && listDays.includes(chosenDay) ? chosenDay : today;
   const sleep = useMemo(() => sleepOnDay(selectedDay, sleepRecords), [selectedDay, sleepRecords]);
   const sessions = useMemo(() => sessionsOnDay(selectedDay, activities), [selectedDay, activities]);
@@ -106,10 +105,12 @@ export function StressLevelView({ api, connected, activities, onOpenOverview }: 
     [listDays, byDay, series.byDay, today, t]
   );
 
+  const { refresh: refreshDays } = days;
+  const { refresh: refreshSeries } = series;
   const refreshAll = useCallback(() => {
-    days.refresh();
-    series.refresh();
-  }, [days, series]);
+    refreshDays();
+    refreshSeries();
+  }, [refreshDays, refreshSeries]);
 
   if (!connected) {
     return (
