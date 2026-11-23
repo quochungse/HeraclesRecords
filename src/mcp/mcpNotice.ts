@@ -45,7 +45,7 @@ export function mcpRetryHint(): string {
  * What a surface's data is. The sentence is whole per subject and per way the
  * server failed: built from an opening and an ending, it read in English only.
  */
-export type McpSubject = "sleep" | "dailyHealth";
+export type McpSubject = "sleep" | "dailyHealth" | "stress" | "heart";
 export const MCP_SLEEP_SUBJECT: McpSubject = "sleep";
 export const MCP_DAILY_HEALTH_SUBJECT: McpSubject = "dailyHealth";
 

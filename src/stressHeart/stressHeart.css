@@ -1,0 +1,1059 @@
+/*
+ * Stress level and Heart rate. The level hues (`--stress-relaxed` …) and the
+ * heart-rate hues are declared on `:root` in src/styles.css beside the sleep
+ * stages. The layout follows the Sleep screen's: a list beside the day, then
+ * trends.
+ */
+.stress-heart-view {
+  gap: 18px;
+}
+
+/* --- Page header ---------------------------------------------------------- */
+
+.stress-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 4px 2px 0;
+}
+
+.stress-page-heading .eyebrow {
+  margin: 0;
+}
+
+.stress-page-heading h1 {
+  margin: 2px 0 0;
+  font-size: clamp(28px, 3.2vw, 36px);
+  background: linear-gradient(
+    100deg,
+    var(--text-primary),
+    color-mix(in srgb, var(--heart-rate) 58%, var(--text-primary))
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.stress-page-subtitle {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.stress-refresh-button {
+  flex: none;
+}
+
+.stress-pane-title {
+  margin: 0 0 12px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.stress-details-error {
+  margin: 0;
+  border: 1px solid var(--error-border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  background: var(--error-bg);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* --- The day: list and detail -------------------------------------------- */
+
+/* The split fills the panel, so a short day (Heart rate's) still gives the
+   list beside it the panel's whole height rather than its own. */
+.stress-day-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 420px;
+}
+
+.stress-day-split {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(220px, 0.5fr) minmax(0, 1.5fr);
+  gap: clamp(16px, 2vw, 28px);
+  align-items: stretch;
+}
+
+.stress-day-list-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
+  padding-right: clamp(12px, 1.4vw, 20px);
+}
+
+/* The list fills the height the day beside it sets, and scrolls inside it
+   (the Sleep screen's `.sleep-night-list-scroll` explains why). */
+.stress-day-list-scroll {
+  position: relative;
+  flex: 1;
+  min-height: 240px;
+}
+
+.stress-day-list {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0 4px 0 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+@media (max-width: 940px) {
+  .stress-day-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stress-day-list-pane {
+    border-right: none;
+    padding-right: 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
+    padding-bottom: 16px;
+  }
+
+  .stress-day-list-scroll {
+    flex: none;
+    min-height: 0;
+  }
+
+  .stress-day-list {
+    position: static;
+    max-height: min(40vh, 320px);
+  }
+}
+
+.stress-day-list-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.stress-day-list > li + li {
+  border-top: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.stress-day-list > li:has(> .stress-day-row:is(:hover, .is-selected)),
+.stress-day-list > li:has(> .stress-day-row:is(:hover, .is-selected)) + li {
+  border-top-color: transparent;
+}
+
+.stress-day-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.stress-day-row:hover {
+  background: var(--glass-bg);
+}
+
+.stress-day-row:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.stress-day-row.is-selected {
+  border-color: color-mix(in srgb, var(--stress-relaxed) 55%, transparent);
+  background: color-mix(in srgb, var(--stress-relaxed) 12%, transparent);
+}
+
+/* Heart rate's chosen day in its own hue, not Stress level's blue. */
+.heart-rate-view .stress-day-row.is-selected {
+  border-color: color-mix(in srgb, var(--heart-rate) 50%, transparent);
+  background: color-mix(in srgb, var(--heart-rate) 7%, transparent);
+}
+
+.stress-day-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.stress-day-row-date {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.stress-day-row-figure {
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.stress-day-row-meta {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stress-day-row-bar,
+.stress-day-levels-stack {
+  display: flex;
+  gap: 1px;
+  overflow: hidden;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.stress-day-row-bar > span,
+.stress-day-levels-stack > span {
+  display: block;
+  height: 100%;
+}
+
+/* One rule for every swatch of a level: the list strip, the day's bar, the
+   legend keys, the chip's dot and the bar's hover card. */
+:is(.stress-day-row-bar, .stress-day-levels-stack, .stress-legend, .stress-level-chip, .stress-levels-tip) .is-relaxed {
+  background: var(--stress-relaxed);
+}
+:is(.stress-day-row-bar, .stress-day-levels-stack, .stress-legend, .stress-level-chip, .stress-levels-tip) .is-low {
+  background: var(--stress-low);
+}
+:is(.stress-day-row-bar, .stress-day-levels-stack, .stress-legend, .stress-level-chip, .stress-levels-tip) .is-medium {
+  background: var(--stress-medium);
+}
+:is(.stress-day-row-bar, .stress-day-levels-stack, .stress-legend, .stress-level-chip, .stress-levels-tip) .is-high {
+  background: var(--stress-high);
+}
+
+:is(.stress-day-row-figure, .stress-day-detail-figure, .stress-day-figure strong).is-relaxed {
+  color: var(--stress-relaxed);
+}
+:is(.stress-day-row-figure, .stress-day-detail-figure, .stress-day-figure strong).is-low {
+  color: var(--stress-low);
+}
+:is(.stress-day-row-figure, .stress-day-detail-figure, .stress-day-figure strong).is-medium {
+  color: var(--stress-medium);
+}
+:is(.stress-day-row-figure, .stress-day-detail-figure, .stress-day-figure strong).is-high {
+  color: var(--stress-high);
+}
+:is(.stress-day-row-figure, .stress-day-detail-figure).is-resting {
+  color: var(--heart-rate-resting);
+}
+
+/* The day's lowest–highest is one figure in one ink wherever it stands — the
+   list's row and the day's own cell (`--heart-range-ink`) — and small in the
+   row, where it sits beside the date rather than over it. */
+.stress-day-row-figure.is-plain {
+  color: var(--heart-range-ink);
+  font-size: 14px;
+}
+
+.stress-day-figure.is-day strong {
+  color: var(--heart-range-ink);
+}
+
+/* A preview of the day's ladder, on one scale for every row (30–210 bpm): the
+   day's range, the night's within it in the sleep's lavender and each session
+   at its average in its sport's colour — washed as the ladder's ranges are. */
+.heart-day-row-range {
+  position: relative;
+  display: block;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.heart-day-row-range i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--radius-pill);
+}
+
+.heart-day-row-range i.is-day {
+  background: color-mix(in srgb, var(--heart-rate) 45%, var(--heart-wash-ground));
+}
+
+.heart-day-row-range i.is-sleep {
+  background: color-mix(in srgb, var(--sleep-hr) 45%, var(--heart-wash-ground));
+}
+
+.heart-day-row-range i.is-session {
+  background: color-mix(in srgb, var(--heart-session-color) 45%, var(--heart-wash-ground));
+}
+
+/* A session whose highest is not known yet: a short mark at its average. */
+.heart-day-row-range b {
+  position: absolute;
+  top: 0;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--heart-session-color) 45%, var(--heart-wash-ground));
+}
+
+.stress-day-main {
+  min-width: 0;
+}
+
+.stress-day-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.stress-day-detail-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.stress-day-detail-date {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.stress-day-detail-lead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  margin-top: 4px;
+}
+
+.stress-day-detail-figure {
+  color: var(--text-primary);
+  font-size: 36px;
+  line-height: 1;
+}
+
+.stress-day-detail-unit {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.stress-level-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: center;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  padding: 2px 10px;
+  background: var(--glass-bg);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.stress-level-chip i {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.stress-day-detail-sub {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The day's figures: one box of three cells, as the Sleep screen's night
+   figures are. */
+.stress-day-figures {
+  display: flex;
+  margin: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 0;
+}
+
+.stress-day-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 96px;
+  padding: 0 12px;
+}
+
+.stress-day-figure + .stress-day-figure {
+  border-left: 1px solid var(--glass-border);
+}
+
+.stress-day-figure dt,
+.stress-trend-figures dt {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.stress-day-figure dd,
+.stress-trend-figures dd {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+}
+
+.stress-day-figure dd > span,
+.stress-trend-figures dd > span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stress-day-figure strong,
+.stress-trend-figures strong {
+  color: var(--text-primary);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.stress-day-figure strong small,
+.stress-trend-figures strong small {
+  margin-left: 3px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.stress-day-figure.is-resting strong,
+.stress-trend-figures .is-resting strong {
+  color: var(--heart-rate-resting);
+}
+
+.stress-day-figure.is-asleep strong {
+  color: var(--sleep-hr);
+}
+
+.stress-trend-figures .is-easy strong {
+  color: var(--intensity-easy);
+}
+
+.stress-trend-figures .is-hard strong {
+  color: var(--intensity-hard);
+}
+
+@media (max-width: 620px) {
+  .stress-day-figures {
+    width: 100%;
+  }
+
+  .stress-day-figure {
+    flex: 1;
+    min-width: 0;
+    padding: 0 10px;
+  }
+}
+
+/* --- The day's timeline -------------------------------------------------- */
+
+.stress-timeline {
+  position: relative;
+  min-width: 0;
+  height: 215px;
+}
+
+.stress-timeline.is-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.stress-timeline-svg {
+  display: block;
+  overflow: visible;
+}
+
+.stress-timeline-svg text {
+  fill: var(--text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stress-timeline-grid {
+  stroke: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  stroke-dasharray: 3 4;
+}
+
+.stress-timeline-axis {
+  stroke: color-mix(in srgb, var(--text-primary) 14%, transparent);
+}
+
+/* The hours asleep and in a session, lit faintly from the plot down to the
+   line, as their mark on the line is. */
+.stress-timeline-sleep-shade {
+  fill: color-mix(in srgb, var(--sleep-deep) 14%, transparent);
+}
+
+.stress-timeline-session-shade {
+  fill: color-mix(in srgb, var(--stress-session-color) 14%, transparent);
+}
+
+.stress-timeline-bar.is-relaxed {
+  fill: var(--stress-relaxed);
+}
+.stress-timeline-bar.is-low {
+  fill: var(--stress-low);
+}
+.stress-timeline-bar.is-medium {
+  fill: var(--stress-medium);
+}
+.stress-timeline-bar.is-high {
+  fill: var(--stress-high);
+}
+
+/* The day's line: solid where a reading was taken, dotted where none was,
+   in the sleep's colour asleep and the sport's in a session. */
+.stress-timeline-line {
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.stress-timeline-line.is-measured {
+  stroke: color-mix(in srgb, var(--text-primary) 34%, transparent);
+}
+
+.stress-timeline-line.is-unmeasured {
+  stroke: color-mix(in srgb, var(--text-primary) 30%, transparent);
+  stroke-width: 2.5;
+  stroke-dasharray: 0 7;
+}
+
+.stress-timeline-line.is-sleep {
+  stroke: var(--sleep-deep);
+}
+
+.stress-timeline-line.is-session {
+  stroke: var(--stress-session-color);
+}
+
+.stress-timeline-badge circle {
+  stroke: var(--bg-base);
+  stroke-width: 2;
+}
+
+.stress-timeline-badge svg {
+  fill: none;
+  stroke: var(--bg-base);
+  pointer-events: none;
+}
+
+.stress-timeline-badge.is-sleep circle {
+  fill: var(--text-primary);
+}
+
+.stress-timeline-badge.is-session circle {
+  fill: var(--stress-session-color);
+}
+
+.stress-timeline-now {
+  stroke: var(--text-muted);
+  stroke-dasharray: 2 3;
+}
+
+.stress-tip,
+.stress-levels-tip {
+  position: absolute;
+  z-index: 2;
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  background: var(--menu-surface);
+  box-shadow: var(--shadow-soft);
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.stress-tip {
+  max-width: 260px;
+}
+
+/* --- Legends ---------------------------------------------------------------- */
+
+.stress-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.stress-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stress-legend i {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-xs);
+}
+
+.stress-legend i.is-line {
+  height: 2px;
+  border-radius: 0;
+}
+
+.stress-legend i.is-average {
+  background: var(--accent);
+}
+
+.stress-legend i.is-resting {
+  background: var(--heart-rate-resting);
+}
+
+.stress-legend i.is-heart {
+  background: var(--heart-rate);
+}
+
+.stress-legend i.is-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.stress-legend i.is-range {
+  width: 4px;
+  opacity: 0.35;
+}
+
+/* --- Time in each level ----------------------------------------------------- */
+
+/* One bar; a part says what it is when pointed at. */
+.stress-day-levels {
+  position: relative;
+}
+
+.stress-day-levels-stack {
+  gap: 2px;
+  height: 12px;
+}
+
+.stress-day-levels-stack > span {
+  cursor: default;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.stress-day-levels-stack > span.is-dimmed {
+  opacity: 0.4;
+}
+
+.stress-levels-tip {
+  bottom: calc(100% + 8px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.stress-levels-tip i {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.stress-levels-tip span:last-child {
+  color: var(--text-muted);
+}
+
+.stress-day-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* --- Heart rate's ladder ---------------------------------------------------- */
+
+/* Where the day's heart rate sat: a row each for the whole day, asleep and
+   every session, on one scale, with the resting rate drawn through them. */
+.heart-ladder {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.heart-ladder-row.is-pointed .heart-ladder-label {
+  color: var(--text-primary);
+}
+
+/* A row's hover card, beside the pointer, flipped to its left near the edge. */
+.heart-ladder-tip {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  transform: translate(14px, -50%);
+}
+
+.heart-ladder-tip.is-left {
+  transform: translate(calc(-100% - 14px), -50%);
+}
+
+.heart-ladder-row {
+  display: grid;
+  grid-template-columns: minmax(96px, 160px) minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+}
+
+.heart-ladder-label {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.heart-ladder-track {
+  position: relative;
+  height: 14px;
+}
+
+.heart-ladder-row:not(.is-axis) .heart-ladder-track::before {
+  content: "";
+  position: absolute;
+  inset: 5px 0;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+}
+
+.heart-ladder-row.is-day {
+  --heart-ladder-color: var(--heart-rate);
+}
+
+.heart-ladder-row.is-asleep {
+  --heart-ladder-color: var(--sleep-hr);
+}
+
+.heart-ladder-range {
+  position: absolute;
+  top: 3px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--heart-ladder-color) 45%, var(--heart-wash-ground));
+}
+
+.heart-ladder-average {
+  position: absolute;
+  top: 1px;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  /* Ringed in the card's own ground, so the dot stands off its range. */
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--heart-ladder-color);
+}
+
+.heart-ladder-resting {
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  width: 0;
+  border-left: 1.5px dashed var(--heart-rate-resting);
+}
+
+.heart-ladder-row.is-axis .heart-ladder-track {
+  height: 12px;
+}
+
+.heart-ladder-row.is-axis small {
+  position: absolute;
+  top: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  transform: translateX(-50%);
+}
+
+/* --- Trends ---------------------------------------------------------------- */
+
+.stress-trend-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.stress-trend-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+
+.stress-trend-head .stress-pane-title {
+  margin: 0;
+}
+
+.stress-trend-figures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.stress-trend-chart {
+  min-width: 0;
+}
+
+/*
+ * A period chosen beside the chart (`useChartGrowth`): the bars rise from the
+ * plot's floor and the lines come in, drawn by the browser — Recharts' own
+ * animation draws every bar again each frame and stuttered. The two names
+ * alternate so a second press restarts it. The floor is the plot's bottom
+ * edge: the chart's 220px less its 4px margin and the 30px axis.
+ */
+.stress-trend-chart .recharts-bar-rectangles {
+  transform-box: view-box;
+  transform-origin: 0 186px;
+}
+
+.stress-trend-chart[data-grow="a"] .recharts-bar-rectangles {
+  animation: stress-chart-grow-a 480ms var(--ease) both;
+}
+
+.stress-trend-chart[data-grow="b"] .recharts-bar-rectangles {
+  animation: stress-chart-grow-b 480ms var(--ease) both;
+}
+
+.stress-trend-chart[data-grow="a"] :is(.recharts-line-curve, .recharts-line-dots) {
+  animation: stress-chart-fade-a 480ms var(--ease) both;
+}
+
+.stress-trend-chart[data-grow="b"] :is(.recharts-line-curve, .recharts-line-dots) {
+  animation: stress-chart-fade-b 480ms var(--ease) both;
+}
+
+@keyframes stress-chart-grow-a {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes stress-chart-grow-b {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes stress-chart-fade-a {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes stress-chart-fade-b {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* --- Exercise heart rate: time in each zone ----------------------------- */
+
+.heart-zones-model {
+  color: var(--text-muted);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.heart-zones {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.heart-zones li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1.2fr) minmax(0, 1.4fr) 72px 40px;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.heart-zones li + li {
+  border-top: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.heart-zone-number {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.heart-zone-name {
+  min-width: 0;
+  color: var(--text-primary);
+}
+
+.heart-zone-name span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.heart-zones i {
+  display: block;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background:
+    linear-gradient(90deg, var(--zone-colour) var(--zone-fill), transparent 0),
+    color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.heart-zone-time {
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.heart-zone-share {
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-align: right;
+}
+
+.heart-zones.is-compact li {
+  padding: 6px 0;
+  font-size: 12px;
+}
+
+/* --- Heart rate: the day's sessions ---------------------------------------- */
+
+.heart-sessions {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
+  padding-top: 16px;
+}
+
+.heart-sessions .stress-pane-title {
+  margin: 0;
+}
+
+.heart-session {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* A session is one row, pressed to open its zones. */
+.heart-session-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  width: 100%;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 7px 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.heart-session-head:hover {
+  background: var(--glass-bg);
+}
+
+.heart-session-head:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.heart-session-chevron {
+  align-self: center;
+  flex: none;
+  color: var(--text-muted);
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.heart-session.is-open .heart-session-chevron {
+  transform: rotate(90deg);
+}
+
+.heart-session-zones {
+  padding: 0 8px 0 32px;
+}
+
+.heart-session-head i {
+  align-self: center;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--heart-session-color);
+}
+
+.heart-session-head strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.heart-session-head span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.heart-session-head .heart-session-hr {
+  margin-left: auto;
+  color: var(--text-secondary);
+}

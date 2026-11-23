@@ -1,13 +1,15 @@
 import type { NavMessages } from "../en/nav.ts";
 
 const nav: NavMessages = {
-  "nav.section.today": "วันนี้",
+  "nav.section.health": "สุขภาพ",
   "nav.section.plan": "วางแผน",
   "nav.section.history": "ประวัติ",
   "nav.section.journey": "เส้นทางของคุณ",
 
   "nav.overview": "ภาพรวม",
   "nav.sleep": "การนอน",
+  "nav.stress": "ระดับความเครียด",
+  "nav.heartRate": "อัตราการเต้นของหัวใจ",
   "nav.coach": "เมนเทอร์",
   "nav.calendar": "ปฏิทิน",
   "nav.library": "คลังการฝึก",

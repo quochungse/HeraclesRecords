@@ -75,6 +75,8 @@ export interface ActivityDetailSummariesInput {
   requirePerformance?: boolean;
   /** Also count a swim as missing until it carries its strokes, pool and best efforts. */
   requireSwim?: boolean;
+  /** Also count a session as missing until it carries its average and highest heart rate. */
+  requireHeartRate?: boolean;
   /** The allowance this read's fetches are charged to; the screens' shared one when left out. */
   budget?: SummaryFetchBudget;
 }
@@ -102,6 +104,7 @@ export function useActivityDetailSummariesState({
   requireIntensity = false,
   requirePerformance = false,
   requireSwim = false,
+  requireHeartRate = false,
   budget = SCREENS_BUDGET
 }: ActivityDetailSummariesInput): ActivityDetailSummariesState {
   const { name: budgetName, cap: budgetCap } = budget;
@@ -145,7 +148,7 @@ export function useActivityDetailSummariesState({
           const pass = await api.syncActivityDetailSummaries(
             ids,
             SUMMARY_CHUNK,
-            { requireIntensity, requirePerformance, requireSwim }
+            { requireIntensity, requirePerformance, requireSwim, requireHeartRate }
           );
           // Charged before anything else: the fetches happened whether or not
           // this effect is still around to see them, and a period change tears
@@ -185,7 +188,7 @@ export function useActivityDetailSummariesState({
     return () => {
       cancelled = true;
     };
-  }, [api, budgetCap, budgetName, enabled, key, requireIntensity, requirePerformance, requireSwim]);
+  }, [api, budgetCap, budgetName, enabled, key, requireIntensity, requirePerformance, requireSwim, requireHeartRate]);
 
   return { summaries, settled: !api || key.length === 0 || settledKey === key };
 }

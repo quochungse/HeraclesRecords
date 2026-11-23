@@ -17,6 +17,8 @@ import calendar from "./calendar.ts";
 import workout from "./workout.ts";
 import library from "./library.ts";
 import sleep from "./sleep.ts";
+import stress from "./stress.ts";
+import heart from "./heart.ts";
 import map from "./map.ts";
 import profile from "./profile.ts";
 import records from "./records.ts";
@@ -50,6 +52,8 @@ const en = {
   ...workout,
   ...library,
   ...sleep,
+  ...stress,
+  ...heart,
   ...map,
   ...profile,
   ...records,

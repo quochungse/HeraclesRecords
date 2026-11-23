@@ -346,6 +346,11 @@ import {
 } from "./sleepHistoryService";
 import { clearSleepSeriesCache, getSleepNightSeries } from "./sleepSeriesService";
 import {
+  clearStressHeartCache,
+  getStressHeartDays,
+  getStressSeries
+} from "./stressHeartService";
+import {
   isSampleRideId,
   sampleRideDetail,
   sampleRidesEnabled,
@@ -2197,6 +2202,7 @@ function registerIpcHandlers(): void {
     // The cached nights belong to the account that just left.
     clearSleepHistoryCache();
     clearSleepSeriesCache();
+    clearStressHeartCache();
     // Sync belongs to an account, so signing out has to stop it. Without this
     // the loop keeps publishing into the vault of the account that just left —
     // and anything done on this machine afterwards would land in their data.
@@ -2651,6 +2657,18 @@ function registerIpcHandlers(): void {
     "sleep:getNightSeries",
     (_event, request: { happenDay: string; refresh?: boolean }) =>
       getSleepNightSeries(request)
+  );
+
+  // Stress level and Heart rate: their days, and a run of days' five-minute
+  // stress readings. Both are cached by day in the main process.
+  ipcMain.handle("stressHeart:getDays", (_event, request?: { refresh?: boolean }) =>
+    getStressHeartDays(request ?? {})
+  );
+
+  ipcMain.handle(
+    "stressHeart:getSeries",
+    (_event, request: { fromDay: string; toDay: string; refresh?: boolean }) =>
+      getStressSeries(request)
   );
 
   ipcMain.handle("trainingHub:getDailyHealthData", (_event, days?: number) =>

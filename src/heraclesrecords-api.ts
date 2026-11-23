@@ -49,6 +49,8 @@ import type {
   TrainingHubDashboard,
   SleepHistorySnapshot,
   SleepNightSeries,
+  StressHeartSnapshot,
+  StressSeriesSnapshot,
   TrainingHubSleepSummary,
   TrainingHubRacePredictor,
   TrainingHubSportType,
@@ -341,7 +343,8 @@ export interface HeraclesRecordsApi {
    *  carries the Hall of Records' best efforts and start point;
    *  `requireIntensity` until a run or a ride carries what its label is read from;
    *  `requirePerformance` until a road or track run carries its performance curve;
-   *  `requireSwim` until a swim carries its strokes, pool and best efforts. */
+   *  `requireSwim` until a swim carries its strokes, pool and best efforts;
+   *  `requireHeartRate` until a session carries its average and highest heart rate. */
   syncActivityDetailSummaries: (
     activityIds: string[],
     limit?: number,
@@ -350,6 +353,7 @@ export interface HeraclesRecordsApi {
       requireIntensity?: boolean;
       requirePerformance?: boolean;
       requireSwim?: boolean;
+      requireHeartRate?: boolean;
     }
   ) => Promise<ActivityDetailSummarySync>;
   /** Draws a share image at its full size and puts it on the clipboard. */
@@ -404,6 +408,14 @@ export interface HeraclesRecordsApi {
     happenDay: string;
     refresh?: boolean;
   }) => Promise<SleepNightSeries>;
+  /** The days Stress level and Heart rate read, oldest first. */
+  getStressHeartDays: (request?: { refresh?: boolean }) => Promise<StressHeartSnapshot>;
+  /** Five-minute stress readings for a run of days (at most six weeks). */
+  getStressSeries: (request: {
+    fromDay: string;
+    toDay: string;
+    refresh?: boolean;
+  }) => Promise<StressSeriesSnapshot>;
   getTrainingDailyHealthData: (
     days?: number
   ) => Promise<TrainingHubDailyHealthSummary>;

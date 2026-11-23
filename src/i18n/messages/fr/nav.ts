@@ -1,13 +1,15 @@
 import type { NavMessages } from "../en/nav.ts";
 
 const nav: NavMessages = {
-  "nav.section.today": "Aujourd’hui",
+  "nav.section.health": "Santé",
   "nav.section.plan": "Planifier",
   "nav.section.history": "Historique",
   "nav.section.journey": "Votre parcours",
 
   "nav.overview": "Vue d’ensemble",
   "nav.sleep": "Sommeil",
+  "nav.stress": "Niveau de stress",
+  "nav.heartRate": "Fréquence cardiaque",
   "nav.coach": "Mentor",
   "nav.calendar": "Calendrier",
   "nav.library": "Bibliothèque d’entraînements",

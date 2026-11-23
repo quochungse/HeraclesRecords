@@ -529,8 +529,17 @@ export function AppSidebar({
           />
 
           {sections.map((section) => {
-            const headingId = `app-sidebar-section-${section.id}`;
+            // A run with no heading (Overview, the home) is rows alone, not a
+            // named group.
+            if (!section.label) {
+              return (
+                <div className="app-sidebar-section" key={section.id}>
+                  {section.items.map(renderNavItem)}
+                </div>
+              );
+            }
 
+            const headingId = `app-sidebar-section-${section.id}`;
             return (
               <div
                 className="app-sidebar-section"

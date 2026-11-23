@@ -493,6 +493,24 @@ export function initializeDatabase(userDataPath: string): Database.Database {
       fetched_at INTEGER NOT NULL
     );
 
+    -- Stress level and Heart rate's days: stress level, heart rate and resting
+    -- heart rate as COROS states them per day (StressHeartDay as JSON). A day
+    -- that has ended never changes, so it is kept and re-read.
+    CREATE TABLE IF NOT EXISTS stress_heart_days (
+      day        TEXT PRIMARY KEY,     -- local "YYYYMMDD"
+      payload    TEXT NOT NULL,
+      fetched_at INTEGER NOT NULL
+    );
+
+    -- One day of COROS's five-minute stress readings (StressDaySeries as
+    -- JSON). COROS answers at most 7 days a request, so a day once read is
+    -- kept rather than asked for again.
+    CREATE TABLE IF NOT EXISTS stress_day_series (
+      day        TEXT PRIMARY KEY,
+      payload    TEXT NOT NULL,
+      fetched_at INTEGER NOT NULL
+    );
+
     -- The Hall of Records' memory: milestones whose source forgets them.
     -- Almost every milestone is worked out again from the activity list on
     -- every launch, and none of those is here. What is here is what that
@@ -550,6 +568,10 @@ export function initializeDatabase(userDataPath: string): Database.Database {
   // own like the intensity.
   ensureColumn(db, "training_activity_summaries", "swim_version", "INTEGER");
   ensureColumn(db, "training_activity_summaries", "swim", "TEXT");
+  // A session's average and highest heart rate (`HEART_RATE_SUMMARY_VERSION`):
+  // the list COROS sends carries the average only.
+  ensureColumn(db, "training_activity_summaries", "heart_rate_version", "INTEGER");
+  ensureColumn(db, "training_activity_summaries", "heart_rate", "TEXT");
   // The part of input_tokens a run read from the prompt cache, which the
   // budget counts at a tenth (tokenUsage.ts). NULL on a run from before it was
   // kept, and on one whose provider said nothing about a cache: both count in full.
@@ -1594,6 +1616,53 @@ export function pruneSleepNightSeries(beforeDay: string): void {
     .run(beforeDay);
 }
 
+/** A row of `stress_heart_days` or `stress_day_series`: one day, as JSON. */
+export interface StressDayRow {
+  day: string;
+  payload: string;
+  fetched_at: number;
+}
+
+type StressDayTable = "stress_heart_days" | "stress_day_series";
+
+function upsertStressRows(table: StressDayTable, rows: StressDayRow[]): void {
+  if (!rows.length) {
+    return;
+  }
+
+  const database = requireDatabase();
+  const statement = database.prepare(
+    `INSERT INTO ${table} (day, payload, fetched_at)
+     VALUES (@day, @payload, @fetched_at)
+     ON CONFLICT(day) DO UPDATE SET
+       payload = excluded.payload,
+       fetched_at = excluded.fetched_at`
+  );
+  database.transaction((batch: StressDayRow[]) => {
+    for (const row of batch) {
+      statement.run(row);
+    }
+  })(rows);
+}
+
+function listStressRows(table: StressDayTable): StressDayRow[] {
+  return requireDatabase()
+    .prepare(`SELECT day, payload, fetched_at FROM ${table} ORDER BY day`)
+    .all() as StressDayRow[];
+}
+
+function pruneStressRows(table: StressDayTable, beforeDay: string): void {
+  requireDatabase().prepare(`DELETE FROM ${table} WHERE day < ?`).run(beforeDay);
+}
+
+// The days are a few hundred bytes each and the trend reads all of them, so
+// they are never pruned; the series are a kilobyte a day and are.
+export const upsertStressHeartDays = (rows: StressDayRow[]) => upsertStressRows("stress_heart_days", rows);
+export const listStressHeartDays = () => listStressRows("stress_heart_days");
+export const upsertStressDaySeries = (rows: StressDayRow[]) => upsertStressRows("stress_day_series", rows);
+export const listStressDaySeries = () => listStressRows("stress_day_series");
+export const pruneStressDaySeries = (beforeDay: string) => pruneStressRows("stress_day_series", beforeDay);
+
 /** Samples from `fromDay` (inclusive) onward, ascending. */
 export function listCoachDailySamples(fromDay: string): CoachDailySampleRow[] {
   return requireDatabase()
@@ -2331,6 +2400,8 @@ interface ActivitySummaryRow {
   performance: string | null;
   swim_version: number | null;
   swim: string | null;
+  heart_rate_version: number | null;
+  heart_rate: string | null;
   computed_at: number;
 }
 
@@ -2381,6 +2452,21 @@ function parsePerformance(value: string | null): RunPerformanceCurve | undefined
   }
 }
 
+/** A stored session heart rate (`{}` for a session with none), or nothing when the column is empty or unreadable. */
+function parseHeartRateSummary(value: string | null): ActivityDetailSummary["heartRate"] {
+  if (!value) return undefined;
+  try {
+    const parsed = JSON.parse(value) as { avg?: unknown; max?: unknown };
+    if (typeof parsed !== "object" || parsed === null) return undefined;
+    const finite = (field: unknown) => (typeof field === "number" && Number.isFinite(field) && field > 0 ? field : undefined);
+    const avg = finite(parsed.avg);
+    const max = finite(parsed.max);
+    return { ...(avg !== undefined ? { avg } : {}), ...(max !== undefined ? { max } : {}) };
+  } catch {
+    return undefined;
+  }
+}
+
 /** A stored swim summary, or nothing when the column is empty or not the shape this build reads. */
 function parseSwimSummary(value: string | null): SwimSummary | undefined {
   if (!value) return undefined;
@@ -2426,6 +2512,7 @@ function toActivityDetailSummary(row: ActivitySummaryRow): ActivityDetailSummary
   const intensity = parseIntensity(row.intensity);
   const performance = parsePerformance(row.performance);
   const swim = parseSwimSummary(row.swim);
+  const heartRate = parseHeartRateSummary(row.heart_rate);
   let zoneSeconds: number[] | undefined;
   if (row.zone_seconds) {
     try {
@@ -2464,6 +2551,9 @@ function toActivityDetailSummary(row: ActivitySummaryRow): ActivityDetailSummary
       ? { performanceVersion: row.performance_version, performance }
       : {}),
     ...(swim && row.swim_version !== null ? { swimVersion: row.swim_version, swim } : {}),
+    ...(heartRate && row.heart_rate_version !== null
+      ? { heartRateVersion: row.heart_rate_version, heartRate }
+      : {}),
     computedAt: row.computed_at
   };
 }
@@ -2492,7 +2582,8 @@ export function getActivityDetailSummaries(
         `SELECT activity_id, fingerprint, summary_version, zone_seconds,
                 decoupling_percent, last_upload_time, records_version,
                 best_efforts, start_lat, start_lon, intensity_version, intensity,
-                performance_version, performance, swim_version, swim, computed_at
+                performance_version, performance, swim_version, swim,
+                heart_rate_version, heart_rate, computed_at
          FROM training_activity_summaries
          WHERE activity_id IN (${chunk.map(() => "?").join(", ")})`
       )
@@ -2514,12 +2605,14 @@ export function upsertActivityDetailSummary(
          activity_id, fingerprint, summary_version, zone_seconds,
          decoupling_percent, last_upload_time, records_version,
          best_efforts, start_lat, start_lon, intensity_version, intensity,
-         performance_version, performance, swim_version, swim, computed_at
+         performance_version, performance, swim_version, swim,
+         heart_rate_version, heart_rate, computed_at
        )
        VALUES (@activityId, @fingerprint, @summaryVersion, @zoneSeconds,
                @decouplingPercent, @lastUploadTime, @recordsVersion,
                @bestEfforts, @startLat, @startLon, @intensityVersion, @intensity,
-               @performanceVersion, @performance, @swimVersion, @swim, @computedAt)
+               @performanceVersion, @performance, @swimVersion, @swim,
+               @heartRateVersion, @heartRate, @computedAt)
        ON CONFLICT(activity_id) DO UPDATE SET
          fingerprint = excluded.fingerprint,
          summary_version = excluded.summary_version,
@@ -2536,6 +2629,8 @@ export function upsertActivityDetailSummary(
          performance = excluded.performance,
          swim_version = excluded.swim_version,
          swim = excluded.swim,
+         heart_rate_version = excluded.heart_rate_version,
+         heart_rate = excluded.heart_rate,
          computed_at = excluded.computed_at`
     )
     .run({
@@ -2559,6 +2654,8 @@ export function upsertActivityDetailSummary(
       performance: summary.performance ? JSON.stringify(summary.performance) : null,
       swimVersion: summary.swim ? (summary.swimVersion ?? null) : null,
       swim: summary.swim ? JSON.stringify(summary.swim) : null,
+      heartRateVersion: summary.heartRate ? (summary.heartRateVersion ?? null) : null,
+      heartRate: summary.heartRate ? JSON.stringify(summary.heartRate) : null,
       computedAt: summary.computedAt
     });
 }

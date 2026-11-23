@@ -25,6 +25,7 @@ import {
 } from "./activityDetailCache";
 import {
   ACTIVITY_SUMMARY_VERSION,
+  HEART_RATE_SUMMARY_VERSION,
   RECORDS_SUMMARY_VERSION,
   summarizeActivityDetail
 } from "./activityMetrics";
@@ -2091,7 +2092,10 @@ function validSummaries(
 }
 
 /** Paced like the feel backfill, and for the same reason: this is a sweep over
- *  activities nobody is waiting on, sharing a connection with ones they are. */
+ *  activities nobody is waiting on, sharing a connection with ones they are.
+ *  The pause follows a request to COROS only — a summary worked out again from
+ *  the cached file asks nobody, and waiting there made a new figure across a
+ *  history of files on disk take a minute instead of seconds. */
 const SUMMARY_BACKFILL_DELAY_MS = 400;
 const SUMMARY_BACKFILL_MAX_CONSECUTIVE_FAILURES = 3;
 
@@ -2140,6 +2144,12 @@ export interface ActivityDetailSummarySyncOptions {
    * the Swimming screen asks, for the swims it shows.
    */
   requireSwim?: boolean;
+  /**
+   * Count a session's summary as missing until it carries its average and
+   * highest heart rate (`HEART_RATE_SUMMARY_VERSION`), which COROS's list does
+   * not. Only the Heart rate screen asks, for the sessions on the days it lists.
+   */
+  requireHeartRate?: boolean;
 }
 
 export async function syncActivityDetailSummaries(
@@ -2162,7 +2172,8 @@ export async function syncActivityDetailSummaries(
         summary.performanceVersion === PERFORMANCE_SUMMARY_VERSION) &&
       (!options.requireSwim ||
         !isSwimSportType(sportType) ||
-        summary.swimVersion === SWIM_SUMMARY_VERSION)
+        summary.swimVersion === SWIM_SUMMARY_VERSION) &&
+      (!options.requireHeartRate || summary.heartRateVersion === HEART_RATE_SUMMARY_VERSION)
     );
   };
   const valid = new Set(
@@ -2183,6 +2194,8 @@ export async function syncActivityDetailSummaries(
   let fetched = 0;
   let remaining = 0;
   let consecutiveFailures = 0;
+  // Whether the last attempt went to COROS: only then is the next one paced.
+  let pauseBeforeNext = false;
 
   for (const activityId of activityIds) {
     if (valid.has(activityId) || summaryBackfillFailedIds.has(activityId)) {
@@ -2207,10 +2220,11 @@ export async function syncActivityDetailSummaries(
       continue;
     }
 
-    // Between fetches, never before the first: a screen waiting on its first
-    // summary should not sit through a pause that exists to be polite to COROS
-    // about the second.
-    if (attempted > 0) {
+    // After a request to COROS, never before the first attempt and never
+    // after a read of the cached file: a screen waiting on its first summary
+    // should not sit through a pause that exists to be polite to COROS about
+    // the second, and a file on disk asked COROS nothing.
+    if (pauseBeforeNext) {
       await delay(SUMMARY_BACKFILL_DELAY_MS);
     }
 
@@ -2223,6 +2237,7 @@ export async function syncActivityDetailSummaries(
         { listActivity: activity, persist: false }
       );
       if (!cached) fetched += 1;
+      pauseBeforeNext = !cached;
       const summary = cacheActivityDetailSummary(
         activityId,
         fingerprint,
@@ -2249,6 +2264,7 @@ export async function syncActivityDetailSummaries(
       }
     } catch {
       // The cached file never throws: this was a request COROS refused or never got.
+      pauseBeforeNext = true;
       summaryBackfillFailedIds.add(activityId);
       failed += 1;
       fetched += 1;

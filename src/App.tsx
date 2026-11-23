@@ -26,6 +26,7 @@ import type {
   TrainingHubSleepSummary,
   TrainingHubSportType,
   TrainingHubStatus,
+  TrainingHubThresholdZone,
   TrainingHubUpcomingWorkout,
   AppUpdateSnapshot,
 } from "../electron/types";
@@ -179,6 +180,18 @@ const LazySwimmingView = lazy(() =>
 const LazyStrengthView = lazy(() =>
   import("./strength/StrengthView").then(({ StrengthView }) => ({
     default: StrengthView,
+  })),
+);
+/** A stable empty list, so the Heart rate screen is not handed a new one each render. */
+const NO_LTHR_ZONES: TrainingHubThresholdZone[] = [];
+const LazyStressLevelView = lazy(() =>
+  import("./stressHeart/StressLevelView").then(({ StressLevelView }) => ({
+    default: StressLevelView,
+  })),
+);
+const LazyHeartRateView = lazy(() =>
+  import("./stressHeart/HeartRateView").then(({ HeartRateView }) => ({
+    default: HeartRateView,
   })),
 );
 const LazySleepDetailsView = lazy(() =>
@@ -2195,6 +2208,27 @@ export default function App() {
                   trendPointsLoading={
                     trainingHubSnapshotStatus === "pending" && !trainingHubSnapshot
                   }
+                  onOpenOverview={() => setActiveView("overview")}
+                />
+              </Suspense>
+            ) : null}
+            {activeView === "stress" ? (
+              <Suspense fallback={<DeferredSurfaceFallback label={t("nav.stress")} />}>
+                <LazyStressLevelView
+                  api={api}
+                  connected={Boolean(trainingHubStatus?.authenticated)}
+                  activities={trainingHubActivities}
+                  onOpenOverview={() => setActiveView("overview")}
+                />
+              </Suspense>
+            ) : null}
+            {activeView === "heartRate" ? (
+              <Suspense fallback={<DeferredSurfaceFallback label={t("nav.heartRate")} />}>
+                <LazyHeartRateView
+                  api={api}
+                  connected={Boolean(trainingHubStatus?.authenticated)}
+                  activities={trainingHubActivities}
+                  lthrZones={trainingHubSnapshot?.dashboard?.lthrZones ?? NO_LTHR_ZONES}
                   onOpenOverview={() => setActiveView("overview")}
                 />
               </Suspense>

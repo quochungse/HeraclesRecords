@@ -1,13 +1,15 @@
 import type { NavMessages } from "../en/nav.ts";
 
 const nav: NavMessages = {
-  "nav.section.today": "今天",
+  "nav.section.health": "健康",
   "nav.section.plan": "计划",
   "nav.section.history": "历史",
   "nav.section.journey": "你的旅程",
 
   "nav.overview": "概览",
   "nav.sleep": "睡眠",
+  "nav.stress": "压力水平",
+  "nav.heartRate": "心率",
   "nav.coach": "导师",
   "nav.calendar": "日历",
   "nav.library": "训练库",

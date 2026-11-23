@@ -168,6 +168,8 @@
     "test:sleep-data-parser": "npm run build:electron && node scripts/test-sleep-data-parser.mjs",
     "test:sleep-freshness": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-sleep-freshness.mjs",
     "test:sleep-history-cache": "npm run build:electron && node scripts/test-sleep-history-cache.mjs",
+    "test:stress-heart": "npm run build:electron && node scripts/test-stress-heart.mjs",
+    "test:stress-heart-renderer": "npm run build:renderer-harness && node scripts/run-electron-gui.mjs scripts/test-stress-heart-renderer.mjs",
     "test:sleep-metrics": "npm run build:electron && node scripts/test-sleep-metrics.mjs",
     "test:sleep-renderer": "npm run build:renderer-harness && node scripts/run-electron-gui.mjs scripts/test-sleep-renderer.mjs",
     "test:sleep-series": "npm run build:electron && node scripts/test-sleep-series.mjs",

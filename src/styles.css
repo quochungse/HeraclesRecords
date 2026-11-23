@@ -16,6 +16,27 @@
   --sleep-hrv: #74c08f;
   --sleep-hr: #b79bff;
 
+  /* COROS's four stress levels (Relaxed 0–25, Low, Medium, High 76–100),
+     blue through to red so the hotter colour is the higher reading, and the
+     day's heart rate on the Heart rate screen. Resting heart rate is a calm
+     sky blue — the body at rest; lavender is the night's (--sleep-hr) and an
+     orange read as a warning beside the heart rate's rose. */
+  --stress-relaxed: #4c9be8;
+  --stress-low: #e3c14a;
+  --stress-medium: #f0883e;
+  --stress-high: #e5534b;
+  --heart-rate: #ff6b81;
+  --heart-rate-resting: #8cc8f0;
+  /* The day's lowest–highest, in the list and the day's cell alike: the
+     plain ink on dark; on paper the secondary one, where black at that weight
+     outshouted the date beside it. */
+  --heart-range-ink: var(--text-primary);
+  /* What a heart-rate wash is mixed into: nothing on dark's glass, where the
+     washes may overlap and read as layers; the card's white on paper, where
+     two translucent washes overlapping went muddy (lavender on pink, mint on
+     pink) and an opaque pastel stays its own colour. */
+  --heart-wash-ground: transparent;
+
   /* Per-sport activity colors. Overridden at runtime from localStorage via
      applySportColors(); customizable in Settings → Activity colors.
      Mirrors DEFAULT_SPORT_COLORS in src/training/sportColors.ts (the source
@@ -306,6 +327,14 @@ svg:focus-visible {
   --sleep-awake: #e3c94a;
   --sleep-hrv: #0f7f5f;
   --sleep-hr: #7c5cd6;
+  --stress-relaxed: #2c7bd0;
+  --stress-low: #b38a0c;
+  --stress-medium: #d26a1c;
+  --stress-high: #c8333a;
+  --heart-rate: #d23f5a;
+  --heart-rate-resting: #3b86c4;
+  --heart-range-ink: var(--text-secondary);
+  --heart-wash-ground: #ffffff;
 
   --bg-base: #e9ecf2; /* cool paper */
   --bg-ambient-tertiary: color-mix(in srgb, var(--accent) 8%, transparent);
@@ -2318,6 +2347,11 @@ input::placeholder {
 .run-hero-value,
 .running-stat strong,
 .sleep-detail-figure strong,
+.stress-day-row-figure,
+.stress-day-detail-figure,
+.stress-day-figure strong,
+.stress-trend-figures strong,
+.heart-zone-time,
 .muscle-hero-value strong {
   font-family: var(--font-display);
   font-weight: 500;
@@ -2339,6 +2373,7 @@ input::placeholder {
 .profile-header h2,
 .running-page-header h1,
 .sleep-page-heading h1,
+.stress-page-heading h1,
 .strength-title h2,
 .activities-head h2,
 .training-map-page-header h1,

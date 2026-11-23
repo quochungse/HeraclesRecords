@@ -52,6 +52,8 @@ import type {
   TrainingHubDashboard,
   SleepHistorySnapshot,
   SleepNightSeries,
+  StressHeartSnapshot,
+  StressSeriesSnapshot,
   TrainingHubSleepSummary,
   TrainingHubRacePredictor,
   TrainingHubSportType,
@@ -373,6 +375,7 @@ const api = {
       requireIntensity?: boolean;
       requirePerformance?: boolean;
       requireSwim?: boolean;
+      requireHeartRate?: boolean;
     }
   ): Promise<ActivityDetailSummarySync> =>
     ipcRenderer.invoke(
@@ -463,6 +466,16 @@ const api = {
     refresh?: boolean;
   }): Promise<SleepNightSeries> =>
     ipcRenderer.invoke("sleep:getNightSeries", request),
+  getStressHeartDays: (request?: {
+    refresh?: boolean;
+  }): Promise<StressHeartSnapshot> =>
+    ipcRenderer.invoke("stressHeart:getDays", request),
+  getStressSeries: (request: {
+    fromDay: string;
+    toDay: string;
+    refresh?: boolean;
+  }): Promise<StressSeriesSnapshot> =>
+    ipcRenderer.invoke("stressHeart:getSeries", request),
   getTrainingDailyHealthData: (
     days?: number
   ): Promise<TrainingHubDailyHealthSummary> =>

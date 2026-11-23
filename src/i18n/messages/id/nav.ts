@@ -1,13 +1,15 @@
 import type { NavMessages } from "../en/nav.ts";
 
 const nav: NavMessages = {
-  "nav.section.today": "Hari ini",
+  "nav.section.health": "Kesehatan",
   "nav.section.plan": "Rencana",
   "nav.section.history": "Riwayat",
   "nav.section.journey": "Perjalanan Anda",
 
   "nav.overview": "Ringkasan",
   "nav.sleep": "Tidur",
+  "nav.stress": "Tingkat stres",
+  "nav.heartRate": "Detak jantung",
   "nav.coach": "Mentor",
   "nav.calendar": "Kalender",
   "nav.library": "Pustaka latihan",
