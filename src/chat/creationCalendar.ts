@@ -11,10 +11,18 @@
  */
 import type { PlanCalendarState } from "../../electron/types";
 import { describeCompliance, planCompliance } from "../training-library/planCompliance";
+import { runRanOut } from "../training-library/planFilters";
 import { getIntlLocale, t } from "../i18n/core";
 
 export interface CreationCalendar {
+  /** COROS's running copy has days still ahead: the card says it is on the calendar, and an update can carry to it. */
   running: boolean;
+  /**
+   * COROS still runs a copy, one past its last day too (`runRanOut`: COROS says
+   * finished only some time later). Until then it refuses a second run, so the
+   * plan is not offered for the calendar again.
+   */
+  held: boolean;
   /** "Week 2 of 8 · 3 done · 1 ahead", or "Starts Mon 5 Oct". */
   line?: string;
 }
@@ -37,7 +45,9 @@ export function creationCalendar(
   today: string
 ): CreationCalendar {
   const running = state?.running;
-  if (!running) return { running: false };
+  if (!running) return { running: false, held: false };
+  /* Past its last day the run is over, as the Library lists it. */
+  if (runRanOut(running, new Date(`${today}T12:00:00`))) return { running: false, held: true };
   const parts: string[] = [];
   if (running.startDate && /^\d{4}-\d{2}-\d{2}$/.test(running.startDate)) {
     const offset = dayNumber(today) - dayNumber(running.startDate);
@@ -57,5 +67,5 @@ export function creationCalendar(
   }
   const progress = describeCompliance(planCompliance(running, state.matches));
   if (progress) parts.push(progress);
-  return { running: true, ...(parts.length ? { line: parts.join(" · ") } : {}) };
+  return { running: true, held: true, ...(parts.length ? { line: parts.join(" · ") } : {}) };
 }

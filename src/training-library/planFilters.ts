@@ -122,6 +122,17 @@ export function planLifecycle(
   return midnight < end ? "active" : "done";
 }
 
+/**
+ * A calendar copy past its last day has run out, whatever COROS calls it: it
+ * reports one finished only some time later. What the screen says of a plan on
+ * the calendar — the mark, "On calendar", an offer to update the calendar too —
+ * follows this; what COROS refuses while it still calls the copy running (a
+ * second run, deleting the plan with the copy on) does not.
+ */
+export function runRanOut(run: TrainingPlanDocument, today: Date = new Date()): boolean {
+  return run.calendar === "running" && planLifecycle(run, today) === "done";
+}
+
 /** Which of a plan's runs it stands for first: one going on, then one ahead, then one over. */
 const RUN_RANK: Record<PlanLifecycle, number> = { active: 0, upcoming: 1, done: 2, undated: 3 };
 

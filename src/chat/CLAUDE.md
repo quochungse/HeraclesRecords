@@ -187,7 +187,9 @@ Coach never writes to COROS directly; it writes drafts and change sets the athle
   **An update leaves COROS's running copy as it was**, so a plan on the calendar offers
   **Update plan & calendar** (leads) or Update plan only; following is the window's
   `syncTrainingPlanToCalendar` after the save, as the Library's (from today on), and a failed
-  one leaves the plan saved and says so.
+  one leaves the plan saved and says so. A run past its last day is over (`creationCalendar`,
+  the Library's `runRanOut`): plain Update, not On calendar, and no Add to calendar while COROS
+  still holds the copy (`held`).
 - It goes on the calendar through the Library's `TrainingPlanCalendarDialog`; an unsaved
   version previews as `chat:<draftId>` through `setChatPlanReader` (the two modules must not
   import each other).

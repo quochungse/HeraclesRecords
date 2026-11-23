@@ -363,6 +363,7 @@ export function CoachCreationCard({
         onCoros={onCoros || (status.saved && status.kind === "onCoros")}
         onCalendar={onCalendar}
         onCalendarNow={calendar?.running ?? false}
+        calendarHeld={calendar?.held ?? false}
       />
     </article>
   );

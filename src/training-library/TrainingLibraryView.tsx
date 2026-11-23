@@ -49,6 +49,7 @@ import {
   planEmptyState,
   planRunOf,
   planRuns,
+  runRanOut,
   planScopeOptions,
   planProgress,
   planStartLabel,
@@ -442,7 +443,11 @@ export function TrainingLibraryView({
    */
   const requestSave = async (plan: TrainingPlanDocument) => {
     const listed = snapshot?.plans.find((item) => item.id === plan.id);
-    if (listed?.runningInstanceId) {
+    const run = listed?.runningInstanceId
+      ? snapshot?.plans.find((item) => item.remoteId === listed.runningInstanceId)
+      : undefined;
+    /* A run past its last day has nothing ahead for the calendar to follow (`runRanOut`). */
+    if (listed?.runningInstanceId && !(run && runRanOut(run))) {
       setCalendarSave(plan);
       return;
     }
@@ -868,6 +873,7 @@ export function TrainingLibraryView({
               <PlanReader
                 key={readingPlan.id}
                 plan={readingPlan}
+                run={planRunOf(readingPlan, planRuns(current.plans))}
                 matches={current.matches}
                 offline={current.offline}
                 api={api}
@@ -1094,6 +1100,7 @@ function planView(
      * earned.
      */
     description: plan.description || undefined,
+    calendarRun: run,
     startLabel: planStartLabel(run ?? plan),
     /*
      * What replaced the Adherence tab: how a plan on the calendar is going, as
@@ -1190,7 +1197,7 @@ function PlanTile({
             `.tl-card-name` and wraps where an unmarked tile's does. */}
         {mark ? <PlanDraftMark kind={mark} /> : null}
         <span className="tl-card-name">
-          <PlanCalendarBadge plan={plan} />
+          <PlanCalendarBadge plan={plan} run={view.calendarRun} />
           {plan.name}
         </span>
         {/*
@@ -1341,7 +1348,7 @@ function PlanInProgress({
         ) : null}
         {editing ? <PlanDraftMark kind="editing" /> : null}
         <span className="tl-card-name">
-          <PlanCalendarBadge plan={plan} />
+          <PlanCalendarBadge plan={plan} run={view.calendarRun} />
           {plan.name}
         </span>
         {view.description ? <span className="tl-card-desc">{view.description}</span> : null}

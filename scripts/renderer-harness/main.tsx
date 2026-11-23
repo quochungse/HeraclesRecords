@@ -527,6 +527,7 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
       >
         <PlanReader
           plan={options.plan as never}
+          run={options.run as never}
           matches={(options.matches as never) ?? []}
           offline={(options.offline as boolean | undefined) ?? false}
           loadingFull={(options.loadingFull as boolean | undefined) ?? false}

@@ -58,7 +58,7 @@ import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { formatDistanceValue } from "../units/units";
 import { describeCompliance, formatCompliance, planCompliance } from "./planCompliance";
-import { planStartLabel, planWeekPosition } from "./planFilters";
+import { planStartLabel, planWeekPosition, runRanOut } from "./planFilters";
 import { PlanEntryRow } from "./PlanEntryRow";
 import { formatWeekLine, planSessions, readPlan, type PlanReaderWeek } from "./planReaderModel";
 import { PlanSessionView } from "./PlanSessionView";
@@ -75,6 +75,8 @@ export type PlanCalendarAction = "add" | "remove";
 
 interface PlanReaderProps {
   plan: TrainingPlanDocument;
+  /** The calendar copy a plan in the library stands for (`planRuns`); a copy stands for itself. */
+  run?: TrainingPlanDocument;
   matches: readonly TrainingActivityMatch[];
   offline?: boolean;
   /** Only so a session can name its exercises and read the account's pool
@@ -131,6 +133,7 @@ function localDayKey(date: Date): string {
 
 export function PlanReader({
   plan,
+  run,
   matches,
   offline = false,
   api,
@@ -181,6 +184,10 @@ export function PlanReader({
   const sessions = useMemo(() => planSessions(reading), [reading]);
 
   const now = today ?? new Date();
+  /* Past its last day the run is over (`runRanOut`) though COROS still calls it
+     running: the head says nothing of the calendar, and Remove from calendar
+     stays behind ⋯, since COROS refuses a second run until the copy is off. */
+  const ranOut = runRanOut(run ?? plan, now);
   const todayKey = localDayKey(now);
   const position = planWeekPosition(plan, now);
   const currentWeek = position ? position.week - 1 : undefined;
@@ -530,7 +537,7 @@ export function PlanReader({
               <FilePen size={14} /> {t("library.reader.continue")}
             </button>
           ) : null}
-          {onCalendarAction && !finished ? (
+          {onCalendarAction && !finished && !ranOut ? (
             onCalendar ? (
               /* A statement, not a control: taking it off is behind ⋯. */
               <span
@@ -566,7 +573,7 @@ export function PlanReader({
 
       <div className="plan-reader-title">
         <h1>
-          <PlanCalendarBadge plan={plan} />
+          <PlanCalendarBadge plan={plan} run={run} today={now} />
           {plan.name}
         </h1>
         <p className="plan-reader-meta">

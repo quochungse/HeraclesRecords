@@ -101,6 +101,10 @@ ten sessions on a day is an error.
   COROS has said finished (it says so some time later). The tile's date and done count are the
   run's. `PlanCalendarBadge` marks a plan on the calendar. Compliance joins
   `remoteId:idInPlan` to the calendar's `schedulePlanId:scheduleIdInPlan`.
+- **What the screen says follows the same line** (`runRanOut`, shared with Coach's card): past
+  its last day a run has no calendar mark, no On calendar, no Save & update calendar question.
+  What COROS refuses while it still calls the copy running does not: a second run stays
+  blocked, Remove from calendar stays behind ⋯, and a delete still takes the copy off first.
 - `npm run test:coros-plan-writes` (fake COROS), `npm run verify:coros-plan-api -- --live`.
 
 ## Workouts tab

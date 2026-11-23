@@ -1,6 +1,7 @@
 import { CalendarCheck } from "lucide-react";
 import type { TrainingPlanDocument } from "../../electron/types";
 import { plural, t } from "../i18n/core";
+import { runRanOut } from "./planFilters";
 
 function todayKey(now = new Date()): string {
   return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
@@ -32,8 +33,19 @@ export function isOnCalendar(plan: TrainingPlanDocument): boolean {
  * Sized in `em`, so one component sits right before an 18px tile name, a 22px
  * hero name and a 28px reader title.
  */
-export function PlanCalendarBadge({ plan }: { plan: TrainingPlanDocument }) {
-  if (!isOnCalendar(plan)) return null;
+export function PlanCalendarBadge({
+  plan,
+  run,
+  today
+}: {
+  plan: TrainingPlanDocument;
+  /** The calendar copy a plan in the library stands for (`planRuns`); a copy stands for itself. */
+  run?: TrainingPlanDocument;
+  /** The reader's clock, so the mark and the reader's head agree. */
+  today?: Date;
+}) {
+  /* Past its last day the run is over (`runRanOut`), though COROS has not said so yet. */
+  if (!isOnCalendar(plan) || runRanOut(run ?? plan, today)) return null;
   const upcoming = upcomingCalendarSessions(plan);
   const title =
     plan.calendar === "running"

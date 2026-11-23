@@ -662,6 +662,7 @@ function ArtifactView({
               onRestore={onRestore ? () => onRestore(shown.draftId) : undefined}
               onCalendar={onCalendar && latest ? () => onCalendar(shown.draftId) : undefined}
               onCalendarNow={calendar?.running ?? false}
+              calendarHeld={calendar?.held ?? false}
               sheetSide="above"
             />
             <button

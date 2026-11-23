@@ -253,6 +253,18 @@ const PLAN = {
   updatedAt: "2026-02-20T00:00:00.000Z"
 };
 
+/**
+ * A running copy started this Monday, for a screen that reads the real clock:
+ * PLAN's own March dates are long past its last day, where a run has run out
+ * (`runRanOut`) and says nothing of the calendar.
+ */
+function liveRun(plan, overrides = {}) {
+  const now = new Date();
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
+  const startDate = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`;
+  return { ...plan, startDate, ...overrides };
+}
+
 /** The same plan as a template: no dates, no identities on a calendar. */
 function templateOf(plan, overrides = {}) {
   const { startDate: _start, sourcePlanId: _source, ...rest } = plan;
@@ -1299,9 +1311,11 @@ async function main() {
       "and the button says what adding will do"
     );
 
-    // What the reload after adding sees: the template, with its running copy.
+    // What the reload after adding sees: the template, with its running copy,
+    // dated from the day it was added from (a copy past its last day has run out).
+    const added = { ...running, startDate: `${asked.slice(0, 4)}-${asked.slice(4, 6)}-${asked.slice(6)}` };
     await harness("setScript", {
-      getTrainingLibrarySnapshot: snapshotOf([{ ...template, runningInstanceId: running.remoteId }, running])
+      getTrainingLibrarySnapshot: snapshotOf([{ ...template, runningInstanceId: added.remoteId }, added])
     });
     await evaluate(`document.querySelector(".plan-calendar-dialog > footer .primary-button").click()`);
     await settle();
@@ -1406,12 +1420,13 @@ async function main() {
      * on the calendar either way.
      */
     const template = templateOf(PLAN, { id: "coros:tpl-1", remoteId: "tpl-1", name: "Spring marathon", runningInstanceId: "run-1" });
-    const orphan = { ...PLAN, id: "coros:run-2", remoteId: "run-2", name: "Catalogue plan", sourcePlanId: "somewhere-else" };
+    const run = liveRun(PLAN);
+    const orphan = liveRun(PLAN, { id: "coros:run-2", remoteId: "run-2", name: "Catalogue plan", sourcePlanId: "somewhere-else" });
     await harness(
       "mount",
       "TrainingLibraryView",
       { height: 900 },
-      { getTrainingLibrarySnapshot: snapshotOf([template, PLAN, orphan]), getNativeTrainingPlan: null }
+      { getTrainingLibrarySnapshot: snapshotOf([template, run, orphan]), getNativeTrainingPlan: null }
     );
     await openPlansTab();
     assert.deepEqual(
@@ -1621,6 +1636,31 @@ async function main() {
       true,
       "a copy of the shallow plan would be the names without the sessions"
     );
+  }
+
+  // -------------------------------------------------------------------------
+  // 3e. Past its last day a run has run out, though COROS still calls it running
+  // -------------------------------------------------------------------------
+  {
+    /* Three weeks from 2 March: the last day is 22 March. */
+    const markOf = () => count(".plan-reader-title h1 .plan-calendar-mark");
+    await mount({ plan: PLAN, matches: MATCHES, today: "2026-03-22T09:00:00" });
+    assert.equal(await markOf(), 1, "on its last day it is on the calendar");
+    assert.equal(await count(".plan-reader-scheduled"), 1);
+
+    await mount({ plan: PLAN, matches: MATCHES, today: "2026-03-23T09:00:00" });
+    assert.equal(await markOf(), 0, "the day after, the mark goes");
+    assert.equal(await count(".plan-reader-scheduled"), 0, "and On calendar with it");
+    assert.equal(await count(".plan-reader-add-calendar"), 0, "COROS refuses a second run while it holds the copy");
+    assert.equal((await menuItemState("Remove from calendar"))?.disabled, false, "so taking it off stays behind ⋯");
+
+    /* A plan in the library reads its run's dates. */
+    const template = templateOf(PLAN, { id: "coros:tpl-1", remoteId: "tpl-1", runningInstanceId: PLAN.remoteId });
+    const run = { ...PLAN, sourcePlanId: "tpl-1" };
+    await mount({ plan: template, run, matches: [], today: "2026-03-23T09:00:00" });
+    assert.equal(await markOf(), 0, "its plan carries no mark either");
+    await mount({ plan: template, run, matches: [], today: "2026-03-10T09:00:00" });
+    assert.equal(await markOf(), 1, "while the run has days ahead, it does");
   }
 
   // -------------------------------------------------------------------------

@@ -42,7 +42,8 @@ import {
   planScopeOptions,
   planStartLabel,
   planProgress,
-  planWeekPosition
+  planWeekPosition,
+  runRanOut
 } from "../src/training-library/planFilters.ts";
 import { compareFavoriteThenName } from "../src/training-library/libraryOrder.ts";
 
@@ -286,6 +287,11 @@ const names = (plans) => plans.map((item) => item.name);
   assert.equal(planRunOf(ranOut, runs), ranOutRun, "the plan's tile is measured and dated by its run");
   assert.equal(planRunOf(anytime, runs), undefined, "a plan never on the calendar has none");
   assert.equal(planRunOf(ranOutRun, runs), undefined, "a run stands for itself");
+
+  /* What the screen says follows the same line: past its last day the run has run out. */
+  assert.equal(runRanOut(pastItsDaysRun, today), true, "COROS still calls it running");
+  assert.equal(runRanOut(ranOutRun, today), false, "one COROS calls finished is not a running copy at all");
+  assert.equal(runRanOut(onCalendar("2026-09-14", { weekCount: 4 }), today), false, "days still ahead");
 
   /* Run again: the run going on is the one the plan stands for, and the old one stays folded. */
   const again = onCalendar("2026-09-21", { name: "Ran out", weekCount: 4, sourcePlanId: "ran-out" });

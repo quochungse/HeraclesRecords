@@ -235,7 +235,7 @@ const ids = (choices) => ({
     pathToFileURL(path.join(repoRoot, "src", "chat", "creationCalendar.ts")).href
   );
   assert.match(localDayKey(new Date(2026, 8, 5, 23, 30)), /^2026-09-05$/, "the local day, not UTC's");
-  assert.deepEqual(creationCalendar(undefined, "2026-09-30"), { running: false });
+  assert.deepEqual(creationCalendar(undefined, "2026-09-30"), { running: false, held: false });
   const running = {
     remoteId: "R1",
     calendar: "running",
@@ -247,15 +247,31 @@ const ids = (choices) => ({
   const state = (matches) => ({ artifactId: "a", remotePlanId: "coros:900", running, matches });
   assert.deepEqual(
     creationCalendar(state([match("1", "completed"), match("2", "missed"), match("3", "upcoming")]), "2026-09-30"),
-    { running: true, line: "Week 2 of 4 · 1 done · 1 missed · 1 ahead" }
+    { running: true, held: true, line: "Week 2 of 4 · 1 done · 1 missed · 1 ahead" }
   );
   assert.deepEqual(
     creationCalendar(state([match("1", "upcoming")]), "2026-09-21"),
-    { running: true, line: "Week 1 of 4 · 1 session ahead" },
+    { running: true, held: true, line: "Week 1 of 4 · 1 session ahead" },
     "nothing settled: sessions ahead, never 0%"
   );
   assert.match(creationCalendar(state([]), "2026-09-14").line, /^Starts /, "before it starts");
-  assert.equal(creationCalendar(state([]), "2026-12-30").line, "Week 4 of 4", "not past its last week");
+  assert.equal(creationCalendar(state([]), "2026-10-18").line, "Week 4 of 4", "its last day is still on");
+  /*
+   * Past its last day the run is over, as the Library lists it, though COROS
+   * calls it running until it says finished some time later. The card no
+   * longer says it is on the calendar, and nothing is offered that COROS would
+   * refuse while it still holds the copy.
+   */
+  assert.deepEqual(creationCalendar(state([]), "2026-10-19"), { running: false, held: true });
+  const saved = plan(entry("a"), entry("b"));
+  const held = { latest: true, onCoros: true, onCalendar: false, calendarHeld: true };
+  const ranOut = artifactActions(saved, held, today);
+  assert.equal(ranOut.choices.primary.id, "updatePlan", "nothing ahead for the calendar to follow");
+  assert.equal(
+    artifactActions({ ...saved, uploadedAt: 1 }, held, today).addToCalendar,
+    false,
+    "COROS refuses a second run while it holds the copy"
+  );
 }
 
 // A proposal that is a programme can also go on the calendar, saved first;

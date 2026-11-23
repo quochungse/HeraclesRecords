@@ -52,6 +52,7 @@ export function CreationActions({
   onRestore,
   onCalendar,
   onCalendarNow = false,
+  calendarHeld,
   sheetSide = "below"
 }: {
   draft: PlanDraftPreview;
@@ -75,13 +76,19 @@ export function CreationActions({
   onRestore?: () => void;
   /** Opens the calendar dialog; without it, adding to the calendar is not offered. */
   onCalendar?: () => void;
-  /** COROS is running a copy of the plan on the calendar already. */
+  /** COROS is running a copy of the plan on the calendar, with days still ahead (`CreationCalendar.running`). */
   onCalendarNow?: boolean;
+  /** COROS still holds a copy, one past its last day too (`CreationCalendar.held`). */
+  calendarHeld?: boolean;
   /** Where the ways to save open: under a card, over a footer. */
   sheetSide?: "below" | "above";
 }) {
   const today = todayKey();
-  const offered = artifactActions(draft, { latest, editing, saved, onCoros, onCalendar: onCalendarNow }, today);
+  const offered = artifactActions(
+    draft,
+    { latest, editing, saved, onCoros, onCalendar: onCalendarNow, calendarHeld },
+    today
+  );
   const withoutCalendar = (list: CreationAction[]) =>
     onCalendar ? list : list.filter((action) => action.id !== "addToCalendar");
   const actions =

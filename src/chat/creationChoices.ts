@@ -242,8 +242,14 @@ export function artifactActions(
     editing?: boolean;
     saved?: boolean;
     onCoros?: boolean;
-    /** COROS is running a copy of the plan on the calendar already. */
+    /** COROS is running a copy of the plan on the calendar, with days still ahead. */
     onCalendar?: boolean;
+    /**
+     * COROS still runs a copy, one past its last day too, and refuses a second
+     * run until it is off: the plan is not offered for the calendar. As
+     * `onCalendar` when not given.
+     */
+    calendarHeld?: boolean;
   },
   today: string
 ): ArtifactActions {
@@ -253,7 +259,7 @@ export function artifactActions(
   if (state.editing) return { kind: "editing" };
   if (draft.uploadedAt || draft.uploadResult) {
     const asPlan = isPlan && (draft.uploadResult?.destination === "nativePlan" || Boolean(state.onCoros));
-    return { kind: "saved", addToCalendar: asPlan && !state.onCalendar };
+    return { kind: "saved", addToCalendar: asPlan && !(state.calendarHeld ?? state.onCalendar) };
   }
   if (isPlan && state.onCoros) {
     const asNew: CreationAction = {
