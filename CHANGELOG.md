@@ -7,9 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-23
+
+Heart rate and Stress level join Sleep under Health, and Overview stands on its own at the top of the sidebar.
+
 ### What's new
 - **Heart rate** - a new screen under Health, the sidebar's new group with Sleep. A day shows its resting heart rate against the week before, its range, and where it sat - daily, during sleep and in each session - on one scale. Below: your daily heart rate over 4 weeks, 3 months or all of your history, and your exercise time in each of your own heart-rate zones. Both screens read COROS MCP, like Sleep.
 - **Stress level** - a new screen under Health, after Sleep. A day opens on COROS's stress reading every five minutes over a line of the sleep and sessions it held, with its peak, its time at High and Relaxed, and one bar of the four levels that names each part when you point at it. Below: stress by day over 4 weeks, 3 months or all of your history. Today leads with its latest reading and states no average until it is over.
+
+### Changed
+- The sidebar opens with Overview on its own, then Health (Heart rate, Sleep and Stress level) where Today was. Plan, History and Your journey are unchanged.
+- A figure a screen works out across your history, such as time in zones, a record or a session's highest heart rate, is read from the sessions already on this computer without a pause between them, so it fills in within seconds rather than a minute.
 
 ## [1.5.2] - 2026-11-23
 
