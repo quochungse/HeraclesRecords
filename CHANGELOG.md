@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-11-23
+
+Running Fitness and VO2 Max draw COROS's dial, Personal Records adds 3K and 15K, and a plan session you trained is counted as trained.
+
+### What's new
+- **Running Fitness and VO2 Max draw COROS's dial** - on the Personal screen, Running Fitness shows COROS's total on the half-circle dial its Training Hub draws, with the four abilities on bars cut at the same levels and the pace range COROS prints under each. VO2 Max takes the same dial and rates your value for your age and sex on The Cooper Institute's five ratings, Poor to Superior, instead of fixed bands that called 47 "Peak" for everyone. LTHR, max heart rate and threshold pace stay on the Thresholds card above.
+- **Personal Records adds 3K and 15K** - the two metric records COROS keeps besides 1K, 5K, 10K, half and marathon, each with its history. Your runs are read again for them while the Hall of Records is open.
+- **Update a Mentor plan and your calendar together** - a Mentor plan on your calendar offers Update plan & calendar, or Update plan only, as the Training Library's save asks. The sessions still ahead on your calendar follow from today; if the calendar cannot be updated, the plan stays saved and Mentor says so.
+
+### Changed
+- Mentor puts the recovery chart above an answer only when the answer is about recovery, not whenever it read your trends, and decides on every read of your zones whether the HR zones chart belongs with the answer.
+- Long Mentor conversations roll their summary less often, so fewer turns wait for it.
+- The VO2 Max dial tells a screen reader its value.
+
+### Fixed
+- Personal Records: the 12 weeks and the half year were the wrong way round.
+- Training Library: a session trained on its day counts as done even when it went much harder than planned or its name was typed with a different space, and the activity COROS linked to a session is the one counted.
+- Training Library: a plan whose run is over is listed under Done, once, with Mentor's mark, including a run COROS still calls running past its last day. Such a run no longer carries the calendar mark or reads On calendar, saving its plan no longer asks to update the calendar, and Mentor offers a plain Update.
+
 ## [1.5.1] - 2026-11-16
 
 Mentor's Calendar changes say what they change, and its conversations cost fewer tokens.
