@@ -86,7 +86,9 @@ Thêm bảng nào thì phân loại trong `syncPolicy.ts`, hoặc `test:sync-pol
   với `sourcePlanId` trỏ về nó.
 - Instance đang chạy mà không có plan mẫu trong library (ví dụ plan official đã áp lịch như
   P10035) là một dòng riêng. Sửa dòng này là sửa lịch.
-- Instance chạy hết (`finished`) chỉ đọc, nằm trong mục Done. Instance đã gỡ khỏi lịch
+- Instance chạy hết (`finished`) chỉ đọc, nằm trong mục Done: gộp vào plan mẫu như instance đang
+  chạy (`planRuns`), plan mẫu nằm ở mục mà lần chạy của nó đứng — Done khi đã qua buổi cuối, kể
+  cả khi COROS chưa đổi sang `finished`. Không có plan mẫu thì instance là một dòng riêng. Instance đã gỡ khỏi lịch
   (`stopped`) không được liệt kê: COROS từ chối `executeSubPlan` trên nó (1031), và plan mẫu
   (nếu còn) là dòng đại diện.
 

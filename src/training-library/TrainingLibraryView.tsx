@@ -47,6 +47,8 @@ import {
   groupPlans,
   listedPlans,
   planEmptyState,
+  planRunOf,
+  planRuns,
   planScopeOptions,
   planProgress,
   planStartLabel,
@@ -1074,7 +1076,9 @@ function planView(
   compliance: PlanCompliance | undefined,
   heraclesLoads: PlanHeraclesLoads | undefined,
   athlete: WorkoutEditorContext | undefined,
-  athletePending: boolean
+  athletePending: boolean,
+  /** The calendar copy a plan in the library stands for (`planRuns`): its dates are the tile's. */
+  run?: TrainingPlanDocument
 ) {
   /* The reader's own measure, so the tile and the ridge it opens onto agree. */
   const { weeks } = readPlan(plan, [], heraclesLoads, athlete, athletePending);
@@ -1090,7 +1094,7 @@ function planView(
      * earned.
      */
     description: plan.description || undefined,
-    startLabel: planStartLabel(plan),
+    startLabel: planStartLabel(run ?? plan),
     /*
      * What replaced the Adherence tab: how a plan on the calendar is going, as
      * one figure. `null` for a plan that is not on the calendar — which is
@@ -1441,17 +1445,14 @@ function PlanIndex({
 
   /* Joined once for the whole list: the matcher produces a few hundred rows
      and every plan would otherwise walk all of them on every render. A plan
-     running on the calendar is measured by its calendar copy, which is the one
-     whose sessions COROS dated. */
-  const compliance = useMemo(() => {
-    const byRemoteId = new Map(plans.map((plan) => [plan.remoteId, plan]));
-    return new Map(
-      plans.map((plan) => {
-        const running = plan.runningInstanceId ? byRemoteId.get(plan.runningInstanceId) : undefined;
-        return [plan.id, planCompliance(running ?? plan, matches)];
-      })
-    );
-  }, [plans, matches]);
+     that is or was on the calendar is measured by its calendar copy
+     (`planRuns`), which is the one whose sessions COROS dated — a run that is
+     over as much as one still going, since its tile now stands under Done. */
+  const runs = useMemo(() => planRuns(plans), [plans]);
+  const compliance = useMemo(
+    () => new Map(plans.map((plan) => [plan.id, planCompliance(planRunOf(plan, runs) ?? plan, matches)])),
+    [plans, runs, matches]
+  );
 
   const { locale } = useI18n();
   const scopes = useMemo(() => planScopeOptions(plans), [plans, locale]);
@@ -1529,10 +1530,18 @@ function PlanIndex({
       new Map(
         plans.map((plan) => [
           plan.id,
-          planView(plan, summaries.get(plan.id), compliance.get(plan.id), heraclesLoads, athlete, athletePending)
+          planView(
+            plan,
+            summaries.get(plan.id),
+            compliance.get(plan.id),
+            heraclesLoads,
+            athlete,
+            athletePending,
+            planRunOf(plan, runs)
+          )
         ])
       ),
-    [plans, summaries, compliance, locale, heraclesLoads, athlete, athletePending]
+    [plans, runs, summaries, compliance, locale, heraclesLoads, athlete, athletePending]
   );
   const viewOf = (plan: TrainingPlanDocument) => views.get(plan.id)!;
 

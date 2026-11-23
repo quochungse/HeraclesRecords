@@ -37,6 +37,8 @@ import {
   planEmptyState,
   planLifecycle,
   planOriginLabel,
+  planRunOf,
+  planRuns,
   planScopeOptions,
   planStartLabel,
   planProgress,
@@ -256,6 +258,51 @@ const names = (plans) => plans.map((item) => item.name);
     ["Official"],
     "a copy whose plan is not in the library — COROS's own catalogue — is listed as itself"
   );
+
+  /*
+   * A plan whose run is over goes under Done, and the run with it. Only a
+   * running copy was folded into its plan, so the plan — undated, like every
+   * plan in the library — stayed among the current plans for good while its
+   * finished run went under Done as a second tile without the coach's mark.
+   * And a run COROS still calls running past its last day was folded away and
+   * listed nowhere as over.
+   */
+  const ranOut = plan({ name: "Ran out", remoteId: "ran-out", origin: "coach" });
+  const ranOutRun = onCalendar("2026-06-01", {
+    name: "Ran out",
+    weekCount: 4,
+    calendar: "finished",
+    sourcePlanId: "ran-out"
+  });
+  const pastItsDays = plan({ name: "Past its days", remoteId: "past", origin: "coach" });
+  const pastItsDaysRun = onCalendar("2026-09-07", { name: "Past its days", weekCount: 2, sourcePlanId: "past" });
+  const over = groupPlans([ranOut, ranOutRun, pastItsDays, pastItsDaysRun, anytime], today);
+  assert.deepEqual(names(over.done), ["Ran out", "Past its days"], "each plan under Done, once");
+  assert.ok(over.done.every((item) => item.calendar === "unscheduled"), "as the plan, which carries the coach's mark");
+  assert.deepEqual(names(over.current), ["Anytime"]);
+  assert.equal(over.hero, undefined, "a run past its last day is not in progress, whatever COROS calls it");
+
+  const runs = planRuns([ranOut, ranOutRun, pastItsDays, pastItsDaysRun, anytime], today);
+  assert.equal(planRunOf(ranOut, runs), ranOutRun, "the plan's tile is measured and dated by its run");
+  assert.equal(planRunOf(anytime, runs), undefined, "a plan never on the calendar has none");
+  assert.equal(planRunOf(ranOutRun, runs), undefined, "a run stands for itself");
+
+  /* Run again: the run going on is the one the plan stands for, and the old one stays folded. */
+  const again = onCalendar("2026-09-21", { name: "Ran out", weekCount: 4, sourcePlanId: "ran-out" });
+  const rerun = groupPlans([ranOut, ranOutRun, again, anytime], today);
+  assert.equal(rerun.hero?.name, "Ran out");
+  assert.equal(rerun.heroRun, again);
+  assert.deepEqual(names(rerun.done), [], "the earlier run is not a tile of its own");
+  assert.equal(planRunOf(ranOut, planRuns([ranOut, ranOutRun, again], today)), again);
+
+  /* Taken off the calendar, a run is not listed, and its plan is a plan again. */
+  const offAgain = groupPlans(
+    listedPlans([ranOut, onCalendar("2026-09-07", { calendar: "stopped", weekCount: 6, sourcePlanId: "ran-out" })]),
+    today
+  );
+  assert.deepEqual(names(offAgain.current), ["Ran out"]);
+  assert.deepEqual(names(groupPlans([{ ...ranOut, archived: true }, ranOutRun], today).archived), ["Ran out"],
+    "an archived plan stays archived, its run with it");
 }
 
 // ---------------------------------------------------------------------------
@@ -266,6 +313,11 @@ const names = (plans) => plans.map((item) => item.name);
   assert.equal(planStartLabel(onCalendar("2026-03-23"), today), "Starts Mar 23");
   assert.equal(planStartLabel(onCalendar("2026-03-02"), today), "On calendar since Mar 2");
   assert.equal(planStartLabel(onCalendar("2026-01-05", { calendar: "finished" }), today), "Ran from Jan 5");
+  assert.equal(
+    planStartLabel(onCalendar("2026-02-16", { weekCount: 2 }), today),
+    "Ran from Feb 16",
+    "past its last day it ran, though COROS has not said finished yet"
+  );
   assert.equal(
     planStartLabel(onCalendar("2026-03-23", { calendar: "stopped" }), today),
     "Taken off the calendar",

@@ -30,7 +30,8 @@ export function planOriginLabel(plan: Pick<TrainingPlanDocument, "origin">): str
  * Such a run is still in COROS's list, but there is nothing left to do with
  * it — COROS will not put it back on the calendar — and the plan it came from,
  * where there is one, is the row that stands for it. A run that ran out stays,
- * under Done, as the record of what was trained.
+ * under Done, as the record of what was trained: through its plan's row where
+ * that plan is listed (`groupPlans`), as itself where it is not.
  */
 export function listedPlans(plans: readonly TrainingPlanDocument[]): TrainingPlanDocument[] {
   return plans.filter((plan) => plan.calendar !== "stopped");
@@ -121,6 +122,54 @@ export function planLifecycle(
   return midnight < end ? "active" : "done";
 }
 
+/** Which of a plan's runs it stands for first: one going on, then one ahead, then one over. */
+const RUN_RANK: Record<PlanLifecycle, number> = { active: 0, upcoming: 1, done: 2, undated: 3 };
+
+/**
+ * The calendar copy each plan in the library stands for, keyed by the plan's
+ * `remoteId`: one running, or one that ran out. A run taken off is not one
+ * (`listedPlans` drops it), and a copy whose plan is not listed stands for
+ * itself.
+ *
+ * **A run that ran out is its plan's too.** Only a running copy was folded
+ * into its plan, so once it was over the plan — undated, as a plan in the
+ * library always is — stayed among the current plans for good, while the run
+ * went under Done as a second tile without the coach's mark. A run COROS still
+ * calls running past its last day (it reports one finished only some time
+ * after) was hidden behind the plan and listed nowhere as over.
+ *
+ * One run per plan: COROS runs a plan once at a time, so where two are listed
+ * the one going on wins, then the later start.
+ */
+export function planRuns(
+  plans: readonly TrainingPlanDocument[],
+  today: Date = new Date()
+): Map<string, TrainingPlanDocument> {
+  const listed = new Set(
+    plans.filter((plan) => plan.calendar === "unscheduled" && plan.remoteId).map((plan) => plan.remoteId)
+  );
+  const runs = new Map<string, TrainingPlanDocument>();
+  for (const plan of plans) {
+    if (plan.calendar !== "running" && plan.calendar !== "finished") continue;
+    if (!plan.sourcePlanId || !listed.has(plan.sourcePlanId)) continue;
+    const held = runs.get(plan.sourcePlanId);
+    const rank = RUN_RANK[planLifecycle(plan, today)];
+    const heldRank = held ? RUN_RANK[planLifecycle(held, today)] : Infinity;
+    if (rank < heldRank || (rank === heldRank && (plan.startDate ?? "") > (held?.startDate ?? ""))) {
+      runs.set(plan.sourcePlanId, plan);
+    }
+  }
+  return runs;
+}
+
+/** The run a plan in the library stands for, if it has one. */
+export function planRunOf(
+  plan: TrainingPlanDocument,
+  runs: ReadonlyMap<string, TrainingPlanDocument>
+): TrainingPlanDocument | undefined {
+  return plan.calendar === "unscheduled" && plan.remoteId ? runs.get(plan.remoteId) : undefined;
+}
+
 /**
  * The plan on the screen's shoulders: the one being trained right now.
  *
@@ -196,7 +245,7 @@ export interface PlanSections {
   heroRun?: TrainingPlanDocument;
   /** Everything still ahead or still usable, the hero excluded. */
   current: TrainingPlanDocument[];
-  /** Past their last week. */
+  /** Past their last week: a run, or a plan in the library whose run is (`planRuns`). */
   done: TrainingPlanDocument[];
   /** Put away by hand, whatever their dates say. */
   archived: TrainingPlanDocument[];
@@ -219,9 +268,10 @@ export function groupPlans(
   today: Date = new Date()
 ): PlanSections {
   const running = activePlan(plans, today);
-  /* A plan running from a template in the library is that template's
-     calendar copy, and the template stands for it — with a mark saying it is
-     on the calendar. Listing both drew every scheduled plan twice. */
+  /* A plan running from a template in the library — or run out — is that
+     template's calendar copy, and the template stands for it, with a mark
+     saying it is on the calendar while it runs. Listing both drew every
+     scheduled plan twice. */
   const templates = new Map(
     plans.filter((plan) => plan.calendar === "unscheduled").map((plan) => [plan.remoteId, plan])
   );
@@ -237,11 +287,20 @@ export function groupPlans(
     done: [],
     archived: []
   };
+  /* A plan in the library has no dates of its own; it is listed where its run
+     stands — under Done once that run is over. */
+  const runs = planRuns(plans, today);
   for (const plan of plans) {
     if (plan.id === hero?.id || plan.id === running?.id) continue;
-    if (plan.calendar === "running" && plan.sourcePlanId && templates.has(plan.sourcePlanId)) continue;
+    if (
+      (plan.calendar === "running" || plan.calendar === "finished") &&
+      plan.sourcePlanId &&
+      templates.has(plan.sourcePlanId)
+    ) {
+      continue;
+    }
     if (plan.archived) sections.archived.push(plan);
-    else if (planLifecycle(plan, today) === "done") sections.done.push(plan);
+    else if (planLifecycle(planRunOf(plan, runs) ?? plan, today) === "done") sections.done.push(plan);
     else sections.current.push(plan);
   }
   return sections;
@@ -359,8 +418,9 @@ export function planStartLabel(plan: TrainingPlanDocument, today: Date = new Dat
   if (!plan.startDate) return undefined;
   const label = shortDate(plan.startDate);
   if (!label) return undefined;
-  if (plan.calendar === "finished") return t("library.start.ranFrom", { date: label });
   if (plan.calendar === "stopped") return t("library.start.takenOff");
+  /* Past its last day it ran, whether or not COROS has said finished yet. */
+  if (planLifecycle(plan, today) === "done") return t("library.start.ranFrom", { date: label });
   const start = planStartDate(plan);
   return start && start > startOfDay(today) ? t("library.start.starts", { date: label }) : t("library.start.since", { date: label });
 }

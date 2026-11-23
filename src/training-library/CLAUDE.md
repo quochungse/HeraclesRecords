@@ -96,9 +96,11 @@ ten sessions on a day is an error.
 - **Saving a plan with a copy running asks** Keep editing / Save plan only / Save & update
   calendar. Updating is not `plan/sync` (it does not move sessions): `syncPlanToCalendar`
   rewrites the copy through `plan/update` (`planOntoRunningCopy`), from today on only.
-- A running copy folds into its plan's row (`groupPlans`). `PlanCalendarBadge` marks a plan on
-  the calendar. Compliance joins `remoteId:idInPlan` to the calendar's
-  `schedulePlanId:scheduleIdInPlan`.
+- A calendar copy, running or run out, folds into its plan's row (`groupPlans`, `planRuns`), and
+  the plan is listed where its run stands: under Done once past its last day, whether or not
+  COROS has said finished (it says so some time later). The tile's date and done count are the
+  run's. `PlanCalendarBadge` marks a plan on the calendar. Compliance joins
+  `remoteId:idInPlan` to the calendar's `schedulePlanId:scheduleIdInPlan`.
 - `npm run test:coros-plan-writes` (fake COROS), `npm run verify:coros-plan-api -- --live`.
 
 ## Workouts tab
