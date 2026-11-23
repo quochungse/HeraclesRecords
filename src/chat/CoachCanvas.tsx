@@ -11,7 +11,6 @@ import {
 import type {
   PlanArtifactVersion,
   PlanDraftPreview,
-  PlanDraftSaveOptions,
   PlanRef,
   TrainingPlanDestination,
   TrainingPlanDocument
@@ -31,7 +30,7 @@ import { creationFigures } from "./CoachCreationCard";
 import { datedForReading } from "./planDating";
 import { CreationActions } from "./CreationActions";
 import type { CreationCalendar } from "./creationCalendar";
-import { creationStatus } from "./creationChoices";
+import { creationStatus, type CreationSaveOptions } from "./creationChoices";
 import { isOnCoros, supersededLine, type CreationVersion } from "./creationVersions";
 import { getIntlLocale, messageRecord, plural, t } from "../i18n/core";
 
@@ -102,7 +101,7 @@ export default function CoachCanvas({
     destination: TrainingPlanDestination,
     scheduleDate?: string,
     keepInLibrary?: boolean,
-    options?: PlanDraftSaveOptions
+    options?: CreationSaveOptions
   ) => void;
   onEdit?: (draftId: string) => void;
   onRestore?: (draftId: string) => void;
@@ -320,7 +319,7 @@ function ArtifactView({
     destination: TrainingPlanDestination,
     scheduleDate?: string,
     keepInLibrary?: boolean,
-    options?: PlanDraftSaveOptions
+    options?: CreationSaveOptions
   ) => void;
   onEdit?: (draftId: string) => void;
   onRestore?: (draftId: string) => void;

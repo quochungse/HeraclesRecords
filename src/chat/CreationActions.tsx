@@ -9,12 +9,14 @@ import {
   RotateCcw,
   TriangleAlert
 } from "lucide-react";
-import type {
-  PlanDraftPreview,
-  PlanDraftSaveOptions,
-  TrainingPlanDestination
-} from "../../electron/types";
-import { actionOutcome, artifactActions, type CreationAction } from "./creationChoices";
+import type { PlanDraftPreview, TrainingPlanDestination } from "../../electron/types";
+import {
+  actionOutcome,
+  artifactActions,
+  creationSaveOptions,
+  type CreationAction,
+  type CreationSaveOptions
+} from "./creationChoices";
 import { plural, t } from "../i18n/core";
 
 function todayKey(): string {
@@ -58,7 +60,7 @@ export function CreationActions({
     destination: TrainingPlanDestination,
     scheduleDate?: string,
     keepInLibrary?: boolean,
-    options?: PlanDraftSaveOptions
+    options?: CreationSaveOptions
   ) => void;
   onEdit?: () => void;
   /** Another version of it is a COROS plan, which saving this one updates. */
@@ -134,7 +136,7 @@ export function CreationActions({
       action.destination,
       action.date,
       isWorkout && action.destination === "calendar" ? keepInLibrary : undefined,
-      action.asNew ? { asNew: true } : undefined
+      creationSaveOptions(action)
     );
   };
 

@@ -75,7 +75,6 @@ import type {
   PlanRef,
   WorkoutSport,
   PlanCorosSync,
-  PlanDraftSaveOptions,
   PlanVersionWritten,
   PlanDraftPreviewEntry,
   TrainingPlanDestination,
@@ -138,6 +137,7 @@ import { EMPTY_NOTES } from "../training-library/runTrail";
 import { briefOpenProblems, briefTitle } from "./planBriefModel";
 import { CoachAskPicker } from "./CoachAskPicker";
 import { remoteErrorMessage } from "./remoteError";
+import type { CreationSaveOptions } from "./creationChoices";
 import {
   displayStepText,
   isPipelineStepText,
@@ -1226,7 +1226,9 @@ export function ChatView({
   >(null);
   const [uploadingDraftId, setUploadingDraftId] = useState<string | null>(null);
   /** An update COROS refused because the plan changed there meanwhile. */
-  const [corosConflict, setCorosConflict] = useState<{ draftId: string; name: string } | null>(null);
+  const [corosConflict, setCorosConflict] = useState<
+    { draftId: string; name: string; updateCalendar: boolean } | null
+  >(null);
   /**
    * Each plan card's document, by draft and edit: the weeks and days the card
    * draws come from what the draft becomes, not from its dates. `null` is a
@@ -4403,9 +4405,10 @@ export function ChatView({
     destination: TrainingPlanDestination,
     scheduleDate?: string,
     keepInLibrary?: boolean,
-    options?: PlanDraftSaveOptions
+    options?: CreationSaveOptions
   ): Promise<UploadPlanResult | undefined> => {
     if (!api || uploadingDraftId) return undefined;
+    const { updateCalendar = false, ...saveOptions } = options ?? {};
     setUploadingDraftId(draftId);
     setCorosConflict(null);
     onError(null);
@@ -4416,12 +4419,12 @@ export function ChatView({
         destination,
         scheduleDate,
         keepInLibrary,
-        options
+        options ? saveOptions : undefined
       );
       // The plan changed on COROS since this version was made: nothing was
       // written, and the athlete says which one stands (P1.6).
       if (result.conflict) {
-        setCorosConflict({ draftId, name: result.planName });
+        setCorosConflict({ draftId, name: result.planName, updateCalendar });
         return result;
       }
       const scheduledDates = new Map(
@@ -4478,6 +4481,21 @@ export function ChatView({
         persistHistory(activeSessionIdRef.current, next, true);
         return next;
       });
+      // A plan on the calendar runs as COROS's own copy of it, which the
+      // update did not touch. It follows only when asked, from today on,
+      // as the Library's save does; the plan is saved either way.
+      if (updateCalendar && result.planId) {
+        try {
+          await api.syncTrainingPlanToCalendar(result.planId);
+        } catch (caught) {
+          onError(
+            t("chat.err.calendarNotUpdated", {
+              name: result.planName,
+              reason: remoteErrorMessage(caught, t("chat.err.upload"))
+            })
+          );
+        }
+      }
       onPlanUploaded?.();
     } catch (caught) {
       onError(
@@ -6796,7 +6814,10 @@ export function ChatView({
           <CorosConflictDialog
             name={corosConflict.name}
             onOverwrite={() =>
-              void handleUploadPlanDraft(corosConflict.draftId, "nativePlan", undefined, undefined, { overwrite: true })
+              void handleUploadPlanDraft(corosConflict.draftId, "nativePlan", undefined, undefined, {
+                overwrite: true,
+                updateCalendar: corosConflict.updateCalendar
+              })
             }
             onSaveAsNew={() =>
               void handleUploadPlanDraft(corosConflict.draftId, "nativePlan", undefined, undefined, { asNew: true })

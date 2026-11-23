@@ -9,7 +9,7 @@ import { pathToFileURL } from "node:url";
  */
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
-const { planSaveChoices, isOneShotPlan, ONE_SHOT_DAYS, artifactActions } = await import(
+const { planSaveChoices, isOneShotPlan, ONE_SHOT_DAYS, artifactActions, creationSaveOptions } = await import(
   pathToFileURL(path.join(repoRoot, "src", "chat", "creationChoices.ts")).href
 );
 
@@ -195,6 +195,25 @@ const ids = (choices) => ({
   assert.equal(change.kind, "save");
   assert.equal(change.choices.primary.id, "updatePlan");
   assert.deepEqual(change.choices.more.map((action) => [action.id, action.asNew]), [["saveAsNewPlan", true]]);
+  assert.equal(creationSaveOptions(change.choices.primary), undefined, "a plain update carries nothing");
+
+  /*
+   * On the calendar, an update of the plan left COROS's running copy as it
+   * was: the coach changed a session and the calendar kept the old one, with
+   * nothing said. The press now says whether the calendar follows, as the
+   * Library's save asks, and following leads.
+   */
+  const onCalendar = artifactActions(draft, { latest: true, onCoros: true, onCalendar: true }, today);
+  assert.equal(onCalendar.kind, "save");
+  assert.equal(onCalendar.choices.primary.id, "updatePlanAndCalendar");
+  assert.deepEqual(creationSaveOptions(onCalendar.choices.primary), { updateCalendar: true });
+  assert.deepEqual(onCalendar.choices.more.map((action) => action.id), ["updatePlanOnly", "saveAsNewPlan"]);
+  assert.equal(creationSaveOptions(onCalendar.choices.more[0]), undefined, "plan only leaves the calendar alone");
+  assert.deepEqual(creationSaveOptions(onCalendar.choices.more[1]), { asNew: true }, "a new plan has no calendar to follow");
+  assert.deepEqual(artifactActions(draft, { latest: false, saved: true, onCoros: true, onCalendar: true }, today), {
+    kind: "older",
+    restore: true
+  });
   assert.deepEqual(artifactActions(draft, { latest: false, saved: true, onCoros: true }, today), { kind: "older", restore: true });
   assert.deepEqual(
     artifactActions({ ...draft, uploadedAt: 1 }, { latest: true, onCoros: true }, today),
@@ -273,6 +292,16 @@ const ids = (choices) => ({
     actionOutcome({ id: "addToCalendar", label: "", destination: "nativePlan" }, week),
     /COROS keeps the calendar in step/,
     "a plan on the calendar says COROS keeps it"
+  );
+  assert.match(
+    actionOutcome({ id: "updatePlanAndCalendar", label: "", destination: "nativePlan" }, week),
+    /calendar/,
+    "an update that the calendar follows says so"
+  );
+  assert.match(
+    actionOutcome({ id: "updatePlanOnly", label: "", destination: "nativePlan" }, week),
+    /calendar/,
+    "and one it does not, says that"
   );
   assert.match(
     actionOutcome({ id: "saveToLibrary", label: "", destination: "workoutLibrary" }, workout()),

@@ -184,6 +184,10 @@ Coach never writes to COROS directly; it writes drafts and change sets the athle
   over. **A draft is read from its row every time** (`loadStoredPlanDraft`) — a cached copy
   once `plan/add`ed a plan twice; saves are serialised per creation (`savingArtifacts`).
   `PartialUploadError` names the sessions that landed so a retry writes only the rest.
+  **An update leaves COROS's running copy as it was**, so a plan on the calendar offers
+  **Update plan & calendar** (leads) or Update plan only; following is the window's
+  `syncTrainingPlanToCalendar` after the save, as the Library's (from today on), and a failed
+  one leaves the plan saved and says so.
 - It goes on the calendar through the Library's `TrainingPlanCalendarDialog`; an unsaved
   version previews as `chat:<draftId>` through `setChatPlanReader` (the two modules must not
   import each other).

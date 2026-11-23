@@ -15,12 +15,14 @@
  *
  * Pure and outside the component for the reason `activityFilters.ts` is.
  */
-import type { PlanDraftPreview, TrainingPlanDestination } from "../../electron/types";
+import type { PlanDraftPreview, PlanDraftSaveOptions, TrainingPlanDestination } from "../../electron/types";
 import { getIntlLocale, t } from "../i18n/core";
 
 export type CreationActionId =
   | "addToCalendar"
   | "updatePlan"
+  | "updatePlanOnly"
+  | "updatePlanAndCalendar"
   | "saveAsNewPlan"
   | "scheduleWorkout"
   | "pickWorkoutDate"
@@ -36,6 +38,24 @@ export interface CreationAction {
   date?: string;
   /** A new COROS plan, though the creation is already one (P1.6). */
   asNew?: boolean;
+  /** The plan's running copy follows the update, from today on (`syncPlanToCalendar`). */
+  updateCalendar?: boolean;
+}
+
+/**
+ * How a press saves, as the window carries it out. `updateCalendar` is the
+ * window's own step after the save — the Library's, through the same
+ * `syncTrainingPlanToCalendar` — so it never reaches the save itself.
+ */
+export interface CreationSaveOptions extends PlanDraftSaveOptions {
+  updateCalendar?: boolean;
+}
+
+/** The options a press carries, or nothing when it carries none. */
+export function creationSaveOptions(action: CreationAction): CreationSaveOptions | undefined {
+  if (action.asNew) return { asNew: true };
+  if (action.updateCalendar) return { updateCalendar: true };
+  return undefined;
 }
 
 export interface CreationChoices {
@@ -236,12 +256,37 @@ export function artifactActions(
     return { kind: "saved", addToCalendar: asPlan && !state.onCalendar };
   }
   if (isPlan && state.onCoros) {
+    const asNew: CreationAction = {
+      id: "saveAsNewPlan",
+      label: t("chat.save.asNew"),
+      destination: "nativePlan",
+      asNew: true
+    };
+    /* A plan on the calendar runs as COROS's own copy of it, which an update
+       of the plan does not touch: the press says whether the calendar
+       follows, as the Library's save asks. Following leads — the coach's
+       change is usually meant for the sessions ahead. */
+    if (state.onCalendar) {
+      return {
+        kind: "save",
+        choices: {
+          primary: {
+            id: "updatePlanAndCalendar",
+            label: t("chat.save.updateWithCalendar"),
+            destination: "nativePlan",
+            updateCalendar: true
+          },
+          secondary: [],
+          more: [{ id: "updatePlanOnly", label: t("chat.save.updatePlanOnly"), destination: "nativePlan" }, asNew]
+        }
+      };
+    }
     return {
       kind: "save",
       choices: {
         primary: { id: "updatePlan", label: t("chat.save.update"), destination: "nativePlan" },
         secondary: [],
-        more: [{ id: "saveAsNewPlan", label: t("chat.save.asNew"), destination: "nativePlan", asNew: true }]
+        more: [asNew]
       }
     };
   }
@@ -285,6 +330,10 @@ export function actionOutcome(action: CreationAction, draft: PlanDraftPreview): 
       return t("chat.outcome.pickDate");
     case "updatePlan":
       return t("chat.outcome.update");
+    case "updatePlanOnly":
+      return t("chat.outcome.updatePlanOnly");
+    case "updatePlanAndCalendar":
+      return t("chat.outcome.updateWithCalendar");
     case "saveAsNewPlan":
       return t("chat.outcome.asNew");
   }

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown, CircleCheck, Maximize2 } from "lucide-react";
 import type {
   PlanDraftPreview,
-  PlanDraftSaveOptions,
   TrainingPlanDestination,
   TrainingPlanDocument,
   UploadPlanResult,
@@ -26,7 +25,7 @@ import { datedForReading } from "./planDating";
 import { useAthleteContextRead } from "../calendar/useAthleteContext";
 import { markFigure } from "../../electron/workoutFigures";
 import type { CreationCalendar } from "./creationCalendar";
-import { creationStatus } from "./creationChoices";
+import { creationStatus, type CreationSaveOptions } from "./creationChoices";
 import { workoutSportLabel } from "../training/workoutSport";
 import { t } from "../i18n/core";
 
@@ -193,7 +192,7 @@ export function CoachCreationCard({
     destination: TrainingPlanDestination,
     scheduleDate?: string,
     keepInLibrary?: boolean,
-    options?: PlanDraftSaveOptions
+    options?: CreationSaveOptions
   ) => void;
   onEdit?: () => void;
   /** Its editor is open: the way on is back into it. */
