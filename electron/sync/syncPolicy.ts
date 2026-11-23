@@ -130,6 +130,10 @@ export const TABLE_POLICY: Readonly<Record<string, TablePolicy>> = {
   // Per-night HRV and stress samples. Rebuildable while COROS still holds them,
   // and far too bulky to carry between machines.
   sleep_night_series: "derived",
+  // Stress level and Heart rate's days and five-minute stress readings. Both
+  // are COROS's own figures, fetched again on another machine.
+  stress_heart_days: "derived",
+  stress_day_series: "derived",
 
   // --- Training library: user intent, worth carrying between machines ------
   // A plan is a COROS plan (docs/training-plan-coros-first.md), so what the

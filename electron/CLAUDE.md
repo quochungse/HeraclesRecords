@@ -61,6 +61,11 @@ fingerprint>/<activityId>.json.br` (brotli 5), and only a summary reaches SQLite
   own channel, `trainingHub:getActivityDetailRaw`.
 - `activityMetrics.ts`, `unitSystem.ts`, `sleepMetrics.ts`, `chartPlacement.ts`,
   `workoutFigures.ts` and other modules the renderer imports must stay free of `node:` imports.
+- A summary's figures are versioned per reader (`recordsVersion`, `intensityVersion`,
+  `performanceVersion`, `swimVersion`, `heartRateVersion`), each swept only by the screen that
+  asks (`require…`), so adding one withholds nothing already stored. The sweep pauses
+  (`SUMMARY_BACKFILL_DELAY_MS`) only after a request to COROS; a summary worked out again from
+  the cached file waits for nothing.
 - `npm run test:activity-detail-cache`.
 
 ## COROS facts for reading

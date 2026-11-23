@@ -42,6 +42,8 @@ import { ActivitiesSummary } from "../../src/training/components/ActivitiesSumma
 import { ActivityDetailPane } from "../../src/training/components/ActivityDetailPane";
 import { ActivityRouteMap } from "../../src/training/components/ActivityRouteMap";
 import { SleepDetailsView } from "../../src/sleep/SleepDetailsView";
+import { StressLevelView } from "../../src/stressHeart/StressLevelView";
+import { HeartRateView } from "../../src/stressHeart/HeartRateView";
 import { PromptDialog } from "../../src/training-library/PromptDialog";
 import { clampTagInput } from "../../src/training-library/tagInput";
 import { PlanReader } from "../../src/training-library/PlanReader";
@@ -817,6 +819,43 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
           api={api}
           connected={(options.connected as boolean | undefined) ?? true}
           trendPoints={(options.trendPoints as never) ?? []}
+          onOpenOverview={spy("onOpenOverview")}
+        />
+      </main>
+    );
+  },
+  /*
+   * Stress level and Heart rate, in a column of a stated width. Their days,
+   * series and cached nights come from the script; their sessions are a prop.
+   */
+  StressLevelView: (options) => {
+    loadAppStyles();
+    return (
+      <main
+        className="content"
+        style={typeof options.width === "number" ? { width: `${options.width}px` } : undefined}
+      >
+        <StressLevelView
+          api={api}
+          connected={(options.connected as boolean | undefined) ?? true}
+          activities={(options.activities as never) ?? []}
+          onOpenOverview={spy("onOpenOverview")}
+        />
+      </main>
+    );
+  },
+  HeartRateView: (options) => {
+    loadAppStyles();
+    return (
+      <main
+        className="content"
+        style={typeof options.width === "number" ? { width: `${options.width}px` } : undefined}
+      >
+        <HeartRateView
+          api={api}
+          connected={(options.connected as boolean | undefined) ?? true}
+          activities={(options.activities as never) ?? []}
+          lthrZones={(options.lthrZones as never) ?? []}
           onOpenOverview={spy("onOpenOverview")}
         />
       </main>

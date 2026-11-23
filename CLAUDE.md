@@ -248,6 +248,7 @@ in". The COROS API notes are in `electron/CLAUDE.md`.
 | Running, Cycling, Hiking, Swimming, trail view, running efficiency | `src/running/`, `src/cycling/`, `src/hiking/`, `src/swimming/`, `electron/swimDetail.ts` | `src/running/CLAUDE.md` |
 | Strength, Hevy | `src/strength/`, `electron/strength*`, `hevyService.ts` | `src/strength/CLAUDE.md` |
 | Sleep | `src/sleep/`, `electron/sleep*` | `src/sleep/CLAUDE.md` |
+| Stress level, Heart rate | `src/stressHeart/`, `electron/stressHeart*` | `src/stressHeart/CLAUDE.md` |
 | Where you've been, places, geocoding | `src/trainingMap/`, `reverseGeocodeService.ts` | `src/trainingMap/CLAUDE.md` |
 | Base maps | `src/mapBase/` | `src/mapBase/CLAUDE.md` |
 | Hall of Records | `src/records/` | `src/records/CLAUDE.md` |
@@ -256,7 +257,7 @@ in". The COROS API notes are in `electron/CLAUDE.md`.
 
 A nested `CLAUDE.md` loads only when you read files under its directory. **Before changing
 main-process code of an area whose notes live under `src/` (Coach, plans, Strength, Sleep,
-places), read that file first.**
+Stress level and Heart rate, places), read that file first.**
 
 ## Releases
 

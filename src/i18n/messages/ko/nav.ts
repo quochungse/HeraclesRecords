@@ -8,6 +8,8 @@ const nav: NavMessages = {
 
   "nav.overview": "개요",
   "nav.sleep": "수면",
+  "nav.stress": "스트레스 수준",
+  "nav.heartRate": "심박수",
   "nav.coach": "멘토",
   "nav.calendar": "캘린더",
   "nav.library": "훈련 라이브러리",

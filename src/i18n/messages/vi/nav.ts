@@ -8,6 +8,8 @@ const nav: NavMessages = {
 
   "nav.overview": "Tổng quan",
   "nav.sleep": "Giấc ngủ",
+  "nav.stress": "Mức căng thẳng",
+  "nav.heartRate": "Nhịp tim",
   "nav.coach": "Mentor",
   "nav.calendar": "Lịch tập",
   "nav.library": "Thư viện bài tập",

@@ -8,6 +8,8 @@ const nav: NavMessages = {
 
   "nav.overview": "ภาพรวม",
   "nav.sleep": "การนอน",
+  "nav.stress": "ระดับความเครียด",
+  "nav.heartRate": "อัตราการเต้นของหัวใจ",
   "nav.coach": "เมนเทอร์",
   "nav.calendar": "ปฏิทิน",
   "nav.library": "คลังการฝึก",

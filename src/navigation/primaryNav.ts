@@ -4,7 +4,9 @@ import {
   BookOpen,
   CalendarDays,
   Dumbbell,
+  Gauge,
   Globe,
+  HeartPulse,
   LayoutGrid,
   Medal,
   Milestone,
@@ -31,6 +33,8 @@ export type PrimaryView =
   | "library"
   | "strength"
   | "sleep"
+  | "stress"
+  | "heartRate"
   | "calendar"
   | "coach"
   | "places"
@@ -85,7 +89,7 @@ function navItem(
 }
 
 /**
- * The rail reads as an index: four standing headings, fourteen destinations,
+ * The rail reads as an index: four standing headings, sixteen destinations,
  * nothing to open first.
  *
  * The sections answer *when the athlete reaches for a screen*, not where the
@@ -103,11 +107,13 @@ export const PRIMARY_NAV_SECTIONS: PrimaryNavSection[] = [
     get label() {
       return t("nav.section.today");
     },
-    // What the morning is read from: the app's own account of it, and the
-    // night it is all judged against.
+    // What the morning is read from: the app's own account of it, then the
+    // body — its heart rate, the night it is judged against, its stress.
     items: [
       navItem("overview", "nav.overview", LayoutGrid),
+      navItem("heartRate", "nav.heartRate", HeartPulse),
       navItem("sleep", "nav.sleep", Moon),
+      navItem("stress", "nav.stress", Gauge),
     ],
   },
   {
@@ -167,7 +173,7 @@ export const PRIMARY_NAV_SECTIONS: PrimaryNavSection[] = [
  * The two destinations that are about the person rather than the training.
  * They sit in the identity row at the foot of the rail, which is where an
  * account and its settings are looked for — and keeping them out of the index
- * is what brings it down to fourteen rows that fit without folding.
+ * is what brings it down to sixteen rows that fit without folding.
  */
 export const PRIMARY_NAV_ACCOUNT_ITEMS: PrimaryNavItem[] = [
   navItem("profile", "nav.profile", User),

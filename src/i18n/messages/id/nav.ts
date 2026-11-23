@@ -8,6 +8,8 @@ const nav: NavMessages = {
 
   "nav.overview": "Ringkasan",
   "nav.sleep": "Tidur",
+  "nav.stress": "Tingkat stres",
+  "nav.heartRate": "Detak jantung",
   "nav.coach": "Mentor",
   "nav.calendar": "Kalender",
   "nav.library": "Pustaka latihan",

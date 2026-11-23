@@ -255,6 +255,20 @@ assert.ok(
 assert.equal(summary.lastUploadTime, 1789215000);
 assert.equal(summary.summaryVersion, metrics.ACTIVITY_SUMMARY_VERSION);
 
+// The session's average and highest heart rate, which COROS's list never
+// carries the highest of: kept from the detail, versioned on their own. A
+// session with no heart rate is stamped all the same, so it is not read again.
+assert.equal(summary.heartRateVersion, metrics.HEART_RATE_SUMMARY_VERSION);
+assert.deepEqual(
+  metrics.summarizeActivityDetail({
+    activityId: run.activityId,
+    fingerprint: base,
+    detail: service.parseActivityDetail({ ...detailPayload, summary: { ...detailPayload.summary, avgHr: 151, maxHr: 176 } })
+  }).heartRate,
+  { avg: 151, max: 176 }
+);
+assert.deepEqual(summary.heartRate, {}, "no heart rate in the payload, an empty one stamped");
+
 // A detail COROS scored no zones for stores none rather than six zeroes, which
 // would read on screen as a run spent entirely below zone 1.
 assert.equal(
@@ -696,8 +710,29 @@ assert.equal(pass.failed, 2, "two attempts, both failures — and no more than t
 assert.equal(pass.remaining, 8, "the rest wait for the next pass");
 assert.deepEqual(pass.summaries, []);
 assert.ok(
-  Date.now() - sweepStarted >= 350,
-  "and the pause between the two attempts was still taken"
+  Date.now() - sweepStarted < 350,
+  "both read from the cached files, which ask COROS nothing: no pause between them"
+);
+
+// What is paced is a request to COROS: two activities with no cached file,
+// both refused, and the pause between the two requests still taken.
+const uncached = Array.from({ length: 2 }, (_, index) => ({
+  ...run,
+  activityId: `run-uncached-${index}`,
+  name: `Uncached ${index}`
+}));
+database.upsertTrainingActivities(uncached);
+const fetchesBeforePaced = fetches;
+const pacedStarted = Date.now();
+const paced = await service.syncActivityDetailSummaries(
+  uncached.map((activity) => activity.activityId),
+  2
+);
+assert.equal(paced.failed, 2);
+assert.ok(fetches > fetchesBeforePaced, "COROS was asked for both");
+assert.ok(
+  Date.now() - pacedStarted >= 350,
+  "and the pause between the two requests was taken"
 );
 
 // A pass that does compute hands its summaries back, so the screen can merge

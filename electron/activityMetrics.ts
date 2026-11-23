@@ -51,6 +51,13 @@ export const ACTIVITY_SUMMARY_VERSION = 2;
 // 3: 3K and 15K, the metric records COROS keeps besides these.
 export const RECORDS_SUMMARY_VERSION = 3;
 
+/**
+ * A session's average and highest heart rate, versioned on its own like the
+ * records: the Heart rate screen asks for it (`requireHeartRate`) and a row
+ * from before it keeps serving every other figure meanwhile.
+ */
+export const HEART_RATE_SUMMARY_VERSION = 1;
+
 /** 1K, 3K, 5K, 10K, 15K, half and full marathon, in metres. */
 export const BEST_EFFORT_DISTANCES: readonly number[] = [
   1000, 3000, 5000, 10000, 15000, 21097.5, 42195
@@ -434,7 +441,15 @@ export interface ActivityDetailSummaryInput {
     Partial<
       Pick<
         TrainingHubActivityDetail,
-        "sportType" | "track" | "laps" | "paceZones" | "adjustedPaceZones" | "duration" | "swim"
+        | "sportType"
+        | "track"
+        | "laps"
+        | "paceZones"
+        | "adjustedPaceZones"
+        | "duration"
+        | "swim"
+        | "avgHr"
+        | "maxHr"
       >
     >;
   /** The payload as COROS sent it, for the fields the parser has no use for. */
@@ -494,6 +509,13 @@ export function summarizeActivityDetail(
     ...(intensity ? { intensityVersion: INTENSITY_SUMMARY_VERSION, intensity } : {}),
     ...(performance ? { performanceVersion: PERFORMANCE_SUMMARY_VERSION, performance } : {}),
     ...(swim ? { swimVersion: SWIM_SUMMARY_VERSION, swim } : {}),
+    // Written whether or not the session kept a heart rate, so the screen that
+    // asks for it does not ask again for one that has none.
+    heartRateVersion: HEART_RATE_SUMMARY_VERSION,
+    heartRate: {
+      ...(detail.avgHr !== undefined && detail.avgHr > 0 ? { avg: detail.avgHr } : {}),
+      ...(detail.maxHr !== undefined && detail.maxHr > 0 ? { max: detail.maxHr } : {})
+    },
     computedAt: now ?? Date.now()
   };
 }

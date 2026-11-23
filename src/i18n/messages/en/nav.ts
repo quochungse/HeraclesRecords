@@ -9,6 +9,8 @@ const nav = {
 
   "nav.overview": "Overview",
   "nav.sleep": "Sleep",
+  "nav.stress": "Stress level",
+  "nav.heartRate": "Heart rate",
   "nav.coach": "Mentor",
   "nav.calendar": "Calendar",
   "nav.library": "Training Library",

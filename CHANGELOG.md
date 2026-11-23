@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### What's new
+- **Heart rate** - a new screen under Today, above Sleep. A day shows its resting heart rate against the week before, its range, and where it sat - the whole day, asleep and each session - on one scale. Below: your daily heart rate over 4 weeks, 3 months or all of your history, and your exercise time in each of your own heart-rate zones. Both screens read COROS MCP, like Sleep.
+- **Stress level** - a new screen under Today, after Sleep. A day opens on COROS's stress reading every five minutes over a line of the sleep and sessions it held, with its peak, its time at High and Relaxed, and one bar of the four levels that names each part when you point at it. Below: stress by day over 4 weeks, 3 months or all of your history. Today leads with its latest reading and states no average until it is over.
+
 ## [1.5.2] - 2026-11-23
 
 Running Fitness and VO2 Max draw COROS's dial, Personal Records adds 3K and 15K, and a plan session you trained is counted as trained.

@@ -864,6 +864,14 @@ export interface ActivityDetailSummary {
    */
   swimVersion?: number;
   swim?: SwimSummary;
+  /**
+   * The session's average and highest heart rate, from its detail
+   * (`HEART_RATE_SUMMARY_VERSION`): COROS's activity list carries the average
+   * and never the highest, which the Heart rate screen's list draws. Empty on a
+   * session with no heart rate.
+   */
+  heartRateVersion?: number;
+  heartRate?: { avg?: number; max?: number };
   /** Epoch milliseconds. */
   computedAt: number;
 }
@@ -1363,6 +1371,66 @@ export interface SleepNightSeries {
  * screen shows says "cached" rather than "updated" on the strength of it.
  */
 export type SleepHistorySource = "cache" | "network";
+
+/**
+ * Minutes a day spent in each of COROS's four stress levels: Relaxed 0–25,
+ * Low 26–50, Medium 51–75, High 76–100. Measured time only — the watch reads
+ * stress while the wearer is still, so the four rarely add up to a day.
+ */
+export interface StressLevelMinutes {
+  relaxed: number;
+  low: number;
+  medium: number;
+  high: number;
+}
+
+/**
+ * One calendar day of Stress level and Heart rate, from three COROS MCP tools
+ * (`queryStressLevel`, `queryAvgHeartRate`, `queryRestingHeartRate`). Every
+ * figure is optional: each tool answers on its own, and a day the watch was
+ * off the wrist has none of them.
+ */
+export interface StressHeartDay {
+  /** "YYYYMMDD", the calendar day in the athlete's COROS timezone. */
+  day: string;
+  stressAvg?: number;
+  levels?: StressLevelMinutes;
+  /** The whole day's heart rate, sessions included. */
+  avgHr?: number;
+  minHr?: number;
+  maxHr?: number;
+  /** COROS's resting heart rate for the day (the web's `testRhr`, not `rhr`). */
+  restingHr?: number;
+}
+
+export interface StressHeartSnapshot {
+  /** Oldest first, from the first day COROS had anything to the latest. */
+  days: StressHeartDay[];
+  mcpState: McpAvailability;
+  /** Epoch ms the newest of these rows came off COROS. */
+  fetchedAt?: number;
+  source: SleepHistorySource;
+  /** Set when a fill was attempted and failed; the cache still stands. */
+  error?: string;
+}
+
+/**
+ * One day of COROS's stress series (`queryStressTimeSeries`), a reading every
+ * five minutes. `slots[i]` is the reading at local minute `5 * i`, `null` where
+ * COROS has none — a session, or the watch off the wrist.
+ */
+export interface StressDaySeries {
+  day: string;
+  slots: Array<number | null>;
+}
+
+export interface StressSeriesSnapshot {
+  /** The days asked for that could be answered, oldest first. A day missing
+   *  here failed to load; a day present with every slot `null` had no reading. */
+  days: StressDaySeries[];
+  mcpState: McpAvailability;
+  error?: string;
+}
 
 export interface SleepHistorySnapshot {
   /** Nights newest first, main sleeps only — naps are folded into their night. */
