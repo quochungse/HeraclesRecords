@@ -191,7 +191,7 @@ const activity: ActivityMessages = {
   "activity.vo2.last": "直近{span}",
   "activity.vo2.plateau": "VO2 Max {value}、{days}日間、{range}",
   "activity.vo2.title": "ランニングエンジン",
-  "activity.vo2.gauge": "VO2 max ゲージ",
+  "activity.vo2.gauge": "VO2 max ゲージ：{value}",
   "activity.vo2.level": "レベル",
   "activity.vo2.lastStep": "直近の変化",
   "activity.vo2.ago": "{delta} · {duration}前",

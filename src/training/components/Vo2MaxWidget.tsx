@@ -33,6 +33,9 @@ const VO2_LEVEL_NAMES = messageRecord<Vo2Level>({
   superior: "activity.vo2.superior"
 });
 
+/** Five equal parts, one per rating (`vo2DialPosition`). */
+const VO2_DIAL_WEIGHTS = VO2_LEVELS.map(() => 1);
+
 /**
  * Smallest share of the bar that still fits "47 · 33d" under a segment. A
  * narrower plateau keeps its color and its tooltip and drops the caption,
@@ -156,6 +159,7 @@ export function Vo2MaxWidget({ snapshot, profile }: Vo2MaxWidgetProps) {
   const displayValue = latest?.value;
   const edges = vo2LevelEdges(ageOnDay(profile?.birthday, today), athleteSex(profile?.sex));
   const level = displayValue !== undefined ? vo2LevelOf(displayValue, edges) : undefined;
+  const shown = displayValue !== undefined ? String(Math.round(displayValue)) : undefined;
 
   return (
     <section
@@ -170,10 +174,11 @@ export function Vo2MaxWidget({ snapshot, profile }: Vo2MaxWidgetProps) {
       </header>
 
       <SegmentedDial
-        weights={VO2_LEVELS.map(() => 1)}
+        weights={VO2_DIAL_WEIGHTS}
         position={displayValue !== undefined ? vo2DialPosition(displayValue, edges) : undefined}
-        value={displayValue !== undefined ? String(Math.round(displayValue)) : "-"}
-        label={t("activity.vo2.gauge")}
+        value={shown ?? "-"}
+        // The dial is one image to a screen reader, its figure included.
+        label={t("activity.vo2.gauge", { value: shown ?? t("activity.vo2.waiting") })}
       />
 
       <div className="vo2-widget-footer">

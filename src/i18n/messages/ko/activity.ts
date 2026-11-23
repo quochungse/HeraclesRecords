@@ -191,7 +191,7 @@ const activity: ActivityMessages = {
   "activity.vo2.last": "최근 {span}",
   "activity.vo2.plateau": "VO2 Max {value}, {days}일, {range}",
   "activity.vo2.title": "러닝 엔진",
-  "activity.vo2.gauge": "VO2 max 게이지",
+  "activity.vo2.gauge": "VO2 max 게이지: {value}",
   "activity.vo2.level": "수준",
   "activity.vo2.lastStep": "최근 변화",
   "activity.vo2.ago": "{delta} · {duration} 전",

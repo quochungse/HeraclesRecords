@@ -5045,8 +5045,9 @@ const RECORD_DISPLAY_ORDER: Record<number, number> = {
   6: 3,
   5: 4,
   4: 5,
-  2: 6,
-  13: 7
+  3: 6,
+  2: 7,
+  13: 8
 };
 
 const DISTANCE_PR_DISTANCE_METERS: Record<number, number> = {

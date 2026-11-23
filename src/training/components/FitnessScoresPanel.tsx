@@ -29,6 +29,7 @@ const FITNESS_LEVELS = FITNESS_LEVEL_BOUNDS.map((to, index) => ({
   from: index === 0 ? 0 : FITNESS_LEVEL_BOUNDS[index - 1],
   to
 }));
+const FITNESS_LEVEL_WEIGHTS = FITNESS_LEVELS.map((level) => level.to - level.from);
 
 function hasValue(value?: number): value is number {
   return value !== undefined && Number.isFinite(value);
@@ -123,7 +124,7 @@ export function FitnessScoresPanel({
 
       {hasValue(total) ? (
         <SegmentedDial
-          weights={FITNESS_LEVELS.map((level) => level.to - level.from)}
+          weights={FITNESS_LEVEL_WEIGHTS}
           position={clampScore(total) / 100}
           value={formatOptionalNumber(total)}
           label={t("activity.scores.total", { value: formatOptionalNumber(total) })}

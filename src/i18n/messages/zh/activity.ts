@@ -191,7 +191,7 @@ const activity: ActivityMessages = {
   "activity.vo2.last": "最近 {span}",
   "activity.vo2.plateau": "VO2 Max {value}，{days} 天，{range}",
   "activity.vo2.title": "跑步引擎",
-  "activity.vo2.gauge": "VO2 max 仪表",
+  "activity.vo2.gauge": "VO2 max 仪表：{value}",
   "activity.vo2.level": "水平",
   "activity.vo2.lastStep": "最近变化",
   "activity.vo2.ago": "{delta} · {duration}前",

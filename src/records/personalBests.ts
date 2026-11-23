@@ -57,7 +57,7 @@ export interface RecordRun {
   activity?: { activityId: string; sportType: number; startTime?: number };
   /** The session's name, where COROS has one. */
   name?: string;
-  /** Age grade 0–1 on its own day, at a graded distance (5K and longer). */
+  /** Age grade 0–1 on its own day, at a graded distance (`AGE_GRADED_DISTANCES`: 5K, 10K, half, marathon). */
   grade?: number;
 }
 

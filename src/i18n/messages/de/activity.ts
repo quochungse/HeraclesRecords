@@ -191,7 +191,7 @@ const activity: ActivityMessages = {
   "activity.vo2.last": "Letzte {span}",
   "activity.vo2.plateau": "VO2 Max {value}, {days} Tage, {range}",
   "activity.vo2.title": "Laufmotor",
-  "activity.vo2.gauge": "VO2-max-Anzeige",
+  "activity.vo2.gauge": "VO2-max-Anzeige: {value}",
   "activity.vo2.level": "Niveau",
   "activity.vo2.lastStep": "Letzte Änderung",
   "activity.vo2.ago": "{delta} · vor {duration}",

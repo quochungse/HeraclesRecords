@@ -191,7 +191,7 @@ const activity: ActivityMessages = {
   "activity.vo2.last": "{span} gần nhất",
   "activity.vo2.plateau": "VO2 Max {value}, {days} ngày, {range}",
   "activity.vo2.title": "Động cơ chạy bộ",
-  "activity.vo2.gauge": "Đồng hồ VO2 max",
+  "activity.vo2.gauge": "Đồng hồ VO2 max: {value}",
   "activity.vo2.level": "Mức",
   "activity.vo2.lastStep": "Lần thay đổi gần nhất",
   "activity.vo2.ago": "{delta} · {duration} trước",

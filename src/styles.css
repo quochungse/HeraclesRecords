@@ -3748,9 +3748,6 @@ td span {
 
 /* ── Training Intelligence (Recovery + Fitness Trend) ───────────────── */
 
-/* Matte cards in dark. Paper's `.panel` rule outranks this, so there they are
-   white cards on their shadow like every other panel. */
-
 /*
  * VO2 Max: The Cooper Institute's five ratings for the athlete's age and sex
  * (src/training/vo2Level.ts), in the hues Garmin rates them in. The card is

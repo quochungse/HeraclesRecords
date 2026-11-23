@@ -191,7 +191,7 @@ const activity: ActivityMessages = {
   "activity.vo2.last": "{span} terakhir",
   "activity.vo2.plateau": "VO2 Max {value}, {days} hari, {range}",
   "activity.vo2.title": "Mesin lari",
-  "activity.vo2.gauge": "Pengukur VO2 max",
+  "activity.vo2.gauge": "Pengukur VO2 max: {value}",
   "activity.vo2.level": "Level",
   "activity.vo2.lastStep": "Perubahan terakhir",
   "activity.vo2.ago": "{delta} · {duration} lalu",

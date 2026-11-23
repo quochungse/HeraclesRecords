@@ -192,7 +192,7 @@ const activity = {
   "activity.vo2.last": "Last {span}",
   "activity.vo2.plateau": "VO2 Max {value}, {days} days, {range}",
   "activity.vo2.title": "Running engine",
-  "activity.vo2.gauge": "VO2 max gauge",
+  "activity.vo2.gauge": "VO2 max gauge: {value}",
   "activity.vo2.level": "Level",
   "activity.vo2.lastStep": "Last step",
   "activity.vo2.ago": "{delta} · {duration} ago",
