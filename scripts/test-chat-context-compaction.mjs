@@ -392,6 +392,14 @@ for (const stored of [
     assert.equal(request.question, heavy[at - 1].content, "each with the question it answered");
   }
 
+  // A batch whose digests are on their way is weighed as those digests, not
+  // whole: whole, it rolled the summary on the turn it moved.
+  const fresh = Array.from({ length: 12 }, (_, index) => long(index, index % 2 ? 6_000 : 300));
+  assert.ok(planTranscriptContext(fresh, { through: 0 }).toSummarise.length > 0, "with no digests to come it rolls");
+  const waiting = planTranscriptContext(fresh, { through: 0 }, DEFAULT_CONTEXT_WINDOW, { digestOf: () => undefined });
+  assert.ok(waiting.condensedThrough > 0 && waiting.toDigest.length > 0);
+  assert.deepEqual(waiting.toSummarise, [], "a batch waiting for its digests does not roll");
+
   // The boundary is stored and moves in batches: one more short turn does not
   // move it, so what a provider caches ahead of it stays put.
   const next = planTranscriptContext(

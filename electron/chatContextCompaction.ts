@@ -17,6 +17,7 @@ import type {
 import { briefLine, outlineLine } from "./planBrief";
 import { stripChartPlaceholders } from "./chartPlacement";
 import { isChatProvider } from "./chatModels";
+import { DIGEST_CHARS } from "./answerDigest";
 
 /**
  * Context compaction — the rolling summary that stands in for the head of a
@@ -679,6 +680,26 @@ export interface PlanTranscriptOptions {
   digestOf?: AnswerDigestLookup;
 }
 
+/** What a digest weighs when it comes in at the length it is asked for. */
+const EXPECTED_DIGEST_TOKENS = estimateTokens(`${CONDENSED_ANSWER_MARK} ${"x".repeat(DIGEST_CHARS)}`);
+
+/**
+ * How many times `middle` the condensed layer may weigh as sent while its
+ * answers wait for digests — a digest refused, or digests not being made.
+ */
+const MIDDLE_CAP = 2;
+
+/**
+ * What an entry of the condensed layer will weigh once the digests asked for
+ * have landed: an answer with none yet is weighed as the digest coming for it.
+ */
+function expectedEntryTokens(entry: PersistedChatEntry, digestOf: AnswerDigestLookup): number {
+  const cost = entryTokens(entry, digestOf);
+  if (entry.kind !== "message" || entry.role !== "assistant") return cost;
+  const content = stripChartPlaceholders(entry.content);
+  return content.trim() && !digestOf(content) ? Math.min(cost, EXPECTED_DIGEST_TOKENS) : cost;
+}
+
 /**
  * What of a transcript this turn should send, and what has to be folded into
  * the summary first. Pure: the folding itself is a model call and belongs to
@@ -689,7 +710,9 @@ export interface PlanTranscriptOptions {
  * `keep`. Then the condensed layer folds its oldest part into the summary once
  * it runs past `middle` tokens — until half of that is left — or the whole of
  * it once everything past the summary runs past the entry window, which is
- * what the window has always meant.
+ * what the window has always meant. An answer still waiting for its digest is
+ * weighed as that digest (`expectedEntryTokens`); what is sent is held to
+ * `MIDDLE_CAP` times `middle` for digests that never come.
  *
  * A `through` past the end of the transcript describes a conversation that is
  * no longer there, so the summary is abandoned rather than trusted. It should
@@ -744,12 +767,26 @@ export function planTranscriptContext(
   if (options.force || entries.length - through > window.limit) {
     nextThrough = condensed;
   } else {
-    let cost = tokensOf(entries.slice(through, condensed), digestOf);
-    if (cost > budget.middle) {
-      while (nextThrough < condensed && cost > budget.middle / 2) {
-        cost -= entryTokens(entries[nextThrough]!, digestOf);
-        nextThrough += 1;
-      }
+    // A batch that just moved here has no digests yet — they are asked for
+    // once this plan is made. Weighed whole, it rolled the summary on the very
+    // turn it moved, and its answers reached the summary never digested.
+    const weigh = (entry: PersistedChatEntry) =>
+      digestOf ? expectedEntryTokens(entry, digestOf) : entryTokens(entry, digestOf);
+    let weighed = 0;
+    let sent = 0;
+    for (let index = through; index < condensed; index += 1) {
+      weighed += weigh(entries[index]!);
+      sent += entryTokens(entries[index]!, digestOf);
+    }
+    const overBudget = weighed > budget.middle;
+    const overCap = sent > budget.middle * MIDDLE_CAP;
+    while (
+      nextThrough < condensed &&
+      ((overBudget && weighed > budget.middle / 2) || (overCap && sent > budget.middle))
+    ) {
+      weighed -= weigh(entries[nextThrough]!);
+      sent -= entryTokens(entries[nextThrough]!, digestOf);
+      nextThrough += 1;
     }
   }
 
