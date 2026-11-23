@@ -2,7 +2,7 @@ import type { Translation } from "../../types.ts";
 
 /** The rail: its four headings, every destination, and its own controls. */
 const nav = {
-  "nav.section.today": "Today",
+  "nav.section.health": "Health",
   "nav.section.plan": "Plan",
   "nav.section.history": "History",
   "nav.section.journey": "Your journey",

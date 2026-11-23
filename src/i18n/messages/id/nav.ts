@@ -1,7 +1,7 @@
 import type { NavMessages } from "../en/nav.ts";
 
 const nav: NavMessages = {
-  "nav.section.today": "Hari ini",
+  "nav.section.health": "Kesehatan",
   "nav.section.plan": "Rencana",
   "nav.section.history": "Riwayat",
   "nav.section.journey": "Perjalanan Anda",

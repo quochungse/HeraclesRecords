@@ -19,7 +19,7 @@ That is all. The app reads your nights from then on, and Mentor can read them to
 - **Every night and nap**: stages, time asleep, the sleep window and wake-ups.
 - **Across the night**: heart rate, HRV and stress.
 - **By day**: steps, exercise minutes and stress by the hour, which Mentor reads beside your training load.
-- **Stress level** and **Heart rate**: two screens of their own under Today. Your stress every five minutes and the time in each stress level; your resting heart rate, your heart rate asleep and your exercise time in each heart-rate zone.
+- **Stress level** and **Heart rate**: two screens of their own, with Sleep under Health in the sidebar. Your stress every five minutes and the time in each stress level; your resting heart rate, your heart rate asleep and your exercise time in each heart-rate zone.
 
 ## Kept past nine weeks
 

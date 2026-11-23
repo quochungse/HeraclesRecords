@@ -1,7 +1,7 @@
 import type { NavMessages } from "../en/nav.ts";
 
 const nav: NavMessages = {
-  "nav.section.today": "Aujourd’hui",
+  "nav.section.health": "Santé",
   "nav.section.plan": "Planifier",
   "nav.section.history": "Historique",
   "nav.section.journey": "Votre parcours",

@@ -148,7 +148,8 @@ window edge.
 
 ## The primary rail
 
-`PRIMARY_NAV_SECTIONS` is four standing headings (Today, Plan, History, Your journey) — labels,
+`PRIMARY_NAV_SECTIONS` is Overview under no heading (the home), then four standing headings
+(Health, Plan, History, Your journey) — labels,
 not disclosures. Personal and Settings sit in the identity row at the rail's foot
 (`PRIMARY_NAV_ACCOUNT_ITEMS`, COROS nickname and avatar from the cached profile); both carry
 `data-nav-label`, which `probe-ui-cdp.mjs` navigates by. The rail draws one hairline

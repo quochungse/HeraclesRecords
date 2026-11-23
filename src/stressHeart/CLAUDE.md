@@ -1,6 +1,6 @@
 # Stress level and Heart rate
 
-Two screens under Today (`StressLevelView`, `HeartRateView`) over one data layer: COROS's stress
+Two screens under Health (`StressLevelView`, `HeartRateView`) over one data layer: COROS's stress
 and the day's heart rate from the COROS MCP server (`electron/stressHeartService.ts`, parsers in
 `electron/stressHeartParser.ts`), cached by day in `stress_heart_days` and `stress_day_series`
 (both `derived`). Messages: `stress.*` (Stress level, and the day list both share), `heart.*`.

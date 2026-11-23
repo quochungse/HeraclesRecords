@@ -18,9 +18,9 @@ More on what the app reads and keeps: [Connect your COROS account](/guide/connec
 
 ## 3. Look around
 
-The sidebar groups the screens by when you reach for them:
+The sidebar opens with **Overview**, your day at a glance, then groups the screens by when you reach for them:
 
-- **Today**: Overview, Heart rate, Sleep and Stress level.
+- **Health**: Heart rate, Sleep and Stress level.
 - **Plan**: Mentor, Calendar and Training Library.
 - **History**: Activities, then a screen each for Running, Cycling, Hiking, Swimming and Strength.
 - **Your journey**: the Hall of Records (Timeline, Personal Records and The Twelve Labours) and Where you've been.

@@ -1,7 +1,7 @@
 import type { NavMessages } from "../en/nav.ts";
 
 const nav: NavMessages = {
-  "nav.section.today": "今日",
+  "nav.section.health": "健康",
   "nav.section.plan": "計画",
   "nav.section.history": "履歴",
   "nav.section.journey": "これまでの歩み",

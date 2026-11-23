@@ -43,7 +43,7 @@ export type PrimaryView =
   | "labours"
   | "settings";
 
-export type PrimaryNavSectionId = "today" | "plan" | "history" | "journey";
+export type PrimaryNavSectionId = "home" | "health" | "plan" | "history" | "journey";
 
 export interface PrimaryNavItem {
   id: PrimaryView;
@@ -62,11 +62,12 @@ export interface PrimaryNavItem {
 
 /**
  * A run of destinations under one standing heading. The heading is a label and
- * nothing more — it does not open, close or remember anything.
+ * nothing more — it does not open, close or remember anything. Overview's run
+ * has none: it is the app's home, which no heading names better than its own.
  */
 export interface PrimaryNavSection {
   id: PrimaryNavSectionId;
-  readonly label: string;
+  readonly label?: string;
   items: PrimaryNavItem[];
 }
 
@@ -89,12 +90,12 @@ function navItem(
 }
 
 /**
- * The rail reads as an index: four standing headings, sixteen destinations,
- * nothing to open first.
+ * The rail reads as an index: Overview, the app's home, then four standing
+ * headings — sixteen destinations, nothing to open first.
  *
  * The sections answer *when the athlete reaches for a screen*, not where the
  * data came from. That is the one grouping the athlete already has in their
- * head — the morning check, the week being planned, the work on file, the
+ * head — the body's own record, the week being planned, the work on file, the
  * ground covered over the years — and it is what lets the whole list stand
  * open at once. The
  * disclosure groups this replaced existed only because eighteen equal rows did
@@ -103,14 +104,19 @@ function navItem(
  */
 export const PRIMARY_NAV_SECTIONS: PrimaryNavSection[] = [
   {
-    id: "today",
+    // The app's own account of the day — readiness, the week, the load — first
+    // and under no heading: it is home, and opens most mornings.
+    id: "home",
+    items: [navItem("overview", "nav.overview", LayoutGrid)],
+  },
+  {
+    id: "health",
     get label() {
-      return t("nav.section.today");
+      return t("nav.section.health");
     },
-    // What the morning is read from: the app's own account of it, then the
-    // body — its heart rate, the night it is judged against, its stress.
+    // The body's own record, a month at a time: its heart rate, the night it
+    // is judged against, its stress.
     items: [
-      navItem("overview", "nav.overview", LayoutGrid),
       navItem("heartRate", "nav.heartRate", HeartPulse),
       navItem("sleep", "nav.sleep", Moon),
       navItem("stress", "nav.stress", Gauge),
