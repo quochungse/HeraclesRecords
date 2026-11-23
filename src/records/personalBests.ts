@@ -57,7 +57,7 @@ export interface RecordRun {
   activity?: { activityId: string; sportType: number; startTime?: number };
   /** The session's name, where COROS has one. */
   name?: string;
-  /** Age grade 0–1 on its own day, at a graded distance (`AGE_GRADED_DISTANCES`: 5K, 10K, half, marathon). */
+  /** On a `best` only: age grade 0–1 on its own day, at a graded distance (`AGE_GRADED_DISTANCES`: 5K, 10K, half, marathon). */
   grade?: number;
 }
 
@@ -147,7 +147,7 @@ export function buildRecordBoard(input: RecordBoardInput): RecordBoard {
     input.groups?.find((candidate) => candidate.type === COROS_PERIOD_GROUP[period]);
 
   const distances = BOARD_DISTANCES.map((entry): DistanceRecord => {
-    const history = (input.fell.get(entry.distance) ?? []).map((run) => graded(entry.distance, run));
+    const history = [...(input.fell.get(entry.distance) ?? [])];
     const best: DistanceRecord["best"] = {};
     for (const period of RECORD_PERIODS) {
       const record = group(period)?.records.find((candidate) => candidate.type === entry.corosType);
@@ -161,7 +161,7 @@ export function buildRecordBoard(input: RecordBoardInput): RecordBoard {
     // Before COROS has answered — or for a record it does not keep — the
     // all-time best is the last time the history fell.
     const last = history[history.length - 1];
-    if (!best.all && last) best.all = last;
+    if (!best.all && last) best.all = graded(entry.distance, last);
     return {
       key: entry.key,
       distance: entry.distance,
