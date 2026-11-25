@@ -73,8 +73,19 @@ export function useSleepHistory(
   );
 
   useEffect(() => {
+    if (!enabled) {
+      // An answer belongs to the session that asked. Kept, the next load
+      // would show it as loaded — the loading copy waits for an empty list —
+      // until its own answer replaced it. A read still out is not this one's.
+      requestSequence.current += 1;
+      setSnapshot(null);
+      setLoading(false);
+      setRefreshing(false);
+      setError(null);
+      return;
+    }
     void load(false);
-  }, [load]);
+  }, [enabled, load]);
 
   const refresh = useCallback(() => {
     void load(true);

@@ -1907,6 +1907,13 @@ export default function App() {
     trainingHubStatus?.email?.split("@")[0]?.trim() ??
     null;
 
+  // Sleep, Stress level and Heart rate read COROS MCP, not the Training Hub
+  // token: a start-up re-login (signed out for the second or two it takes)
+  // must not drop them, or each one reads its data again under it.
+  const healthScreensConnected = Boolean(
+    trainingHubStatus?.authenticated || trainingHubStatus?.restoring,
+  );
+
   return (
     <ShareFactsProvider result={hallOfRecords.result}>
     <div className="app">
@@ -2203,7 +2210,7 @@ export default function App() {
               <Suspense fallback={<DeferredSurfaceFallback label={t("nav.sleep")} />}>
                 <LazySleepDetailsView
                   api={api}
-                  connected={Boolean(trainingHubStatus?.authenticated)}
+                  connected={healthScreensConnected}
                   trendPoints={trainingHubSnapshot?.trendPoints ?? []}
                   trendPointsLoading={
                     trainingHubSnapshotStatus === "pending" && !trainingHubSnapshot
@@ -2216,7 +2223,7 @@ export default function App() {
               <Suspense fallback={<DeferredSurfaceFallback label={t("nav.stress")} />}>
                 <LazyStressLevelView
                   api={api}
-                  connected={Boolean(trainingHubStatus?.authenticated)}
+                  connected={healthScreensConnected}
                   activities={trainingHubActivities}
                   onOpenOverview={() => setActiveView("overview")}
                 />
@@ -2226,7 +2233,7 @@ export default function App() {
               <Suspense fallback={<DeferredSurfaceFallback label={t("nav.heartRate")} />}>
                 <LazyHeartRateView
                   api={api}
-                  connected={Boolean(trainingHubStatus?.authenticated)}
+                  connected={healthScreensConnected}
                   activities={trainingHubActivities}
                   lthrZones={trainingHubSnapshot?.dashboard?.lthrZones ?? NO_LTHR_ZONES}
                   onOpenOverview={() => setActiveView("overview")}

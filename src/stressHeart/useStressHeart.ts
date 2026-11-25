@@ -55,8 +55,17 @@ export function useStressHeartDays(api: HeraclesRecordsApi | null, enabled: bool
   );
 
   useEffect(() => {
+    if (!enabled) {
+      // As `useSleepHistory`: a kept answer would read as loaded under the next load.
+      sequence.current += 1;
+      setSnapshot(null);
+      setLoading(false);
+      setRefreshing(false);
+      setError(null);
+      return;
+    }
     void load(false);
-  }, [load]);
+  }, [enabled, load]);
 
   const refresh = useCallback(() => void load(true), [load]);
   return { snapshot, loading, refreshing, error, refresh };
