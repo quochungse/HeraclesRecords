@@ -40,6 +40,8 @@ const records: RecordsMessages = {
   "records.pr.beyond.swim": "Längstes Schwimmen",
   "records.pr.beyond.hike": "Längste Wanderung",
   "records.pr.beyond.rideClimb": "Meiste Höhenmeter auf dem Rad",
+  "records.pr.climb.route": "Schwerste durchstiegene Route",
+  "records.pr.climb.boulder": "Schwerster durchstiegener Boulder",
   "records.pr.empty.title": "Noch keine Rekorde",
   "records.pr.empty.body": "Deine Bestzeiten erscheinen hier nach deinem ersten Lauf mit GPS.",
   "records.backfill.paused_one": "Noch {count} ältere Aktivität für Rekorde und Orte zu lesen — der Rest beim nächsten Besuch.",

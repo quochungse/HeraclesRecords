@@ -32,6 +32,7 @@ import {
 import { INTENSITY_SUMMARY_VERSION, sportHasTrainingBenefit } from "./sessionIntensity";
 import { PERFORMANCE_SUMMARY_VERSION, sportHasRunPerformance } from "./runPerformance";
 import { SWIM_SUMMARY_VERSION, isSwimSportType, parseSwimDetail, swimLaps } from "./swimDetail";
+import { CLIMB_SUMMARY_VERSION, isClimbSportType, parseClimbDetail } from "./climbDetail";
 import {
   countStrengthActivitiesMissingDetail,
   countTrainingActivitiesMissingFeelType,
@@ -2145,6 +2146,12 @@ export interface ActivityDetailSummarySyncOptions {
    */
   requireSwim?: boolean;
   /**
+   * Count a climbing session's summary as missing until it carries its climbs
+   * (`CLIMB_SUMMARY_VERSION`). The Climbing screen asks, for the sessions it
+   * shows, and the Hall of Records for every climb (its hardest sends).
+   */
+  requireClimb?: boolean;
+  /**
    * Count a session's summary as missing until it carries its average and
    * highest heart rate (`HEART_RATE_SUMMARY_VERSION`), which COROS's list does
    * not. Only the Heart rate screen asks, for the sessions on the days it lists.
@@ -2173,6 +2180,9 @@ export async function syncActivityDetailSummaries(
       (!options.requireSwim ||
         !isSwimSportType(sportType) ||
         summary.swimVersion === SWIM_SUMMARY_VERSION) &&
+      (!options.requireClimb ||
+        !isClimbSportType(sportType) ||
+        summary.climbVersion === CLIMB_SUMMARY_VERSION) &&
       (!options.requireHeartRate || summary.heartRateVersion === HEART_RATE_SUMMARY_VERSION)
     );
   };
@@ -8255,6 +8265,7 @@ export function parseActivityDetail(
   const track = parseActivityTrack(raw, wallClock);
   const sportType = toOptionalNumber(raw.sportType) ?? toOptionalNumber(summary.sportType);
   const swim = parseSwimDetail(raw, { sportType: sportType ?? listSportType, laps });
+  const climb = parseClimbDetail(raw, { sportType: sportType ?? listSportType });
 
   return {
     activityId:
@@ -8301,7 +8312,8 @@ export function parseActivityDetail(
     series: parseActivitySeries(raw, wallClock),
     strength: parseStrengthDetail(raw),
     exerciseSets: parseSessionSets(raw),
-    ...(swim ? { swim } : {})
+    ...(swim ? { swim } : {}),
+    ...(climb ? { climb } : {})
   };
 }
 

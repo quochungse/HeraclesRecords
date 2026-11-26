@@ -1,7 +1,12 @@
 import type {
+  ActivityDetailSummary,
+  ClimbStyle,
   TrainingHubActivity,
   TrainingHubPersonalRecordGroup
 } from "../../electron/types";
+import { isClimbSportType } from "../../electron/climbDetail";
+import type { ClimbFamily } from "../../electron/climbGrades";
+import { climbRecords, climbScales, gradeName, hardestSend } from "../climbing/climbMetrics";
 import { isRideSportType } from "../cycling/rideType";
 import { isHikeSportType } from "../hiking/hikeType";
 import { isRunSportType } from "../running/runSurface";
@@ -83,6 +88,16 @@ export interface FarthestMark {
 
 export type BeyondKey = "ride" | "swim" | "hike" | "rideClimb";
 
+/** The hardest climb sent, a route's or a boulder's: a grade, how it went, and when. */
+export interface ClimbMark {
+  /** Named in the scale most of the athlete's climbs were graded in. */
+  grade: string;
+  style: ClimbStyle;
+  day: string;
+  activity?: RecordRun["activity"];
+  name?: string;
+}
+
 export interface RecordBoard {
   /** Every running distance, in order, whether or not it has a record. */
   distances: DistanceRecord[];
@@ -90,6 +105,8 @@ export interface RecordBoard {
   mostClimb?: FarthestMark;
   /** The farthest and highest outside running, those the athlete has done. */
   beyond: Array<{ key: BeyondKey; mark: FarthestMark }>;
+  /** The hardest route and boulder sent, those the athlete has climbed. */
+  climbing: Array<{ key: ClimbFamily; mark: ClimbMark }>;
   /** The distance whose all-time record grades highest for age and sex. */
   bestByStandard?: string;
 }
@@ -120,6 +137,8 @@ export interface RecordBoardInput {
   /** Every time each distance's record fell, oldest first, by metres. */
   fell: ReadonlyMap<number, readonly RecordRun[]>;
   athlete?: { birthday?: number; sex?: number };
+  /** Stored summaries by activity id: a climbing session's climbs are read off them. */
+  summaries?: ReadonlyMap<string, ActivityDetailSummary>;
 }
 
 const isDay = (day: string | undefined): day is string => Boolean(day && /^\d{8}$/.test(day));
@@ -211,6 +230,24 @@ export function buildRecordBoard(input: RecordBoardInput): RecordBoard {
     return mark ? [{ key, mark }] : [];
   });
 
+  // The hardest send of each ladder: a route's grade and a boulder's are never
+  // compared. The first time a grade was sent stands; a repeat of it is not new.
+  const climbs = input.summaries
+    ? climbRecords(input.activities.filter((activity) => isClimbSportType(activity.sportType)), input.summaries)
+    : [];
+  const scales = climbScales(undefined, climbs);
+  const climbing = (["route", "boulder"] as const).flatMap((key) => {
+    const best = hardestSend(climbs, key);
+    if (!best || best.ladder === undefined || !best.activity.startTime) return [];
+    const mark: ClimbMark = {
+      grade: gradeName(key, best.ladder, scales),
+      style: best.style,
+      day: localDay(best.activity.startTime),
+      ...session(best.activity.activityId)
+    };
+    return [{ key, mark }];
+  });
+
   let bestByStandard: string | undefined;
   let bestGrade = 0;
   for (const row of distances) {
@@ -226,6 +263,7 @@ export function buildRecordBoard(input: RecordBoardInput): RecordBoard {
     ...(longestRun ? { longestRun } : {}),
     ...(mostClimb ? { mostClimb } : {}),
     beyond,
+    climbing,
     ...(bestByStandard ? { bestByStandard } : {})
   };
 }

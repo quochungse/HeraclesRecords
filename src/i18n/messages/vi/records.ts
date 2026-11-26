@@ -40,6 +40,8 @@ const records: RecordsMessages = {
   "records.pr.beyond.swim": "Bơi xa nhất",
   "records.pr.beyond.hike": "Hiking xa nhất",
   "records.pr.beyond.rideClimb": "Leo cao nhất khi đạp",
+  "records.pr.climb.route": "Tuyến khó nhất đã leo xong",
+  "records.pr.climb.boulder": "Bài boulder khó nhất đã leo xong",
   "records.pr.empty.title": "Chưa có kỷ lục",
   "records.pr.empty.body": "Thành tích tốt nhất của bạn sẽ hiện ở đây sau buổi chạy đầu tiên có GPS.",
   "records.backfill.paused_one": "Còn {count} hoạt động cũ chưa đọc để tìm kỷ lục và địa điểm — phần còn lại sẽ đọc ở lần bạn ghé sau.",

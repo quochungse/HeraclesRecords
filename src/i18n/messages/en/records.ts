@@ -47,6 +47,8 @@ const records = {
   "records.pr.beyond.swim": "Longest swim",
   "records.pr.beyond.hike": "Longest hike",
   "records.pr.beyond.rideClimb": "Most climbed on a ride",
+  "records.pr.climb.route": "Hardest route sent",
+  "records.pr.climb.boulder": "Hardest boulder sent",
   "records.pr.empty.title": "No records yet",
   "records.pr.empty.body": "Your best times appear here after your first run with GPS.",
   "records.backfill.paused_one": "{count} older activity still to read for records and places — the rest on your next visit.",

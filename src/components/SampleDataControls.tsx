@@ -22,6 +22,7 @@ const SAMPLE_OPTIONS: readonly { value: SampleKind; label: string; title: string
     title: "Simulated trail runs (electron/sampleTrailRuns.ts)",
   },
   { value: "swims", label: "Swims", title: "Simulated pool and open-water swims (electron/sampleSwims.ts)" },
+  { value: "climbs", label: "Climbs", title: "Simulated indoor, boulder and outdoor climbing (electron/sampleClimbs.ts)" },
   {
     value: "strength",
     label: "Strength",

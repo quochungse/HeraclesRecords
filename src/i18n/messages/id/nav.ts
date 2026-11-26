@@ -18,6 +18,7 @@ const nav: NavMessages = {
   "nav.cycling": "Bersepeda",
   "nav.hiking": "Mendaki",
   "nav.swimming": "Renang",
+  "nav.climbing": "Panjat tebing",
   "nav.strength": "Latihan beban",
   "nav.timeline": "Linimasa",
   "nav.personalRecords": "Rekor pribadi",

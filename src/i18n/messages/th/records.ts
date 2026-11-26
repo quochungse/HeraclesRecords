@@ -40,6 +40,8 @@ const records: RecordsMessages = {
   "records.pr.beyond.swim": "ว่ายไกลที่สุด",
   "records.pr.beyond.hike": "เดินป่าไกลที่สุด",
   "records.pr.beyond.rideClimb": "ไต่ระดับมากที่สุดขณะปั่น",
+  "records.pr.climb.route": "เส้นทางยากที่สุดที่ปีนสำเร็จ",
+  "records.pr.climb.boulder": "โบลเดอร์ยากที่สุดที่ปีนสำเร็จ",
   "records.pr.empty.title": "ยังไม่มีสถิติ",
   "records.pr.empty.body": "เวลาดีที่สุดของคุณจะปรากฏที่นี่หลังการวิ่งครั้งแรกที่มี GPS",
   "records.backfill.paused_one": "ยังเหลือกิจกรรมเก่า {count} รายการที่ต้องอ่านเพื่อหาสถิติและสถานที่ — ที่เหลือจะอ่านเมื่อคุณเปิดครั้งหน้า",

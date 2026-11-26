@@ -20,6 +20,7 @@ const common: CommonMessages = {
   "sport.run": "ランニング",
   "sport.bike": "サイクリング",
   "sport.swim": "スイム",
+  "sport.climb": "クライミング",
   "sport.hiking": "ハイキング",
   "sport.strength": "筋トレ",
   "sport.other": "その他",

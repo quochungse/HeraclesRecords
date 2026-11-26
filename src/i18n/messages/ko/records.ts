@@ -40,6 +40,8 @@ const records: RecordsMessages = {
   "records.pr.beyond.swim": "최장 수영",
   "records.pr.beyond.hike": "최장 하이킹",
   "records.pr.beyond.rideClimb": "라이드 최대 상승 고도",
+  "records.pr.climb.route": "완등한 최고 난이도 루트",
+  "records.pr.climb.boulder": "완등한 최고 난이도 볼더",
   "records.pr.empty.title": "아직 기록이 없습니다",
   "records.pr.empty.body": "GPS로 첫 러닝을 마치면 최고 기록이 여기에 나타납니다.",
   "records.backfill.paused_one": "기록과 장소를 찾기 위해 아직 읽지 않은 이전 활동이 {count}개 있습니다 — 나머지는 다음에 열 때 읽습니다.",

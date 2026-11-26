@@ -6,6 +6,7 @@ import { resolveSportName } from "../../training/sportTypes";
 import { sportColorCategory, type SportColorCategory } from "../../training/sportColors";
 import { formatSleepDurationMinutes } from "../../training/formatters";
 import { RunnerIcon } from "../../running/runnerIcon";
+import { ClimbIcon } from "../../climbing/climbIcon";
 import { useI18n } from "../../i18n/useI18n";
 import {
   MINUTES_PER_SLOT,
@@ -40,6 +41,7 @@ const SPORT_GLYPHS: Record<SportColorCategory, LucideIcon> = {
   bike: Bike,
   hiking: Mountain,
   swim: Waves,
+  climb: ClimbIcon,
   strength: Dumbbell,
   other: Activity
 };

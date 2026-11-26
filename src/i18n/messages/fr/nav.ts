@@ -18,6 +18,7 @@ const nav: NavMessages = {
   "nav.cycling": "Vélo",
   "nav.hiking": "Randonnée",
   "nav.swimming": "Natation",
+  "nav.climbing": "Escalade",
   "nav.strength": "Musculation",
   "nav.timeline": "Chronologie",
   "nav.personalRecords": "Records personnels",

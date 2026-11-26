@@ -44,6 +44,8 @@ const records: RecordsMessages = {
   "records.pr.beyond.swim": "Самый длинный заплыв",
   "records.pr.beyond.hike": "Самый длинный поход",
   "records.pr.beyond.rideClimb": "Наибольший набор высоты на велосипеде",
+  "records.pr.climb.route": "Сложнейшая пролезенная трасса",
+  "records.pr.climb.boulder": "Сложнейший пролезенный боулдер",
   "records.pr.empty.title": "Рекордов пока нет",
   "records.pr.empty.body": "Ваше лучшее время появится здесь после первой пробежки с GPS.",
   "records.backfill.paused_one": "Ещё {count} старую активность нужно прочитать ради рекордов и мест — остальное при следующем визите.",

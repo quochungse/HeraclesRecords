@@ -40,6 +40,8 @@ const records: RecordsMessages = {
   "records.pr.beyond.swim": "Renang terjauh",
   "records.pr.beyond.hike": "Hiking terjauh",
   "records.pr.beyond.rideClimb": "Tanjakan terbanyak saat bersepeda",
+  "records.pr.climb.route": "Jalur tersulit yang tuntas",
+  "records.pr.climb.boulder": "Boulder tersulit yang tuntas",
   "records.pr.empty.title": "Belum ada rekor",
   "records.pr.empty.body": "Waktu terbaikmu akan muncul di sini setelah lari pertamamu dengan GPS.",
   "records.backfill.paused_one": "Masih ada {count} aktivitas lama yang belum dibaca untuk rekor dan tempat — sisanya saat kunjungan berikutnya.",

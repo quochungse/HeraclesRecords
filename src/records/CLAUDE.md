@@ -52,6 +52,10 @@ celebration open the Labours; a stage's date there opens its milestone on the Ti
   run. Only the best-effort distances are on it — every metric distance COROS keeps (1K, 3K,
   5K, 10K, 15K, half, marathon); a new one needs `RECORDS_SUMMARY_VERSION` bumped so the
   backfill reads it. The page opens on the record that grades highest for age and sex.
+  Climbing's records are the hardest route and the hardest boulder sent (`board.climbing`),
+  read off each session's climbs: the hall's backfill asks for climb summaries too
+  (`requireClimb`, `needsRecordsSummary`), and the grade is named in the scale most of the
+  athlete's climbs used, never one figure for both families.
 - The developer toolbar's Sample menu has four presets (`sampleRecords.ts`), told against a
   notices record in memory, asking nothing of COROS.
 

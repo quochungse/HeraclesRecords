@@ -38,6 +38,7 @@ import {
   type RecordRun
 } from "./personalBests";
 import { LaurelWreath } from "./recordsIcons";
+import { CLIMB_STYLE_LABELS } from "../climbing/climbType";
 
 type SessionRef = NonNullable<RecordRun["activity"]>;
 
@@ -84,7 +85,7 @@ export function PersonalRecordsBoard({ board, today, reading, onOpenActivity }: 
   const [chosen, setChosen] = useState<string | null>(null);
 
   const running = board.distances.some((row) => row.best.all);
-  if (!running && !board.longestRun && board.beyond.length === 0) {
+  if (!running && !board.longestRun && board.beyond.length === 0 && board.climbing.length === 0) {
     return (
       <section className="panel records-empty">
         <h2>{t("records.pr.empty.title")}</h2>
@@ -189,6 +190,23 @@ export function PersonalRecordsBoard({ board, today, reading, onOpenActivity }: 
                     : formatDistanceValue(mark.meters, unitSystem, { swim: key === "swim" })
                 }
               />
+              <SessionLine mark={mark} onOpenActivity={onOpenActivity} />
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {board.climbing.length > 0 ? (
+        <div className="panel records-pr-beyond">
+          {board.climbing.map(({ key, mark }) => (
+            <div key={key} className="records-pr-beyond-cell">
+              <span className="records-eyebrow">
+                {t(key === "boulder" ? "records.pr.climb.boulder" : "records.pr.climb.route")}
+              </span>
+              <Figure text={mark.grade} />
+              <p className="records-pr-session">
+                <span>{CLIMB_STYLE_LABELS[mark.style]}</span>
+              </p>
               <SessionLine mark={mark} onOpenActivity={onOpenActivity} />
             </div>
           ))}
@@ -655,7 +673,7 @@ function SessionLine({
   mark,
   onOpenActivity
 }: {
-  mark: FarthestMark;
+  mark: Pick<FarthestMark, "activity" | "name" | "day">;
   onOpenActivity: (activity: SessionRef) => void;
 }) {
   return (

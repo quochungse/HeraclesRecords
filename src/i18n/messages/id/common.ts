@@ -20,6 +20,7 @@ const common: CommonMessages = {
   "sport.run": "Lari",
   "sport.bike": "Bersepeda",
   "sport.swim": "Renang",
+  "sport.climb": "Panjat tebing",
   "sport.hiking": "Mendaki",
   "sport.strength": "Latihan beban",
   "sport.other": "Lainnya",

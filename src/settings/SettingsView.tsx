@@ -36,6 +36,7 @@ import {
 import { getPrimaryViewLabel } from "../navigation/startupView";
 import { SPORT_SCREENS, type SportScreen } from "../navigation/sportScreens";
 import { RunnerIcon } from "../running/runnerIcon";
+import { ClimbIcon } from "../climbing/climbIcon";
 import {
   summarizeCoachModels,
   type CoachModelsSummary
@@ -119,11 +120,12 @@ const SPORT_COLOR_ICONS: Record<SportColorCategory, LucideIcon> = {
   run: RunnerIcon,
   bike: Bike,
   swim: Waves,
+  climb: ClimbIcon,
   other: Ellipsis,
 };
 
 /** The colour tiles in the sport screens' order — Running, Cycling, Hiking,
-    Swimming, Strength — so each colour sits under its sport's screen in the
+    Swimming, Climbing, Strength — so each colour sits under its sport's screen in the
     card above, the two grids sharing their columns. Other, which has no
     screen, ends it. */
 const SPORT_COLOR_ORDER: SportColorCategory[] = [
@@ -131,6 +133,7 @@ const SPORT_COLOR_ORDER: SportColorCategory[] = [
   "bike",
   "hiking",
   "swim",
+  "climb",
   "strength",
   "other",
 ];

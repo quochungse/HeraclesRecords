@@ -40,6 +40,7 @@ import { isRunSportType } from "../running/runSurface";
 import { formatDurationSeconds, getLocalHappenDayKey } from "../training/formatters";
 import { isStrengthSportType, isSwimSportType } from "../training/sportTypes";
 import { RECORDS_SUMMARY_VERSION } from "../../electron/activityMetrics";
+import { CLIMB_SUMMARY_VERSION, isClimbSportType } from "../../electron/climbDetail";
 import { isIndoorSportType } from "../../electron/corosSportTypes";
 import {
   VO2_RATINGS,
@@ -550,8 +551,10 @@ const LONGEST_BEFORE = messageRecord<"run" | "ride" | "swim">({
  */
 export function needsRecordsSummary(
   activity: Pick<TrainingHubActivity, "sportType" | "distance">,
-  summary: Pick<ActivityDetailSummary, "recordsVersion"> | undefined
+  summary: Pick<ActivityDetailSummary, "recordsVersion" | "climbVersion"> | undefined
 ): boolean {
+  // A climb's record is its hardest send, read off its climbs, not a distance.
+  if (isClimbSportType(activity.sportType)) return summary?.climbVersion !== CLIMB_SUMMARY_VERSION;
   if (summary?.recordsVersion === RECORDS_SUMMARY_VERSION) return false;
   if (isIndoorSportType(activity.sportType) || isStrengthSportType(activity.sportType)) return false;
   return (activity.distance ?? 0) > 0;
@@ -1134,6 +1137,7 @@ export function computeRecords(input: RecordsInput): RecordsResult {
     activities,
     groups: input.personalRecords,
     fell: records.fell,
+    summaries: input.summaries,
     ...(input.athlete ? { athlete: input.athlete } : {})
   });
 

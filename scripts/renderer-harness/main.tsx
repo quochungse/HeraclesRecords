@@ -33,6 +33,7 @@ import { RunningView } from "../../src/running/RunningView";
 import { CyclingView } from "../../src/cycling/CyclingView";
 import { HikingView } from "../../src/hiking/HikingView";
 import { SwimmingView } from "../../src/swimming/SwimmingView";
+import { ClimbingView } from "../../src/climbing/ClimbingView";
 import { StrengthHero } from "../../src/strength/StrengthHero";
 import { buildStrengthAnalytics } from "../../src/strength/strengthAnalytics";
 import { buildStrengthSessionIndex, sessionHeat } from "../../src/strength/sessionAnalytics";
@@ -462,6 +463,36 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
         }}
       >
         <SwimmingView
+          api={api}
+          activities={(options.activities as never) ?? []}
+          connected={(options.connected as boolean | undefined) ?? true}
+          restoring={false}
+          activitiesStatus={(options.activitiesStatus as never) ?? "ready"}
+          detail={(options.detail as never) ?? null}
+          detailRequest={(options.detailRequest as never) ?? null}
+          busy={(options.busy as string | null | undefined) ?? null}
+          onSelectActivity={spy("onSelectActivity")}
+          onRetryActivities={spy("onRetryActivities")}
+          onOpenOverview={spy("onOpenOverview")}
+          openRequest={(options.openRequest as never) ?? null}
+          onOpenRequestHandled={spy("onOpenRequestHandled")}
+          onReturn={spy("onReturn")}
+        />
+      </main>
+    );
+  },
+  /** Running's page built for the wall, in the same fixed-height column. */
+  ClimbingView: (options) => {
+    loadAppStyles();
+    return (
+      <main
+        className="content content-fill"
+        style={{
+          height: `${(options.height as number | undefined) ?? 700}px`,
+          ...(typeof options.width === "number" ? { width: `${options.width}px` } : {})
+        }}
+      >
+        <ClimbingView
           api={api}
           activities={(options.activities as never) ?? []}
           connected={(options.connected as boolean | undefined) ?? true}

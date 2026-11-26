@@ -1107,6 +1107,7 @@ export function parseWorkoutEditorContext(
     ? account.climbConfig
     : Array.isArray(zoneData.climbConfig) ? zoneData.climbConfig : [];
   const climbSystems: WorkoutEditorContext["climbSystems"] = {};
+  const climbSettings: NonNullable<WorkoutEditorContext["climbSettings"]> = {};
   for (const item of climbConfigs) {
     const config = objectValue(item);
     if (!config) continue;
@@ -1116,6 +1117,11 @@ export function parseWorkoutEditorContext(
       .find((key) => CLIMB_SYSTEM_IDS[key] === systemId);
     if ((sport === "indoorClimb" || sport === "bouldering") && system) {
       climbSystems[sport] = system;
+      // The onsight grade, as COROS's climb settings keep it: an index in that scale.
+      const gradeIndex = numberValue(config.gradeIndex);
+      if (systemId !== undefined && gradeIndex !== undefined && gradeIndex >= 0) {
+        climbSettings[sport] = { system: systemId, gradeIndex };
+      }
     }
   }
   return {
@@ -1132,7 +1138,8 @@ export function parseWorkoutEditorContext(
     zones,
     lthrZones,
     defaultPoolLength: { value: poolLength, unit: poolLengthUnit },
-    climbSystems
+    climbSystems,
+    ...(Object.keys(climbSettings).length > 0 ? { climbSettings } : {})
   };
 }
 

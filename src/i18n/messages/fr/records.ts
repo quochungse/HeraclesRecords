@@ -40,6 +40,8 @@ const records: RecordsMessages = {
   "records.pr.beyond.swim": "Plus longue nage",
   "records.pr.beyond.hike": "Plus longue randonnée",
   "records.pr.beyond.rideClimb": "Plus grand dénivelé à vélo",
+  "records.pr.climb.route": "Voie la plus dure enchaînée",
+  "records.pr.climb.boulder": "Bloc le plus dur enchaîné",
   "records.pr.empty.title": "Pas encore de records",
   "records.pr.empty.body": "Vos meilleurs temps apparaîtront ici après votre première course avec GPS.",
   "records.backfill.paused_one": "Encore {count} activité ancienne à lire pour les records et les lieux — la suite à votre prochaine visite.",

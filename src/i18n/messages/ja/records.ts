@@ -40,6 +40,8 @@ const records: RecordsMessages = {
   "records.pr.beyond.swim": "最長スイム",
   "records.pr.beyond.hike": "最長ハイク",
   "records.pr.beyond.rideClimb": "ライドの最大獲得標高",
+  "records.pr.climb.route": "完登した最難ルート",
+  "records.pr.climb.boulder": "完登した最難ボルダー課題",
   "records.pr.empty.title": "まだ記録がありません",
   "records.pr.empty.body": "GPS付きの最初のランのあと、ベストタイムがここに表示されます。",
   "records.backfill.paused_one": "記録と場所のために未読の古いアクティビティが {count} 件あります — 残りは次に開いたときに読み込みます。",

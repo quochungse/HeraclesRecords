@@ -3,7 +3,7 @@
 ## Activities (`ActivitiesView.tsx`)
 
 The all-sport log, and the only home for sports no sport screen covers (Running 100–103,
-Cycling 200–205/299, Hiking 104/105, Swimming 300/301, Strength 400/402). Depth per sport belongs on the sport
+Cycling 200–205/299, Hiking 104/105, Swimming 300/301, Climbing 800–802/10003, Strength 400/402). Depth per sport belongs on the sport
 screens; Activities links out with the session (`SportScreenRequest`).
 - The arithmetic is out of the view: `activityFilters.ts` (periods cut at a Monday,
   categories, search, totals), `activityFacts.ts` (a row's facts, capped at three) and

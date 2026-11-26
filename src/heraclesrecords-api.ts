@@ -344,6 +344,7 @@ export interface HeraclesRecordsApi {
    *  `requireIntensity` until a run or a ride carries what its label is read from;
    *  `requirePerformance` until a road or track run carries its performance curve;
    *  `requireSwim` until a swim carries its strokes, pool and best efforts;
+   *  `requireClimb` until a climbing session carries its climbs;
    *  `requireHeartRate` until a session carries its average and highest heart rate. */
   syncActivityDetailSummaries: (
     activityIds: string[],
@@ -353,6 +354,7 @@ export interface HeraclesRecordsApi {
       requireIntensity?: boolean;
       requirePerformance?: boolean;
       requireSwim?: boolean;
+      requireClimb?: boolean;
       requireHeartRate?: boolean;
     }
   ) => Promise<ActivityDetailSummarySync>;

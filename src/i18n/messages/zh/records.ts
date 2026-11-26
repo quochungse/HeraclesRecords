@@ -40,6 +40,8 @@ const records: RecordsMessages = {
   "records.pr.beyond.swim": "最长游泳",
   "records.pr.beyond.hike": "最长徒步",
   "records.pr.beyond.rideClimb": "骑行最大爬升",
+  "records.pr.climb.route": "完攀最难线路",
+  "records.pr.climb.boulder": "完攀最难抱石",
   "records.pr.empty.title": "暂无纪录",
   "records.pr.empty.body": "完成第一次带 GPS 的跑步后,你的最佳成绩会出现在这里。",
   "records.backfill.paused_one": "还有 {count} 次较早的活动未读取纪录和地点 — 其余的下次打开时再读。",

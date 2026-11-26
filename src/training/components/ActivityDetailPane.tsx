@@ -134,6 +134,7 @@ const SPORT_SCREEN_LABELS: Record<SportScreen, MessageKey> = {
   cycling: "nav.cycling",
   hiking: "nav.hiking",
   swimming: "nav.swimming",
+  climbing: "nav.climbing",
   strength: "nav.strength"
 };
 
