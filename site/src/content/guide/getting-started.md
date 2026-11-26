@@ -22,7 +22,7 @@ The sidebar opens with **Overview**, your day at a glance, then groups the scree
 
 - **Health**: Heart rate, Sleep and Stress level.
 - **Plan**: Mentor, Calendar and Training Library.
-- **History**: Activities, then a screen each for Running, Cycling, Hiking, Swimming and Strength.
+- **Logbook**: Activities, then a screen each for Running, Cycling, Hiking, Swimming and Strength.
 - **Your journey**: the Hall of Records (Timeline, Personal Records and The Twelve Labours) and Where you've been.
 
 Your name at the foot of the sidebar opens **Personal**: your profile, zones and units. The gear beside it opens **Settings**.

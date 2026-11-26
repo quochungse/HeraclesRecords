@@ -3,7 +3,7 @@ import type { NavMessages } from "../en/nav.ts";
 const nav: NavMessages = {
   "nav.section.health": "건강",
   "nav.section.plan": "계획",
-  "nav.section.history": "기록",
+  "nav.section.history": "훈련 일지",
   "nav.section.journey": "나의 여정",
 
   "nav.overview": "개요",
