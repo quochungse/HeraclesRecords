@@ -5,7 +5,8 @@
 // ways, no sideways scroll — along with what is Climbing's own: grades said
 // a route's and a boulder's apart and never as one figure, every grade in the
 // scale chosen in COROS's climb settings, a hero that says it is still reading
-// before it says "none", and a session's page read climb by climb.
+// before it says "none", a session's page read climb by climb, and Overview's
+// climbing section.
 //
 // The sessions are the development build's sample climbs (electron/
 // sampleClimbs.ts), built by `npm run build:electron` and read back through
@@ -97,12 +98,12 @@ async function mountClimbing(options, script = READ) {
 async function shoot(name) {
   if (!shots) return;
   const height = await win.webContents.executeJavaScript(
-    `Math.ceil(document.querySelector(".running-view").scrollHeight + 40)`,
+    `Math.ceil((document.querySelector(".running-view") ?? document.querySelector(".training-dashboard")).scrollHeight + 40)`,
     true
   );
   win.setContentSize(1400, Math.min(6000, Math.max(900, height)));
   await win.webContents.executeJavaScript(
-    `document.querySelector("main").style.height = "${Math.max(900, height)}px"`,
+    `document.querySelector("main")?.style.setProperty("height", "${Math.max(900, height)}px")`,
     true
   );
   await settle();
@@ -259,6 +260,40 @@ async function main() {
     const overflow = await harness("overflowX", ".running-view");
     assert.equal(overflow, 0, `the session page scrolls sideways by ${overflow}px in a ${width}px column`);
     if (width === 1344) await shoot("climb-session");
+  }
+
+  // -------------------------------------------------------------------------
+  // Overview: a section for climbing, the screen's figures in brief.
+  // -------------------------------------------------------------------------
+  {
+    // What the screen logged is asked before the page goes: a reload forgets it.
+    const screenErrors = await harness("consoleErrors");
+    assert.deepEqual(screenErrors, [], `no console errors on the screen: ${JSON.stringify(screenErrors)}`);
+    // A fresh page: the harness loads Overview's stylesheet only when no app
+    // stylesheet came before it.
+    await win.loadFile(path.join(repoRoot, "dist-harness", "index.html"));
+    await harness("mount", "OverviewSports", { activities: [RUN, ...CLIMBS] }, READ);
+    await waitFor(() => harness("appStylesReady"), "the app stylesheet loads");
+    await waitFor(() => harness("exists", "#overview-sport-climbing"), "the climbing section draws");
+    await waitFor(() => hasText("Climbs a week"), "its weekly chart");
+    await settle();
+    const section = (selector) =>
+      win.webContents.executeJavaScript(
+        `[...document.querySelector("[data-sport='climb']").querySelectorAll(${JSON.stringify(selector)})].map((node) => node.textContent.trim())`,
+        true
+      );
+    const kpis = await section(".overview-sport-kpis dt");
+    assert.deepEqual(kpis.slice(2), ["Sessions", "Hardest send", "Sent"], `the section's figures: ${kpis}`);
+    const values = await section(".overview-sport-kpis .figure");
+    assert.match(values[3], /^\d[abc]\+? · V\d+$/, `the hardest send in French and V, apart: ${values[3]}`);
+    assert.equal(await harness("count", "[data-sport='climb'] .overview-sport-column"), 5, "five weeks a column");
+    assert.ok((await section(".overview-sport-types li")).length > 0, "the grades climbed lately");
+    assert.equal(await harness("exists", "#overview-sport-running"), true, "the run has its own section");
+    await shoot("overview-climbing");
+
+    await harness("mount", "OverviewSports", { activities: CLIMBS, hiddenSportScreens: ["climbing"] }, READ);
+    await settle();
+    assert.equal(await harness("exists", "#overview-sport-climbing"), false, "a screen taken off the rail has no section");
   }
 
   const errors = await harness("consoleErrors");

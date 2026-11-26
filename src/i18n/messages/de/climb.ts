@@ -109,6 +109,14 @@ const climb: ClimbMessages = {
   "climb.detail.onWall": "An der Wand",
   "climb.detail.restAfter": "Pause danach",
   "climb.detail.recordedTitle": "Der Grad wie aufgezeichnet, in seiner eigenen Skala",
+  "climb.overview.weekly": "Begehungen pro Woche",
+  "climb.overview.plannedAvg": "+ {count} geplant · Ø {avg}",
+  "climb.overview.onWall": "{time} an der Wand",
+  "climb.overview.noSend": "Noch kein bewerteter Durchstieg",
+  "climb.overview.noMarked": "Noch keine Begehung markiert",
+  "climb.overview.grades": "Grade",
+  "climb.overview.gradesNote": "{family}, durchstiegen von geklettert",
+  "climb.overview.noGrades": "Noch keine bewertete Begehung.",
   "climb.detail.pitches_one": "{count} Seillänge",
   "climb.detail.pitches_other": "{count} Seillängen"
 };

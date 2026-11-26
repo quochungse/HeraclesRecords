@@ -91,15 +91,16 @@ const BOULDER: GradeTable = {
 /** The outdoor rope ladder sits this many steps above the indoor one. */
 const OUTDOOR_LADDER_OFFSET = 2;
 
-const INDOOR_CLIMB = 800;
-const BOULDERING = 801;
-const OUTDOOR_CLIMB = 802;
-const MULTI_PITCH = 10003;
+/** COROS's climbing sport codes; `climbDetail.ts` and the screen read them from here. */
+export const INDOOR_CLIMB_SPORT_TYPE = 800;
+export const BOULDERING_SPORT_TYPE = 801;
+export const OUTDOOR_CLIMB_SPORT_TYPE = 802;
+export const MULTI_PITCH_SPORT_TYPE = 10003;
 
 /** The table COROS's web app reads a climb of this sport against. */
 function tableFor(sportType: number | undefined, system: number): GradeTable | undefined {
-  if (sportType === OUTDOOR_CLIMB || sportType === MULTI_PITCH) return OUTDOOR;
-  if (sportType === INDOOR_CLIMB || sportType === BOULDERING) return BOULDER[system] ? BOULDER : INDOOR;
+  if (sportType === OUTDOOR_CLIMB_SPORT_TYPE || sportType === MULTI_PITCH_SPORT_TYPE) return OUTDOOR;
+  if (sportType === INDOOR_CLIMB_SPORT_TYPE || sportType === BOULDERING_SPORT_TYPE) return BOULDER[system] ? BOULDER : INDOOR;
   return undefined;
 }
 

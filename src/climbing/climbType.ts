@@ -77,11 +77,6 @@ export function classifyClimbKind(sportType: number | undefined): ClimbKind | nu
   return sportType === undefined ? null : SPORT_TYPE_KIND[sportType] ?? null;
 }
 
-/** The ladder a kind is graded on. */
-export function familyOfKind(kind: ClimbKind): ClimbFamily {
-  return kind === "boulder" ? "boulder" : "route";
-}
-
 /** Climbing sessions of one kind, or all of them when no kind is asked for. */
 export function climbsOfKind(
   activities: readonly TrainingHubActivity[],

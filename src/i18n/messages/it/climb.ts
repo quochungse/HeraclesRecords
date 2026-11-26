@@ -109,6 +109,14 @@ const climb: ClimbMessages = {
   "climb.detail.onWall": "In parete",
   "climb.detail.restAfter": "Riposo dopo",
   "climb.detail.recordedTitle": "Il grado come registrato, nella sua scala",
+  "climb.overview.weekly": "Salite a settimana",
+  "climb.overview.plannedAvg": "+ {count} pianificate · media {avg}",
+  "climb.overview.onWall": "{time} in parete",
+  "climb.overview.noSend": "Ancora nessuna salita chiusa con grado",
+  "climb.overview.noMarked": "Ancora nessuna salita segnata",
+  "climb.overview.grades": "Gradi",
+  "climb.overview.gradesNote": "{family}, chiuse su salite",
+  "climb.overview.noGrades": "Ancora nessuna salita con grado.",
   "climb.detail.pitches_one": "{count} tiro",
   "climb.detail.pitches_other": "{count} tiri"
 };

@@ -58,6 +58,7 @@ import { AddWorkoutModal } from "../../src/calendar/AddWorkoutModal";
 import { CalendarView } from "../../src/calendar/CalendarView";
 import { CalendarSkeleton } from "../../src/calendar/CalendarSkeleton";
 import { OverviewComingUp } from "../../src/training/overview/OverviewComingUp";
+import { OverviewSports } from "../../src/training/overview/OverviewSports";
 import { TrainingSignIn } from "../../src/training/TrainingSignIn";
 import type { HeraclesRecordsApi } from "../../src/heraclesrecords-api";
 
@@ -753,6 +754,31 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
           sportTypes={[]}
           onOpenActivity={spy("onOpenActivity")}
           onOpenCalendar={spy("onOpenCalendar")}
+        />
+      </div>
+    );
+  },
+  // Overview's per-sport sections, each only when its sport was trained lately.
+  OverviewSports: (options) => {
+    loadOverviewStyles();
+    return (
+      <div
+        className="stack training-dashboard"
+        style={{ width: `${(options.width as number | undefined) ?? 1100}px` }}
+      >
+        <OverviewSports
+          api={api}
+          connected
+          activities={(options.activities as never) ?? []}
+          upcomingWorkouts={(options.upcoming as never) ?? []}
+          profile={null}
+          hrZoneModel={null}
+          zonesSettled
+          lthrZones={[]}
+          vo2Readings={[]}
+          hiddenSportScreens={(options.hiddenSportScreens as never) ?? []}
+          onOpenActivity={spy("onOpenActivity")}
+          onOpenView={spy("onOpenView")}
         />
       </div>
     );

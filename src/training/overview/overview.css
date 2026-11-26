@@ -1927,6 +1927,12 @@ button.overview-plan-entry:hover .overview-plan-chevron {
   background: color-mix(in srgb, var(--text-primary) 62%, transparent);
 }
 
+/* A climbing grade's bar: everything climbed at it, and inside it, in the
+   sport's own colour, what was sent. */
+.overview-sport-types i b .overview-climb-sent {
+  background: var(--sport-tone);
+}
+
 .overview-sport-types .figure {
   font-size: 13px;
   text-align: right;

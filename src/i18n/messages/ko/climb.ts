@@ -109,6 +109,14 @@ const climb: ClimbMessages = {
   "climb.detail.onWall": "벽에서",
   "climb.detail.restAfter": "이후 휴식",
   "climb.detail.recordedTitle": "기록된 그대로의 난이도(원래 척도)",
+  "climb.overview.weekly": "주간 등반 수",
+  "climb.overview.plannedAvg": "+ 예정 {count} · 평균 {avg}",
+  "climb.overview.onWall": "벽에서 {time}",
+  "climb.overview.noSend": "아직 난이도가 있는 완등이 없습니다",
+  "climb.overview.noMarked": "아직 표시한 등반이 없습니다",
+  "climb.overview.grades": "난이도",
+  "climb.overview.gradesNote": "{family}, 등반 중 완등",
+  "climb.overview.noGrades": "아직 난이도가 있는 등반이 없습니다.",
   "climb.detail.pitches_one": "{count}피치",
   "climb.detail.pitches_other": "{count}피치"
 };

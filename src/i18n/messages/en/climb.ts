@@ -110,6 +110,14 @@ const climb = {
   "climb.detail.onWall": "On the wall",
   "climb.detail.restAfter": "Rest after",
   "climb.detail.recordedTitle": "The grade as recorded, in its own scale",
+  "climb.overview.weekly": "Climbs a week",
+  "climb.overview.plannedAvg": "+ {count} planned · avg {avg}",
+  "climb.overview.onWall": "{time} on the wall",
+  "climb.overview.noSend": "No graded send yet",
+  "climb.overview.noMarked": "No climb marked yet",
+  "climb.overview.grades": "Grades",
+  "climb.overview.gradesNote": "{family}, sent of climbed",
+  "climb.overview.noGrades": "No graded climb yet.",
   "climb.detail.pitches_one": "{count} pitch",
   "climb.detail.pitches_other": "{count} pitches"
 };

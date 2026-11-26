@@ -109,6 +109,14 @@ const climb: ClimbMessages = {
   "climb.detail.onWall": "Sur le mur",
   "climb.detail.restAfter": "Repos après",
   "climb.detail.recordedTitle": "La cotation telle qu’enregistrée, dans sa propre échelle",
+  "climb.overview.weekly": "Ascensions par semaine",
+  "climb.overview.plannedAvg": "+ {count} prévues · moy. {avg}",
+  "climb.overview.onWall": "{time} sur le mur",
+  "climb.overview.noSend": "Pas encore d’enchaînement coté",
+  "climb.overview.noMarked": "Pas encore d’ascension marquée",
+  "climb.overview.grades": "Cotations",
+  "climb.overview.gradesNote": "{family}, enchaînées sur grimpées",
+  "climb.overview.noGrades": "Pas encore d’ascension cotée.",
   "climb.detail.pitches_one": "{count} longueur",
   "climb.detail.pitches_other": "{count} longueurs"
 };

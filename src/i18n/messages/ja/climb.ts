@@ -109,6 +109,14 @@ const climb: ClimbMessages = {
   "climb.detail.onWall": "壁にいた時間",
   "climb.detail.restAfter": "その後の休憩",
   "climb.detail.recordedTitle": "記録されたままのグレード（元のスケール）",
+  "climb.overview.weekly": "週ごとの本数",
+  "climb.overview.plannedAvg": "+ 予定 {count} · 平均 {avg}",
+  "climb.overview.onWall": "壁にいた時間 {time}",
+  "climb.overview.noSend": "まだグレード付きの完登はありません",
+  "climb.overview.noMarked": "まだマークした登りはありません",
+  "climb.overview.grades": "グレード",
+  "climb.overview.gradesNote": "{family}・完登 / 登った本数",
+  "climb.overview.noGrades": "まだグレード付きの登りはありません。",
   "climb.detail.pitches_one": "{count} ピッチ",
   "climb.detail.pitches_other": "{count} ピッチ"
 };

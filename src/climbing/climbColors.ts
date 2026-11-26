@@ -23,20 +23,3 @@ export function climbKindColors(): Record<ClimbKind, string> {
 
 /** How a climb went, as a pyramid's segments and a session's blocks are drawn. */
 export type ClimbStyleGroup = "firstGo" | "worked" | "attempt" | "unrecorded";
-
-export const CLIMB_STYLE_GROUPS: readonly ClimbStyleGroup[] = ["firstGo", "worked", "attempt", "unrecorded"];
-
-/**
- * Sent first go is the climbing colour itself, sent after working it a dark
- * shade of it, an attempt its outline, a climb nobody marked a grey: lightness
- * tells them apart, not hue alone. Mirrored as `--climb-*` in climbing.css.
- */
-export function climbStyleColors(): Record<Exclude<ClimbStyleGroup, "attempt">, string> & { attempt: string } {
-  const sport = readStoredSportColors();
-  return {
-    firstGo: sport.climb,
-    worked: mixHex(sport.climb, "#1a1d22", 0.5),
-    attempt: sport.climb,
-    unrecorded: "#5c6167"
-  };
-}

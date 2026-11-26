@@ -109,6 +109,14 @@ const climb: ClimbMessages = {
   "climb.detail.onWall": "Di dinding",
   "climb.detail.restAfter": "Istirahat sesudahnya",
   "climb.detail.recordedTitle": "Grade seperti yang dicatat, dalam skalanya sendiri",
+  "climb.overview.weekly": "Panjatan per minggu",
+  "climb.overview.plannedAvg": "+ {count} terencana · rata-rata {avg}",
+  "climb.overview.onWall": "{time} di dinding",
+  "climb.overview.noSend": "Belum ada panjatan tuntas ber-grade",
+  "climb.overview.noMarked": "Belum ada panjatan bertanda",
+  "climb.overview.grades": "Grade",
+  "climb.overview.gradesNote": "{family}, tuntas dari yang dipanjat",
+  "climb.overview.noGrades": "Belum ada panjatan ber-grade.",
   "climb.detail.pitches_one": "{count} pitch",
   "climb.detail.pitches_other": "{count} pitch"
 };

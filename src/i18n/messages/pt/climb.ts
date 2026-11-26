@@ -109,6 +109,14 @@ const climb: ClimbMessages = {
   "climb.detail.onWall": "Na parede",
   "climb.detail.restAfter": "Descanso depois",
   "climb.detail.recordedTitle": "O grau como foi registrado, na sua própria escala",
+  "climb.overview.weekly": "Escaladas por semana",
+  "climb.overview.plannedAvg": "+ {count} planejados · média {avg}",
+  "climb.overview.onWall": "{time} na parede",
+  "climb.overview.noSend": "Nenhuma cadena com grau ainda",
+  "climb.overview.noMarked": "Nenhuma escalada marcada ainda",
+  "climb.overview.grades": "Graus",
+  "climb.overview.gradesNote": "{family}, cadenadas de escaladas",
+  "climb.overview.noGrades": "Nenhuma escalada com grau ainda.",
   "climb.detail.pitches_one": "{count} enfiada",
   "climb.detail.pitches_other": "{count} enfiadas"
 };

@@ -14,6 +14,7 @@ import { RunnerIcon } from "../../running/runnerIcon";
 import {
   buildRunWeeks,
   climbPerDistanceUnit,
+  startOfRunWeekMs,
   runIntensityMix,
   runSurfaceBreakdown,
   summariseRuns
@@ -43,6 +44,21 @@ import {
 import { SWIM_STYLE_LABELS, swimsOnly } from "../../swimming/swimType";
 import { SWIM_STYLE_COLORS } from "../../swimming/swimColors";
 import { metersToSwimDistance, swimDistanceUnit } from "../../../electron/unitSystem";
+import type { ClimbFamily } from "../../../electron/climbGrades";
+import { ClimbIcon } from "../../climbing/climbIcon";
+import {
+  buildClimbWeeks,
+  climbRecords,
+  climbScales,
+  gradeName,
+  gradePyramid,
+  hardestSend,
+  sendRate,
+  summariseClimbs,
+  type ClimbScales
+} from "../../climbing/climbMetrics";
+import { CLIMB_FAMILY_LABELS, CLIMB_STYLE_LABELS, climbsOfKind } from "../../climbing/climbType";
+import { useAthleteContextRead } from "../../calendar/useAthleteContext";
 import { periodLabel, periodPhrase } from "../../preferences/periodScale";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import {
@@ -1055,9 +1071,197 @@ function SwimmingSection({
   );
 }
 
+
+/** The grades a section lists: the hardest few climbed, a bar each. */
+const CLIMB_GRADE_ROWS = 6;
+
+const CLIMB_FAMILIES: readonly ClimbFamily[] = ["route", "boulder"];
+
+function ClimbingSection({
+  context,
+  climbs,
+  window,
+  scales,
+  settled
+}: {
+  context: SportContext;
+  climbs: TrainingHubActivity[];
+  window: TrainingHubActivity[];
+  scales: ClimbScales;
+  /** Whether the sessions' summaries have all been read: until then a missing figure is on its way. */
+  settled: boolean;
+}) {
+  const { nowMs, upcomingWorkouts, activities, summaries, onOpenActivity, onOpenView } = context;
+  // Sessions and their time come off the list; climbs, grades and how they
+  // went off each session's summary, as the Climbing screen reads them.
+  const { weeks, values, average, loads, totals, records, last } = useMemo(() => {
+    const climbWeeks = buildClimbWeeks(climbs, summaries, { weeks: SPORT_CHART_WEEKS, nowMs });
+    const counts = climbWeeks.map((week) => week.climbs);
+    // COROS's load per week, which the climbs' weeks do not carry.
+    const loadsByWeek = new Map<number, number>();
+    for (const activity of climbs) {
+      const start = epochMsFromCorosTime(activity.startTime);
+      if (start === undefined) continue;
+      const week = startOfRunWeekMs(start);
+      loadsByWeek.set(week, (loadsByWeek.get(week) ?? 0) + (activity.trainingLoad ?? 0));
+    }
+    return {
+      weeks: climbWeeks,
+      values: counts,
+      average: previousWeeksAverage(counts),
+      loads: loadsByWeek,
+      totals: summariseClimbs(window, summaries),
+      records: climbRecords(window, summaries),
+      last: longestAndLast(window, climbs).last
+    };
+  }, [climbs, window, summaries, nowMs]);
+  const planned = useMemo(
+    () => plannedThisWeek(upcomingWorkouts, activities, "climb", new Date(nowMs)).count,
+    [upcomingWorkouts, activities, nowMs]
+  );
+  const families = CLIMB_FAMILIES.filter((family) => records.some((record) => record.family === family));
+  const hardest = families.flatMap((family) => {
+    const record = hardestSend(records, family);
+    return record?.ladder !== undefined ? [{ family, record, name: gradeName(family, record.ladder, scales) }] : [];
+  });
+  const rates = families.flatMap((family) => {
+    const rate = sendRate(records, family);
+    return rate.marked > 0 ? [{ family, share: rate.sent / rate.marked }] : [];
+  });
+  // The grades of the family climbed most, hardest first: what went, against what was tried.
+  const shown = [...families].sort(
+    (left, right) =>
+      records.filter((record) => record.family === right).length - records.filter((record) => record.family === left).length
+  )[0];
+  const grades = shown
+    ? gradePyramid(records, shown, scales).rows.filter((row) => row.total > 0).slice(0, CLIMB_GRADE_ROWS)
+    : [];
+  const most = Math.max(1, ...grades.map((row) => row.total));
+  const reading = !settled && weeks.some((week) => week.unread > 0);
+  const current = values[values.length - 1] ?? 0;
+  const labels = weekLabels(weeks);
+  const familyNote = (entries: readonly { family: ClimbFamily }[]) =>
+    entries.map((entry) => CLIMB_FAMILY_LABELS[entry.family]).join(" · ");
+  const best = hardest[0];
+  return (
+    <Section
+      sport="climb"
+      icon={ClimbIcon}
+      title={t("nav.climbing")}
+      aside={`${plural("climb.sessionCount", window.length)} · ${periodPhrase(WINDOW_DAYS)}`}
+      screen="climbing"
+      onOpenView={onOpenView}
+    >
+      <Kpis
+        items={[
+          {
+            label: t("overview.tiles.thisWeek"),
+            value: reading ? "…" : whole(current),
+            note: reading
+              ? t("climb.reading")
+              : planned > 0
+                ? t("climb.overview.plannedAvg", { count: planned, avg: whole(average ?? 0) })
+                : t("overview.sport.average", { value: whole(average ?? 0) })
+          },
+          {
+            label: periodLabel(WINDOW_DAYS),
+            value: reading ? "…" : whole(totals.climbs),
+            note: t("climb.overview.onWall", { time: formatDurationSpan(totals.climbingSeconds) })
+          },
+          {
+            label: t("climb.sessions"),
+            value: whole(totals.sessions),
+            note: t("overview.sport.perWeek", { count: formatDecimal(totals.sessions / sportWindowWeeks(nowMs), 1) })
+          },
+          {
+            label: t("climb.detail.hardest"),
+            value: hardest.length > 0 ? hardest.map((entry) => entry.name).join(" · ") : "–",
+            note: hardest.length > 0 ? familyNote(hardest) : settled ? t("climb.overview.noSend") : t("climb.reading")
+          },
+          {
+            label: t("climb.list.sent"),
+            value: rates.length > 0 ? rates.map((entry) => `${Math.round(entry.share * 100)}%`).join(" · ") : "–",
+            note: rates.length > 0 ? familyNote(rates) : settled ? t("climb.overview.noMarked") : t("climb.reading")
+          }
+        ]}
+      />
+      <div className="overview-sport-body">
+        <WeekChart
+          title={t("climb.overview.weekly")}
+          weeks={weeks.map((week, index) => ({
+            label: labels[index],
+            value: values[index],
+            dates: weekRange(week.weekStartMs),
+            facts: [
+              { label: t("climb.climbs"), value: whole(values[index]) },
+              { label: t("climb.climbingTime"), value: formatDurationSpan(week.climbingSeconds) },
+              ...weekFacts(
+                { count: week.sessions, duration: week.duration, trainingLoad: loads.get(week.weekStartMs) ?? 0 },
+                t("climb.sessions")
+              )
+            ]
+          }))}
+          average={average}
+          format={(value) => whole(value)}
+        />
+        <div className="overview-sport-side">
+          <div className="overview-sport-types">
+            <p className="overview-sport-subhead">
+              {t("climb.overview.grades")}{" "}
+              <span>· {shown ? t("climb.overview.gradesNote", { family: CLIMB_FAMILY_LABELS[shown] }) : ""}</span>
+            </p>
+            {grades.length > 0 ? (
+              <ul>
+                {grades.map((row) => {
+                  const sent = row.counts.firstGo + row.counts.worked;
+                  return (
+                    <li key={row.name}>
+                      <span>{row.name}</span>
+                      <i aria-hidden="true">
+                        <b style={{ width: `${(row.total / most) * 100}%` }}>
+                          <b
+                            className="overview-climb-sent"
+                            style={{ width: `${row.total > 0 ? (sent / row.total) * 100 : 0}%` }}
+                          />
+                        </b>
+                      </i>
+                      <span className="figure">{`${whole(sent)}/${whole(row.total)}`}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="overview-sport-note">{settled ? t("climb.overview.noGrades") : t("climb.reading")}</p>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="overview-sport-facts">
+        {best ? (
+          <SessionFact
+            label={t("climb.list.hardest")}
+            activity={best.record.activity}
+            meta={`${sessionDay(best.record.activity)} · ${best.name} · ${CLIMB_STYLE_LABELS[best.record.style]}`}
+            onOpenActivity={onOpenActivity}
+          />
+        ) : null}
+        {last ? (
+          <SessionFact
+            label={t("overview.sport.last")}
+            activity={last}
+            meta={[sessionDay(last), formatDurationSpan(last.duration)].join(" · ")}
+            onOpenActivity={onOpenActivity}
+          />
+        ) : null}
+        <NextFact next={nextPlanned(upcomingWorkouts, "climb", new Date(nowMs), activities)} />
+      </div>
+    </Section>
+  );
+}
+
 /**
  * One section a sport the athlete has trained in the last four weeks —
- * Running, Cycling, Hiking, Swimming — each its own screen's figures in brief,
+ * Running, Cycling, Hiking, Swimming, Climbing — each its own screen's figures in brief,
  * with the way out to that screen. A sport whose screen is taken off the rail
  * has no section here either.
  */
@@ -1098,10 +1302,12 @@ export function OverviewSports({
   const rides = useMemo(() => ridesOnly(activities), [activities]);
   const hikes = useMemo(() => hikesOnly(activities), [activities]);
   const swims = useMemo(() => swimsOnly(activities), [activities]);
+  const climbs = useMemo(() => climbsOfKind(activities, null), [activities]);
   const runWindow = useMemo(() => sportWindow(runs, nowMs), [runs, nowMs]);
   const rideWindow = useMemo(() => sportWindow(rides, nowMs), [rides, nowMs]);
   const hikeWindow = useMemo(() => sportWindow(hikes, nowMs), [hikes, nowMs]);
   const swimWindow = useMemo(() => sportWindow(swims, nowMs), [swims, nowMs]);
+  const climbWindow = useMemo(() => sportWindow(climbs, nowMs), [climbs, nowMs]);
   const zoneScale = useMemo(
     () => hrZoneModel ?? { family: "lthr" as const, zones: lthrZones },
     [hrZoneModel, lthrZones]
@@ -1110,20 +1316,34 @@ export function OverviewSports({
   const showRides = rideWindow.length > 0 && !hiddenSportScreens.includes("cycling");
   const showHikes = hikeWindow.length > 0 && !hiddenSportScreens.includes("hiking");
   const showSwims = swimWindow.length > 0 && !hiddenSportScreens.includes("swimming");
+  const showClimbs = climbWindow.length > 0 && !hiddenSportScreens.includes("climbing");
   // The labels and the time in zone come off the sessions' summaries, swept as
   // the Running and Cycling lists sweep theirs; a swim's strokes and SWOLF, as
-  // the Swimming screen sweeps its own. One sweep for all of them.
+  // the Swimming screen sweeps its own, and a climbing session's climbs as the
+  // Climbing screen does. One sweep for all of them.
   const labelled = useMemo(
-    () => [...(showRuns ? runWindow : []), ...(showRides ? rideWindow : []), ...(showSwims ? swimWindow : [])],
-    [showRuns, showRides, showSwims, runWindow, rideWindow, swimWindow]
+    () => [
+      ...(showRuns ? runWindow : []),
+      ...(showRides ? rideWindow : []),
+      ...(showSwims ? swimWindow : []),
+      ...(showClimbs ? climbWindow : [])
+    ],
+    [showRuns, showRides, showSwims, showClimbs, runWindow, rideWindow, swimWindow, climbWindow]
   );
   const { summaries, settled } = useActivityDetailSummariesState({
     api,
     activities: labelled,
     enabled: connected && labelled.length > 0,
     requireIntensity: true,
-    requireSwim: showSwims
+    requireSwim: showSwims,
+    requireClimb: showClimbs
   });
+  // The grades in the scale chosen in COROS's climb settings, as the Climbing screen shows them.
+  const { context: athlete } = useAthleteContextRead(showClimbs ? api : undefined, unitSystem);
+  const climbScale = useMemo(
+    () => climbScales(athlete, showClimbs ? climbRecords(climbWindow, summaries) : []),
+    [athlete, showClimbs, climbWindow, summaries]
+  );
   const context: SportContext = {
     unitSystem,
     nowMs,
@@ -1150,6 +1370,9 @@ export function OverviewSports({
       ) : null}
       {showHikes ? <HikingSection context={context} hikes={hikes} window={hikeWindow} /> : null}
       {showSwims ? <SwimmingSection context={context} swims={swims} window={swimWindow} settled={settled} /> : null}
+      {showClimbs ? (
+        <ClimbingSection context={context} climbs={climbs} window={climbWindow} scales={climbScale} settled={settled} />
+      ) : null}
     </>
   );
 }

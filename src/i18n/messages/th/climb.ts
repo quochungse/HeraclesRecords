@@ -109,6 +109,14 @@ const climb: ClimbMessages = {
   "climb.detail.onWall": "บนผนัง",
   "climb.detail.restAfter": "พักหลังจากนั้น",
   "climb.detail.recordedTitle": "เกรดตามที่บันทึก ในสเกลของตัวเอง",
+  "climb.overview.weekly": "การปีนรายสัปดาห์",
+  "climb.overview.plannedAvg": "+ วางแผนไว้ {count} · เฉลี่ย {avg}",
+  "climb.overview.onWall": "{time} บนผนัง",
+  "climb.overview.noSend": "ยังไม่มีการปีนสำเร็จที่มีเกรด",
+  "climb.overview.noMarked": "ยังไม่มีการปีนที่ทำเครื่องหมายไว้",
+  "climb.overview.grades": "เกรด",
+  "climb.overview.gradesNote": "{family} ปีนสำเร็จจากที่ปีน",
+  "climb.overview.noGrades": "ยังไม่มีการปีนที่มีเกรด",
   "climb.detail.pitches_one": "{count} พิทช์",
   "climb.detail.pitches_other": "{count} พิทช์"
 };

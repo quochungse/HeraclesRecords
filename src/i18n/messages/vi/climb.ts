@@ -109,6 +109,14 @@ const climb: ClimbMessages = {
   "climb.detail.onWall": "Trên vách",
   "climb.detail.restAfter": "Nghỉ sau đó",
   "climb.detail.recordedTitle": "Độ khó như đã ghi, theo thang của chính nó",
+  "climb.overview.weekly": "Lượt leo mỗi tuần",
+  "climb.overview.plannedAvg": "+ {count} theo kế hoạch · TB {avg}",
+  "climb.overview.onWall": "{time} trên vách",
+  "climb.overview.noSend": "Chưa có lượt leo xong nào có độ khó",
+  "climb.overview.noMarked": "Chưa có lượt leo nào được đánh dấu",
+  "climb.overview.grades": "Độ khó",
+  "climb.overview.gradesNote": "{family}, số leo xong trên số đã leo",
+  "climb.overview.noGrades": "Chưa có lượt leo nào có độ khó.",
   "climb.detail.pitches_one": "{count} chặng",
   "climb.detail.pitches_other": "{count} chặng"
 };

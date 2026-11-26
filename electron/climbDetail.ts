@@ -23,18 +23,20 @@ import type {
   TrainingHubClimb,
   TrainingHubClimbDetail
 } from "./types";
-import { climbGradeOf, type ClimbFamily } from "./climbGrades";
+import {
+  BOULDERING_SPORT_TYPE,
+  INDOOR_CLIMB_SPORT_TYPE,
+  MULTI_PITCH_SPORT_TYPE,
+  OUTDOOR_CLIMB_SPORT_TYPE,
+  climbGradeOf,
+  type ClimbFamily
+} from "./climbGrades";
 
 /**
  * Bump when a stored climb summary changes shape or meaning; a row written by
  * an older version is read again rather than trusted.
  */
 export const CLIMB_SUMMARY_VERSION = 1;
-
-export const INDOOR_CLIMB_SPORT_TYPE = 800;
-export const BOULDERING_SPORT_TYPE = 801;
-export const OUTDOOR_CLIMB_SPORT_TYPE = 802;
-export const MULTI_PITCH_SPORT_TYPE = 10003;
 
 const CLIMB_SPORT_TYPES: ReadonlySet<number> = new Set([
   INDOOR_CLIMB_SPORT_TYPE,
@@ -228,7 +230,7 @@ function routeOf(sportType: number, pitches: readonly ClimbLap[]): ClimbLap {
   };
 }
 
-export interface ParseClimbOptions {
+interface ParseClimbOptions {
   sportType?: number;
 }
 

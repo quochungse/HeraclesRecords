@@ -109,6 +109,14 @@ const climb: ClimbMessages = {
   "climb.detail.onWall": "在墙上",
   "climb.detail.restAfter": "之后休息",
   "climb.detail.recordedTitle": "按原始记录的难度，使用其自身的难度体系",
+  "climb.overview.weekly": "每周攀爬次数",
+  "climb.overview.plannedAvg": "+ 计划 {count} · 平均 {avg}",
+  "climb.overview.onWall": "在墙上 {time}",
+  "climb.overview.noSend": "还没有带难度的完攀",
+  "climb.overview.noMarked": "还没有标记的攀爬",
+  "climb.overview.grades": "难度",
+  "climb.overview.gradesNote": "{family}，完攀 / 攀爬",
+  "climb.overview.noGrades": "还没有带难度的攀爬。",
   "climb.detail.pitches_one": "{count} 段",
   "climb.detail.pitches_other": "{count} 段"
 };
