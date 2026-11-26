@@ -4,7 +4,7 @@ import type { Translation } from "../../types.ts";
 const nav = {
   "nav.section.health": "Health",
   "nav.section.plan": "Plan",
-  "nav.section.history": "History",
+  "nav.section.history": "Logbook",
   "nav.section.journey": "Your journey",
 
   "nav.overview": "Overview",

@@ -3,7 +3,7 @@ import type { NavMessages } from "../en/nav.ts";
 const nav: NavMessages = {
   "nav.section.health": "健康",
   "nav.section.plan": "計画",
-  "nav.section.history": "履歴",
+  "nav.section.history": "トレーニング日誌",
   "nav.section.journey": "これまでの歩み",
 
   "nav.overview": "概要",

@@ -3,7 +3,7 @@ import type { NavMessages } from "../en/nav.ts";
 const nav: NavMessages = {
   "nav.section.health": "Kesehatan",
   "nav.section.plan": "Rencana",
-  "nav.section.history": "Riwayat",
+  "nav.section.history": "Jurnal latihan",
   "nav.section.journey": "Perjalanan Anda",
 
   "nav.overview": "Ringkasan",
