@@ -33,20 +33,10 @@ html = html.replace(/<h([23])>(.*?)<\/h\1>/g, (_m, level, text) => `<h${level} i
 
 const SHOTS = [
   ["01", "Overview", "Màn hình Overview (hero đầu README)", "Overview"],
-  ["02", "Activities", "Danh sách mọi buổi tập + panel chi tiết (trail run Hàm Lợn)", "Activities"],
-  ["03", "Running", "Màn hình Running: tuần, load ratio, VO₂max, volume", "Running"],
   ["04", "Run page", "Trang 1 buổi chạy: 6 × 1 km intervals quanh Hồ Tây", "Running → buổi chạy"],
-  ["05", "Ride page", "Trang 1 buổi đạp: Tam Đảo climb, panel Power", "Cycling → buổi đạp"],
-  ["06", "Hike page", "Trang 1 buổi hike: Fansipan, Terrain", "Hiking → buổi hike"],
   ["07", "Strength", "Strength + bản đồ cơ 3D", "Strength"],
-  ["08", "Sleep", "Sleep: giai đoạn ngủ, HRV & stress cả đêm", "Sleep"],
-  ["09", "Calendar", "Calendar tháng: kế hoạch & đã tập", "Calendar"],
-  ["10", "Training Library", "Plan reader: Hanoi Marathon · 12 weeks", "Training Library → Plans"],
   ["11", "Coach · chat", "Coach phân tích buổi interval, kèm biểu đồ", "Coach"],
-  ["12", "Coach · plan", "Coach + Workbench: giáo án marathon", "Coach → Workbench"],
-  ["13", "Twelve Labours", "Hall of Records: Twelve Labours", "Hall of Records"],
-  ["14", "Timeline", "Hall of Records: timeline milestone", "Hall of Records"],
-  ["15", "Where you've been", "Globe + chọn Hà Nội", "Where you've been"]
+  ["14", "Timeline", "Hall of Records: timeline milestone", "Hall of Records"]
 ];
 
 const shotList = SHOTS.map(([n, name, what, where]) => `

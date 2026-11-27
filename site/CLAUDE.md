@@ -21,10 +21,14 @@ ships the license of every package in the root lockfile with the app, and the in
   repository, Issues and Discussions, and a page that asks for a report or an opinion links
   those two (`site/src/github.ts`). What a visitor comes to read (releases, notes, docs) is a
   page of the site, never a GitHub page; the installers are the exception.
-- **Screenshots** `01-`–`18-`, `27-`–`30-` and `34-`–`35-` (Heart rate, Stress level) are the
-  README's, `19-`–`26-`, `31-`–`33-` (Swimming) and `36-`–`38-` (Climbing) the site's; every one is taken by `scripts/screenshots/` (`npm run screenshots`,
+- **Screenshots** all live in `docs/readme/`; the README shows five (`01`, `04`, `07`, `11`,
+  `14`) and the site draws the rest. Every one is taken by `scripts/screenshots/` (`npm run screenshots`,
   demo data only — one invented athlete, never a real database). A screen that changes is reshot there, not by hand.
-- **Screenshots go through `Shot`/`ShotSlider`, never a bare `<img>`** (they are 3024px;
+- **The home page says each thing once and leaves the depth to the pages under it**: a hero,
+  one `Showcase` (a tab per app screen, named as the sidebar names them), four facts, three
+  reasons, the labours and the way in. A new screen or feature gets its words on its own page
+  and, at most, a tab or a sentence here.
+- **Screenshots go through `Shot`/`Showcase`, never a bare `<img>`** (they are 3024px;
   Astro's image service writes a `srcset`); pass `sizes` when a shot is not full width.
   `16-route` is animated and served untouched (`isAnimated`).
 - **Link-preview cards are committed images**: `npm run site:og` renders

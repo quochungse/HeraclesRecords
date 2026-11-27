@@ -10,9 +10,8 @@
 </p>
 
 <p align="center">
-  An unofficial desktop app for COROS athletes: every session read in depth,<br />
-  an AI mentor that has read all of it, and a hall for every record you set along the way.<br />
-  Made to be refined, intuitive and convenient.
+  A free desktop app for COROS athletes: every session read in depth,<br />
+  an AI mentor that has read all of it, and a hall for every record you set along the way.
 </p>
 
 <p align="center">
@@ -25,8 +24,6 @@
 <p align="center">
   <a href="https://github.com/quochungse/HeraclesRecords/releases/latest"><img src="https://img.shields.io/github/v/release/quochungse/HeraclesRecords?style=flat-square&label=release&color=c8952f" alt="Latest release" /></a>
   <a href="https://github.com/quochungse/HeraclesRecords/releases"><img src="https://img.shields.io/github/downloads/quochungse/HeraclesRecords/total?style=flat-square&color=c8952f" alt="Downloads" /></a>
-  <img src="https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-desktop-555?style=flat-square" alt="macOS, Windows and Linux" />
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-555?style=flat-square" alt="MIT license" /></a>
 </p>
 
 <!-- release:badges:start -->
@@ -39,8 +36,37 @@
 </p>
 <!-- release:badges:end -->
 
+<img src="docs/readme/01-overview.webp" alt="Overview: recovery, the week's training, last night's sleep and what is planned next" />
+
 > [!NOTE]
-> Heracles Records is an independent project. It is **not made, endorsed or supported by COROS**. It reads your training through your own COROS account, so it works with any COROS watch that syncs there: PACE, APEX, VERTIX, NOMAD and the rest.
+> An independent project, **not made, endorsed or supported by COROS**. It reads your training through your own COROS account, so it works with any COROS watch that syncs there: PACE, APEX, VERTIX, NOMAD and the rest.
+
+## What's inside
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/readme/04-run.webp" alt="A run: map, pace, heart rate, running form and every channel" />
+      <p><strong>Every session, read in depth.</strong> Runs, rides, hikes, swims and climbs, with every channel the watch recorded and charts that answer a question.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/readme/07-strength.webp" alt="Strength: sessions and a 3D muscle map" />
+      <p><strong>Strength, counted properly.</strong> COROS strength sessions and Hevy workouts together, with every set on the muscles it worked and scored from what you lifted, on the same scale as your runs.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/readme/11-coach.webp" alt="Mentor: an interval session analysed, with heart-rate and pace charts" />
+      <p><strong>A mentor that has read your training.</strong> Ask about a session or a week, or draft a plan with it, on your ChatGPT account, a Claude subscription, an API key or a local model.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/readme/14-timeline.webp" alt="Hall of Records: the timeline of milestones" />
+      <p><strong>Hall of Records.</strong> Every first, record and streak, kept month by month, and twelve labours to reach.</p>
+    </td>
+  </tr>
+</table>
+
+Also inside: Sleep, Heart rate and Stress level · a Calendar and Training Library that save to your COROS account · an Exercises Library with the muscles every movement really works · Where you've been · thirteen languages · sync through your own Google Drive. **Every screen in depth at [heraclesrecords.com](https://heraclesrecords.com).**
 
 ## Download
 
@@ -67,206 +93,19 @@ You sign in with your COROS account. Mentor also needs an AI: your ChatGPT accou
 
 </details>
 
-## What's inside
+## Your data stays yours
 
-A tour of the main screens. [heraclesrecords.com](https://heraclesrecords.com) goes further into [each sport](https://heraclesrecords.com/activities/), [strength](https://heraclesrecords.com/activities/strength/), [your health](https://heraclesrecords.com/health), [plans and the library](https://heraclesrecords.com/plan/), [Mentor](https://heraclesrecords.com/mentor) and the [Twelve Labours](https://heraclesrecords.com/labours), and the [guide](https://heraclesrecords.com/guide/) walks through setting up COROS, Mentor, sync and backups.
-
-### Today at a glance
-
-Recovery, last night's sleep and the week's training status side by side, what is coming up, and a section for every sport you trained in the last four weeks. The screen to open in the morning.
-
-<img src="docs/readme/01-overview.webp" alt="Overview: recovery, the week's training, last night's sleep and what is planned next" />
-
-### Sleep
-
-Nights and naps, stages, HRV and stress across the night, kept long after the nine weeks COROS holds.
-
-<img src="docs/readme/08-sleep.webp" alt="Sleep: stages, HRV and stress across the night" />
-
-### Heart rate and stress
-
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <img src="docs/readme/34-heart-rate.webp" alt="Heart rate: the day's resting heart rate, its range, asleep and in each session, on one scale" />
-      <p><strong>Heart rate</strong>: your resting heart rate against the week before, and where the day sat on one scale: the whole day, asleep and each session, with each session's own time in its zones. Below, daily heart rate and your exercise time in your own heart-rate zones.</p>
-    </td>
-    <td width="50%" valign="top">
-      <img src="docs/readme/35-stress-level.webp" alt="Stress level: a reading every five minutes over the day's sleep and sessions, and stress by day" />
-      <p><strong>Stress level</strong>: COROS's reading every five minutes over a line of the day's sleep and sessions, its peak and its time at High and Relaxed. Below, the hours in each level, day by day.</p>
-    </td>
-  </tr>
-</table>
-
-### Every session, read in depth
-
-**Activities.** Every session COROS holds, across every sport, in one list. Pick one to see its heart-rate zones, running dynamics, power and every channel the watch recorded.
-
-<img src="docs/readme/02-activities.webp" alt="Activities: every session in one list with a detail pane" />
-
-**A page for every run, ride and hike.** The route on a map, then running form, the session's effect and conditions, time in every zone as COROS scored it, and a label for what the session trained: Tempo, Threshold, VO2 Max, Intervals 6 × 1000 m.
-
-<img src="docs/readme/04-run.webp" alt="A run: map, pace, heart rate, running form and every channel" />
-
-**Charts that answer a question.** Scroll down a run and the analysis begins.
-
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <img src="docs/readme/27-run-efficiency.webp" alt="Running efficiency: a long run against the athlete's usual, minute by minute" />
-      <p><strong>Running efficiency</strong>: how much speed each minute bought for the heart rate it cost, on your COROS VO₂max scale and against your usual from the six weeks before. It shows how well you held it to the end, and marks every stretch it could not read fairly.</p>
-    </td>
-    <td width="50%" valign="top">
-      <img src="docs/readme/28-run-performance.webp" alt="Performance chart split in two beside the route: pace and running power above, heart rate below" />
-      <p><strong>Performance</strong>: every surge and stop drawn rather than averaged away, in COROS's own colours. Split it and what you produced sits above what it cost, on one clock. The route stands beside it: drag on the chart, press a lap or drag along the route, and that stretch lights up on all three with its own figures.</p>
-    </td>
-  </tr>
-</table>
-
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <img src="docs/readme/03-running.webp" alt="Running: weekly volume, load ratio, VO2max and threshold" />
-      <p><strong>Running</strong>: weekly volume, load ratio, VO₂max and threshold pace. Switch to Trail and the screen reads climb instead of pace.</p>
-    </td>
-    <td width="50%" valign="top">
-      <img src="docs/readme/05-ride.webp" alt="A ride: normalised power, intensity, TSS and peak power" />
-      <p><strong>Rides</strong>: normalised power, IF and TSS against your FTP, peak power from 5 seconds to an hour, power zones and the climbs.</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <img src="docs/readme/06-hike.webp" alt="A hike: moving time, ascent, terrain and climbing rate" />
-      <p><strong>Hikes</strong>: the moving time inside a long day, your rests, the terrain you covered and your climbing rate.</p>
-    </td>
-    <td width="50%" valign="top">
-      <img src="docs/readme/16-route.webp" alt="A hike around Hàm Lợn replayed on a satellite map, coloured by elevation" />
-      <p><strong>Every route, replayed</strong>: open the map full size, colour the line by pace, heart rate or elevation, and watch the route draw itself the way you covered it.</p>
-    </td>
-  </tr>
-</table>
-
-Swims and climbs have screens of their own too: [Swimming](https://heraclesrecords.com/activities/swimming) reads pace per 100, Critical Swim Speed and SWOLF length by length, and [Climbing](https://heraclesrecords.com/activities/climbing) reads your sends grade by grade, with a grade pyramid and every session climb by climb.
-
-### Strength, done properly
-
-I run and I lift, and strength was the part of my training I could not trust COROS with. The watch records the sets well. What COROS does with them afterwards is the problem:
-
-- **A training load read from heart rate.** COROS scores every session by heart rate. Lifting raises it in short bursts, so an hour of heavy squats can count for less than a short jog. The week's load, Base Fitness and the recommended range all under-count the gym, and so does any plan built on them.
-- **Movements on the wrong muscles.** COROS's catalogue files a squat as hamstring work and battle ropes as biceps, and its muscle list has no obliques or neck at all, so a side plank works neither. Totals by muscle, and Mentor's reading of them, inherit the mistake.
-- **Half the lifting in another app.** Plenty of lifters log in Hevy. COROS never sees those workouts.
-
-So Heracles Records reads strength again, from the sets up, for anyone who mixes lifting with running, cycling or hiking.
-
-<img src="docs/readme/07-strength.webp" alt="Strength: sessions and a 3D muscle map" />
-
-- **Every set on the muscles it worked.** A 3D body map lit by sets, volume or load, every muscle ranked, your coverage of each muscle group, records written in the rows they were set in, your main lifts and your weekly sets.
-- **Every movement described again.** The app reviews COROS's catalogue movement by movement: muscles corrected, obliques and neck added, equipment fixed. Browse it in the Training Library's **Exercises Library**. It disagrees with COROS here and there, on purpose; if you think it got one wrong, please say so in [Discussions](https://github.com/quochungse/HeraclesRecords/discussions) or [an issue](https://github.com/quochungse/HeraclesRecords/issues/new).
-- **Hevy beside COROS.** Hevy workouts join your COROS sessions on one screen, a session logged in both is merged into one, and the RPE you log for a set is used over any guess.
-- **Heracles Training Load.** A load scored from the sets themselves. The weight, the reps, your body weight and the most you have lifted on each exercise say how close to failure every set went; each minute of lifting then weighs what a steady minute at the same effort weighs on COROS's own TRIMP curve. A hard gym session lands on the same scale as a run, so your week finally adds up. One formula for everyone, built from published research (Nuzzo 2024, Zourdos 2016, Foster 2001) and a public dataset (PMData), with nothing tuned on you.
-
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <img src="docs/readme/30-strength-session.webp" alt="A strength session with Heracles TL chosen: each set's reps, weight, estimated max, rest and load" />
-      <p><strong>Every set scored</strong>: with Heracles TL chosen, each set carries its load, and its hover the predicted RPE and the reps it had left.</p>
-    </td>
-    <td width="50%" valign="top">
-      <img src="docs/readme/29-exercises-library.webp" alt="Exercises Library: a goblet squat with its clip and the muscles it works" />
-      <p><strong>Exercises Library</strong>: COROS's whole catalogue by body part, muscle or equipment, each movement with its clip and the muscles it really works.</p>
-    </td>
-  </tr>
-</table>
-
-Choose **Heracles TL** under **Strength → Settings → Training load formula**, and Overview, the Calendar, the Training Library, Activities and Mentor count strength that way. Load Impact, Base Fitness, Intensity Trend and the recommended weekly range follow, by COROS's own formulas. Ask Mentor whether to go long on Sunday and it weighs Tuesday's leg day at what it cost, and a plan's weekly load includes the gym. Other sports, recovery and training effect stay COROS's.
-
-> [!TIP]
-> **How the formula works:** every step, the research behind each constant and a worked example are public at **[heraclesrecords.com/activities/strength/training-load](https://heraclesrecords.com/activities/strength/training-load)**.
-
-### Plan & Library
-
-**Calendar**: planned and done side by side, month by month, with a plan's compliance on every session. Drag a session to another day and it moves on your COROS calendar too.
-
-<img src="docs/readme/09-calendar.webp" alt="Calendar: planned and completed sessions by month" />
-
-**Training Library**: your COROS workouts and plans. Read them, build new ones in one builder for every sport with targets in your own zones, edit, duplicate and put a plan on the calendar. Everything saves straight to your COROS account, so your watch has it. Its **Exercises Library** holds COROS's whole movement catalogue, by body part, muscle or equipment, each movement with its clip and the muscles it really works.
-
-<img src="docs/readme/10-library.webp" alt="Training Library: a 12-week marathon plan, week by week" />
-
-### A mentor that has read your training
-
-Ask about a session, a week or how well you are recovering. Mentor reads your COROS data and answers with the numbers and the charts behind them: a session's card carries the same Performance chart, zones and laps as its own page.
-
-<img src="docs/readme/11-coach.webp" alt="Mentor: an interval session analysed, with heart-rate and pace charts" />
-
-Ask for a plan and Mentor drafts it with you: the brief, the outline, then every session. Read it in the Workbench beside the conversation, change what you like, and save it to COROS and your calendar. Changes Mentor suggests to your week arrive as a list you apply one line at a time.
-
-<img src="docs/readme/12-coach-plan.webp" alt="Mentor: a marathon plan in the Workbench beside the conversation" />
-
-A conversation is yours to shape. Delete a question you regret, edit the last one and ask again, hide a turn from Mentor without losing it, or branch a new conversation from any answer to try another idea. In a long thread, a rail of your questions takes you straight back to any of them.
-
-Mentor runs on your ChatGPT account, your Claude subscription, a Claude or OpenRouter API key, or a local model. Each conversation reads only the data you allow. Scheduled analyses can debrief every new activity on their own, and never change anything without you.
-
-### Hall of Records
-
-Every milestone you reach is kept: firsts, records, streaks, totals and new places, month by month.
-
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <img src="docs/readme/14-timeline.webp" alt="Hall of Records: the timeline of milestones" />
-      <p><strong>Timeline</strong>: every first, record and streak, and the labour stage it reached.</p>
-    </td>
-    <td width="50%" valign="top">
-      <img src="docs/readme/13-labours.webp" alt="Hall of Records: the Twelve Labours" />
-      <p><strong>The Twelve Labours</strong>: twelve kinds of achievement in three stages each, from your first weeks to your first year. Speed and VO₂max are graded for your age and sex, so a stage means the same for everyone.</p>
-    </td>
-  </tr>
-</table>
-
-### Where you've been
-
-Every place your training has taken you, on a globe beside a list of places. Open one to see what you trained there.
-
-<img src="docs/readme/15-places.webp" alt="Where you've been: every place you trained, on a globe" />
-
-### Settings
-
-- **Appearance.** Light or dark, your own accent and sport colours, metric or imperial, in any of thirteen languages.
-- **Your sports.** Running, Cycling, Hiking, Swimming, Climbing and Strength each have a screen, which joins the sidebar with your first session of its sport. Turn any of them on or off.
-- **Cloud sync.** Use two computers? Sync them through your own Google Drive. Passwords and sign-ins never leave the machine they were made on.
-
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <img src="docs/readme/17-settings.webp" alt="Settings: sport screens and appearance" />
-      <p><strong>Sport screens and appearance</strong></p>
-    </td>
-    <td width="50%" valign="top">
-      <img src="docs/readme/18-sync.webp" alt="Settings: sync through Google Drive" />
-      <p><strong>Google Drive sync</strong></p>
-    </td>
-  </tr>
-</table>
-
-### Your data stays yours
-
-- Your training comes from your COROS account and stays on your computer.
+- Your training comes from your COROS account and stays on your computer. The app has no account of its own and the developer runs no servers.
 - Back up everything to one file you keep, and restore it whenever you like.
 
 ## The story behind Heracles Records
 
-Heracles Records began as a fork of CorosLink, a desktop companion for COROS watches. As my own training grew, what I wanted from it changed: a full record of everything I had done, analytics deeper than a summary screen, and an AI mentor that reads all of it. A complete training system rather than a set of tools. So I rebuilt the app around that: training records, deep analytics and AI.
-
-And I want it to be a pleasure to open every day: calm screens, charts you read at a glance, and a short path from wondering how your training is going to knowing what to do next.
-
-If you are looking for music and media on your watch, offline maps and routes, watch faces or gear tracking, **CorosLink** does those well and is the app to use. They are not part of Heracles Records.
+Heracles Records began as a fork of CorosLink, a desktop companion for COROS watches. I wanted a full record of my training, analytics deeper than a summary screen and an AI mentor that reads all of it, so I rebuilt the app around that. If you are looking for music on your watch, offline maps, watch faces or gear tracking, **CorosLink** does those well and is the app to use.
 
 ## Support
 
 - Found a bug or have an idea? [Open an issue](https://github.com/quochungse/HeraclesRecords/issues/new), or use **Settings → About → Report an issue** in the app.
 - Questions about setup? The [guide](https://heraclesrecords.com/guide/) and its [FAQ](https://heraclesrecords.com/guide/faq) may already answer them.
-- Website: [heraclesrecords.com](https://heraclesrecords.com)
 - If the app helps your training, you can [buy me a coffee](https://buymeacoffee.com/quochungse).
 
 <details>
