@@ -12,9 +12,15 @@
   `trainingLibrary.css` is imported by `main.tsx`.
 - A link to a session carries the session, not just the screen: `openActivityFrom` /
   `SportScreenRequest` in `App.tsx`, held until the lazy screen mounts. Every door to a
-  sport screen goes through `openSportScreen`, which refuses a screen hidden in Settings →
-  Navigation (`sportScreens.ts`, the *hidden* list is what is stored); `sportScreenFor` is
-  the one sport-code → screen answer.
+  sport screen goes through `openSportScreen`, which refuses a screen off the rail;
+  `sportScreenFor` is the one sport-code → screen answer.
+- **A sport screen is on the rail once the account has a session of its sport** (or Hevy is
+  connected, for Strength), and Settings → Navigation outranks that both ways
+  (`sportScreens.ts`, `npm run test:sport-screens`). Three lists: hidden and shown (the
+  athlete's, synced; hidden wins a tie) and with-sessions (`derived`). With-sessions is
+  only ever added to, because the activity list is empty while loading, after a failed read
+  and once signed out. Only an explicit sign-out clears it, never an expired session. Every
+  reader asks `readHiddenSportScreens()`.
 - Settings → About: Website, Report an issue (`ReportIssueDialog`), Buy me a coffee; no
   platform versions, no Licenses button (its IPC is gone).
 

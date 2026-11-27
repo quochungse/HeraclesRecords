@@ -124,7 +124,7 @@ export interface AppSidebarProps {
    */
   newCounts?: Partial<Record<PrimaryView, number>>;
   showDevelopmentItems?: boolean;
-  /** Destinations taken off the rail in Settings → Navigation. */
+  /** Sport screens off the rail (`readHiddenSportScreens`). */
   hiddenViews?: readonly PrimaryView[];
   /** COROS nickname, or whatever the account is best known by. */
   athleteName?: string | null;

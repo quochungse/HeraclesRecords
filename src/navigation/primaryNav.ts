@@ -195,7 +195,7 @@ export const PRIMARY_NAV_ITEMS: PrimaryNavItem[] = [
   ...PRIMARY_NAV_ACCOUNT_ITEMS,
 ];
 
-/** `hiddenViews` is what the athlete took off the rail in Settings → Navigation. */
+/** `hiddenViews` is the sport screens off the rail (`readHiddenSportScreens`). */
 function isVisible(
   item: PrimaryNavItem,
   showDevelopmentItems: boolean,

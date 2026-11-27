@@ -32,7 +32,7 @@ export function readStartupView(): PrimaryView {
 
   try {
     const storedView = window.localStorage.getItem(STARTUP_VIEW_STORAGE_KEY);
-    // A sport screen taken off the rail opens Overview instead. The stored
+    // A sport screen off the rail opens Overview instead. The stored
     // choice is left as it is, so showing the screen again brings it back.
     return isPrimaryView(storedView) &&
       !readHiddenSportScreens().includes(storedView as SportScreen)

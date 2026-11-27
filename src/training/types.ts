@@ -182,11 +182,11 @@ export type TrainingOverviewProps = Omit<
   activitiesStatus?: TrainingHubLoadStatus;
   /**
    * Whether Overview's Strength section is drawn. Off when the Strength screen is
-   * hidden in Settings → Navigation, so a sport the athlete took off the rail
-   * does not keep a panel on the Overview.
+   * off the rail, so a sport the rail leaves out does not keep a panel on the
+   * Overview.
    */
   showStrength?: boolean;
-  /** The sport screens taken off the rail: their sections are not drawn either. */
+  /** The sport screens off the rail: their sections are not drawn either. */
   hiddenSportScreens?: readonly SportScreen[];
   /** Opens a session on its own sport's page (App's `openActivityFrom`). */
   onOpenActivity?: (activityId: string) => void;

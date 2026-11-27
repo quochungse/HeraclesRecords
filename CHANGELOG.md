@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- The sidebar shows a sport's screen once you have a session of that sport, rather than all six from the start. Strength stays while Hevy is connected. What you turn on or off under Settings → Navigation → Sport screens stays as you set it.
+
 ## [1.6.0] - 2026-11-23
 
 Heart rate and Stress level join Sleep under Health, and Overview stands on its own at the top of the sidebar.

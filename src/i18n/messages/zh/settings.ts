@@ -15,7 +15,7 @@ const settings: SettingsMessages = {
   "settings.opensOn.title": "启动页面",
   "settings.opensOn.detail": "每次打开应用时显示的页面。",
   "settings.sportScreens.title": "运动页面",
-  "settings.sportScreens.detail": "关闭后将从侧边栏移除。",
+  "settings.sportScreens.detail": "有了该运动的第一次训练后自动显示。在这里开启或关闭的页面会保持你的选择。",
   "settings.sportScreens.hevy": "Hevy 的训练只在力量训练页面显示。",
 
   "settings.appearance.title": "外观",

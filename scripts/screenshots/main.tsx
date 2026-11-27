@@ -9,6 +9,12 @@ try {
   localStorage.setItem("heraclesrecords.startupView", params.get("view") ?? "overview");
   // The strength body map turns by default; a shot catches it on the front.
   localStorage.setItem("heraclesrecords.strength.bodyRotate", "false");
+  // The demo athlete trains every sport, and a shot that opens on a sport
+  // screen cannot wait for the first load to put it on the rail.
+  localStorage.setItem(
+    "heraclesrecords.sportScreensWithSessions",
+    JSON.stringify(["running", "cycling", "hiking", "swimming", "climbing", "strength"]),
+  );
   const extra = params.get("ls");
   if (extra) for (const [k, v] of Object.entries(JSON.parse(extra) as Record<string, string>)) localStorage.setItem(k, v);
 } catch {}

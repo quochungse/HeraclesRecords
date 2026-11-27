@@ -9,7 +9,7 @@ The Strength screen shows your COROS strength sessions on a 3D map of the muscle
 ## Connect Hevy
 
 1. Hevy's developer API comes with **Hevy Pro**. In Hevy, open [Settings → Developer](https://hevy.com/settings?developer) and create an API key.
-2. In Heracles Records, open **Strength**, press **Settings** and, beside Hevy, **Connect**. With no COROS account signed in, **Connect Hevy** is on the screen itself.
+2. In Heracles Records, open **Strength**, press **Settings** and, beside Hevy, **Connect**. With no COROS account signed in, **Connect Hevy** is on the screen itself. Strength joins the sidebar with your first COROS strength session; before that, turn it on under **Settings → Navigation → Sport screens**.
 3. Paste the key and save.
 
 Your Hevy workouts appear beside your COROS sessions, and a session recorded in both is merged into one. The key is stored encrypted on this computer and never synced. Once connected, **Manage** beside Hevy in **Settings** opens the same dialog to change the key, choose whether warm-up sets count, or disconnect. **Data source** in the same place chooses COROS, Hevy or both combined.

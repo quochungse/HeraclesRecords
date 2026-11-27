@@ -15,7 +15,7 @@ const settings: SettingsMessages = {
   "settings.opensOn.title": "Buka di",
   "settings.opensOn.detail": "Layar yang muncul setiap kali aplikasi dibuka.",
   "settings.sportScreens.title": "Layar olahraga",
-  "settings.sportScreens.detail": "Matikan satu untuk menghapusnya dari bilah samping.",
+  "settings.sportScreens.detail": "Setiap layar muncul dengan sesi pertama olahraganya. Yang Anda nyalakan atau matikan di sini tetap seperti itu.",
   "settings.sportScreens.hevy": "Latihan dari Hevy hanya ada di Latihan beban.",
 
   "settings.appearance.title": "Tampilan",

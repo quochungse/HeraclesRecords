@@ -15,7 +15,7 @@ const settings: SettingsMessages = {
   "settings.opensOn.title": "Открывать",
   "settings.opensOn.detail": "Экран, который появляется при каждом запуске приложения.",
   "settings.sportScreens.title": "Экраны видов спорта",
-  "settings.sportScreens.detail": "Выключите экран, чтобы убрать его из боковой панели.",
+  "settings.sportScreens.detail": "Экран появляется с первой тренировкой этого вида спорта. Что вы включите или выключите здесь, так и останется.",
   "settings.sportScreens.hevy": "Тренировки из Hevy есть только в разделе «Силовые».",
 
   "settings.appearance.title": "Оформление",

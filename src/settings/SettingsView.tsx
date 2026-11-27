@@ -177,9 +177,11 @@ interface SettingsViewProps {
       stays with the rest of the app-level messaging. */
   startupView: PrimaryView;
   onStartupViewChange: (view: PrimaryView) => void;
-  /** Sport screens taken off the rail. App owns it, because the rail reads it. */
+  /** Sport screens off the rail, by the athlete's choice or for want of a
+      session. App owns it, because the rail reads it. */
   hiddenSportScreens: SportScreen[];
-  onHiddenSportScreensChange: (hidden: SportScreen[]) => void;
+  /** The athlete's own choice for one screen, which outranks its sessions. */
+  onSportScreenToggle: (screen: SportScreen, shown: boolean) => void;
   showDevelopmentTools: boolean;
   /** COROS Training Hub session, shown as the connected-account card up top. */
   trainingStatus: TrainingHubStatus | null;
@@ -209,7 +211,7 @@ export function SettingsView({
   startupView,
   onStartupViewChange,
   hiddenSportScreens,
-  onHiddenSportScreensChange,
+  onSportScreenToggle,
   showDevelopmentTools,
   trainingStatus,
   trainingBusy,
@@ -350,11 +352,7 @@ export function SettingsView({
   }, [api]);
 
   function toggleSportScreen(screen: SportScreen) {
-    onHiddenSportScreensChange(
-      hiddenSportScreens.includes(screen)
-        ? hiddenSportScreens.filter((hidden) => hidden !== screen)
-        : [...hiddenSportScreens, screen]
-    );
+    onSportScreenToggle(screen, hiddenSportScreens.includes(screen));
   }
 
   // Said beside the version, ahead of the Updates button. An available or

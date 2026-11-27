@@ -436,9 +436,13 @@ export const LOCAL_STORAGE_POLICY: Readonly<Record<string, SyncTier>> = {
   "heraclesrecords.temperatureUnit": "derived",
   "heraclesrecords.sportColors": "preference",
   "heraclesrecords.startupView": "preference",
-  // The sport screens taken off the rail — which sports the athlete reads,
-  // so it follows them to the next machine.
+  // The sport screens the athlete turned off, and the ones turned on with no
+  // session yet — which sports they read, so it follows them to the next machine.
   "heraclesrecords.hiddenSportScreens": "preference",
+  "heraclesrecords.shownSportScreens": "preference",
+  // The sport screens the COROS account has sessions for, which put them on
+  // the rail. Every machine works it out from the account's own history.
+  "heraclesrecords.sportScreensWithSessions": "derived",
   // Which muscle layers the strength body map draws: a view arrangement on
   // this machine, not something to carry to the next.
   "heraclesrecords-strength-muscle-layers-v2": "device",

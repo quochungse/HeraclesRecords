@@ -15,7 +15,7 @@ const settings: SettingsMessages = {
   "settings.opensOn.title": "Startet mit",
   "settings.opensOn.detail": "Der Bildschirm, der bei jedem Start der App erscheint.",
   "settings.sportScreens.title": "Sportarten",
-  "settings.sportScreens.detail": "Schalte eine aus, um sie aus der Seitenleiste zu entfernen.",
+  "settings.sportScreens.detail": "Jede erscheint mit deiner ersten Einheit dieser Sportart. Was du hier ein- oder ausschaltest, bleibt so.",
   "settings.sportScreens.hevy": "Hevy-Workouts erscheinen nur unter Krafttraining.",
 
   "settings.appearance.title": "Darstellung",

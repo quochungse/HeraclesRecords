@@ -15,7 +15,7 @@ const settings: SettingsMessages = {
   "settings.opensOn.title": "เปิดที่หน้า",
   "settings.opensOn.detail": "หน้าที่แสดงทุกครั้งที่เปิดแอป",
   "settings.sportScreens.title": "หน้ากีฬา",
-  "settings.sportScreens.detail": "ปิดหน้าใดหน้าหนึ่งเพื่อเอาออกจากแถบด้านข้าง",
+  "settings.sportScreens.detail": "แต่ละหน้าจะแสดงเมื่อคุณมีเซสชันแรกของกีฬานั้น หน้าที่คุณเปิดหรือปิดไว้ที่นี่จะคงอยู่ตามที่คุณเลือก",
   "settings.sportScreens.hevy": "การฝึกจาก Hevy แสดงเฉพาะในหน้าเวทเทรนนิ่ง",
 
   "settings.appearance.title": "รูปลักษณ์",

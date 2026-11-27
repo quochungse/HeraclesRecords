@@ -15,7 +15,7 @@ const settings: SettingsMessages = {
   "settings.opensOn.title": "Ouvrir sur",
   "settings.opensOn.detail": "L’écran affiché à chaque lancement de l’app.",
   "settings.sportScreens.title": "Écrans de sport",
-  "settings.sportScreens.detail": "Désactivez-en un pour le retirer de la barre latérale.",
+  "settings.sportScreens.detail": "Chacun apparaît avec votre première séance de ce sport. Ce que vous activez ou désactivez ici reste tel quel.",
   "settings.sportScreens.hevy": "Les séances Hevy ne figurent que dans Musculation.",
 
   "settings.appearance.title": "Apparence",

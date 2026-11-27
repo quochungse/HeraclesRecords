@@ -15,7 +15,7 @@ const settings: SettingsMessages = {
   "settings.opensOn.title": "Abrir en",
   "settings.opensOn.detail": "La pantalla que ves cada vez que inicias la app.",
   "settings.sportScreens.title": "Pantallas de deporte",
-  "settings.sportScreens.detail": "Desactiva una para quitarla de la barra lateral.",
+  "settings.sportScreens.detail": "Cada una aparece con tu primera sesión de ese deporte. Lo que actives o desactives aquí se queda así.",
   "settings.sportScreens.hevy": "Los entrenamientos de Hevy solo aparecen en Fuerza.",
 
   "settings.appearance.title": "Apariencia",

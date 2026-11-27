@@ -73,8 +73,11 @@ import {
   saveStartupView,
 } from "./navigation/startupView";
 import {
+  addSportScreensWithSessions,
+  forgetSportScreensWithSessions,
   readHiddenSportScreens,
-  saveHiddenSportScreens,
+  recordSportScreensIn,
+  saveSportScreenChoice,
   sportScreenFor,
   type SportScreen,
 } from "./navigation/sportScreens";
@@ -381,6 +384,20 @@ export default function App() {
   const [hiddenSportScreens, setHiddenSportScreens] = useState<SportScreen[]>(
     readHiddenSportScreens,
   );
+  /**
+   * Reads the rail's sport screens again after anything that decides them
+   * moved: the athlete's choice, another machine's, a first session of a sport.
+   * A hidden startup screen opens Overview, and the Settings menu says so now
+   * rather than on the next launch; the stored choice is not rewritten, so
+   * showing the screen again brings it back.
+   */
+  const refreshHiddenSportScreens = useCallback(() => {
+    const hidden = readHiddenSportScreens();
+    setHiddenSportScreens((current) =>
+      current.join() === hidden.join() ? current : hidden,
+    );
+    setStartupView(readStartupView());
+  }, []);
   const [sidebarExpanded, setSidebarExpanded] = useState(
     createInitialSidebarExpanded,
   );
@@ -557,6 +574,28 @@ export default function App() {
     return api.onAppUpdateStatus(setAppUpdateSnapshot);
   }, [api]);
 
+  // A sport's screen joins the rail with the account's first session of it.
+  // The whole history arrives on every load; an empty list (loading, failed,
+  // signed out) adds nothing.
+  useEffect(() => {
+    if (recordSportScreensIn(trainingHubActivities)) {
+      refreshHiddenSportScreens();
+    }
+  }, [trainingHubActivities, refreshHiddenSportScreens]);
+
+  // Hevy is read on Strength alone, so a connected Hevy keeps Strength on the
+  // rail with no COROS strength session. A local read: at launch, and again
+  // after signing out forgets what COROS's sessions put on the rail.
+  const keepStrengthForHevy = useCallback(async () => {
+    const status = await api?.getHevyStatus().catch(() => null);
+    if (status?.connected && addSportScreensWithSessions(["strength"])) {
+      refreshHiddenSportScreens();
+    }
+  }, [api, refreshHiddenSportScreens]);
+  useEffect(() => {
+    void keepStrengthForHevy();
+  }, [keepStrengthForHevy]);
+
   // Applying a pull's localStorage half belongs here rather than in the Sync
   // panel, which is where it used to live: the main process drains the queue
   // when it sends this event and keeps no second copy, so a change that arrived
@@ -571,15 +610,11 @@ export default function App() {
       if (change.localStorage.length > 0) {
         void api.ackSyncedLocalStorage(change.localStorage).catch(() => undefined);
       }
-      // The rail is drawn from state, and a toggle builds on that state: left
-      // stale, the next one would write back over what the other machine hid.
-      const hidden = readHiddenSportScreens();
-      setHiddenSportScreens((current) =>
-        current.join() === hidden.join() ? current : hidden,
-      );
-      setStartupView(readStartupView());
+      // The rail is drawn from state, so what the other machine turned on or
+      // off reaches it only through here.
+      refreshHiddenSportScreens();
     });
-  }, [api]);
+  }, [api, refreshHiddenSportScreens]);
 
   // The same half on its way out. Theme, units, sport colours and every view
   // preference live only in the renderer, so without this they arrive from the
@@ -1542,6 +1577,11 @@ export default function App() {
     try {
       setTrainingHubStatus(await api.logoutTrainingHub());
       clearTrainingHubData();
+      // Here and not in clearTrainingHubData, which an expired session runs too:
+      // only signing out may mean the next account is someone else's.
+      forgetSportScreensWithSessions();
+      refreshHiddenSportScreens();
+      void keepStrengthForHevy();
       setMessage(t("app.coros.disconnected"));
     } catch (caught) {
       setError(toErrorMessage(caught));
@@ -1832,13 +1872,9 @@ export default function App() {
     setMessage(t("nav.startupSet", { view: getPrimaryViewLabel(view) }));
   }
 
-  function handleHiddenSportScreensChange(hidden: SportScreen[]) {
-    setHiddenSportScreens(hidden);
-    saveHiddenSportScreens(hidden);
-    // A hidden startup screen opens Overview, and the menu says so now rather
-    // than on the next launch. The stored choice is not rewritten, so showing
-    // the screen again brings it back.
-    setStartupView(readStartupView());
+  function handleSportScreenToggle(screen: SportScreen, shown: boolean) {
+    saveSportScreenChoice(screen, shown);
+    refreshHiddenSportScreens();
   }
 
   /**
@@ -1860,7 +1896,7 @@ export default function App() {
    * was trained as, a milestone in the Hall of Records: on the screen built for
    * its sport, the way Activities hands one over, and in Activities itself for
    * a swim, anything else with no screen of its own, or a sport whose screen
-   * the athlete took off the rail.
+   * is off the rail.
    */
   function openActivityFrom(activityId: string, from: PrimaryView) {
     const activity = trainingHubActivities.find(
@@ -2015,7 +2051,7 @@ export default function App() {
                         hiddenSportScreens={hiddenSportScreens}
                         onOpenActivity={(activityId) => openActivityFrom(activityId, "overview")}
                         onOpenView={(view) => {
-                          // A sport screen taken off the rail is not opened from here either.
+                          // A sport screen off the rail is not opened from here either.
                           if (!(hiddenSportScreens as readonly PrimaryView[]).includes(view)) {
                             setActiveView(view);
                           }
@@ -2356,7 +2392,7 @@ export default function App() {
                 startupView={startupView}
                 onStartupViewChange={handleStartupViewChange}
                 hiddenSportScreens={hiddenSportScreens}
-                onHiddenSportScreensChange={handleHiddenSportScreensChange}
+                onSportScreenToggle={handleSportScreenToggle}
                 showDevelopmentTools={showDevelopmentTools}
                 trainingStatus={trainingHubStatus}
                 trainingBusy={busy}

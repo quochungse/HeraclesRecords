@@ -15,7 +15,7 @@ const settings: SettingsMessages = {
   "settings.opensOn.title": "Mở đầu với",
   "settings.opensOn.detail": "Màn hình hiện ra mỗi lần mở ứng dụng.",
   "settings.sportScreens.title": "Màn hình môn thể thao",
-  "settings.sportScreens.detail": "Tắt một môn để ẩn nó khỏi thanh bên.",
+  "settings.sportScreens.detail": "Mỗi màn tự hiện khi bạn có buổi tập đầu tiên của môn đó. Màn bạn bật hoặc tắt ở đây sẽ giữ nguyên như bạn chọn.",
   "settings.sportScreens.hevy": "Bài tập từ Hevy chỉ có ở mục Sức mạnh.",
 
   "settings.appearance.title": "Giao diện",

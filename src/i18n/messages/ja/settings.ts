@@ -15,7 +15,7 @@ const settings: SettingsMessages = {
   "settings.opensOn.title": "起動時の画面",
   "settings.opensOn.detail": "アプリを起動するたびに表示される画面です。",
   "settings.sportScreens.title": "スポーツ画面",
-  "settings.sportScreens.detail": "オフにするとサイドバーから外れます。",
+  "settings.sportScreens.detail": "そのスポーツの最初のセッションで表示されます。ここでオン・オフした画面はそのまま保たれます。",
   "settings.sportScreens.hevy": "Hevy のワークアウトは筋トレ画面にのみ表示されます。",
 
   "settings.appearance.title": "外観",

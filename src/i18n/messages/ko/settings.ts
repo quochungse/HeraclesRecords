@@ -15,7 +15,7 @@ const settings: SettingsMessages = {
   "settings.opensOn.title": "시작 화면",
   "settings.opensOn.detail": "앱을 실행할 때마다 보이는 화면입니다.",
   "settings.sportScreens.title": "종목 화면",
-  "settings.sportScreens.detail": "끄면 사이드바에서 사라집니다.",
+  "settings.sportScreens.detail": "해당 종목의 첫 세션이 생기면 나타납니다. 여기서 켜거나 끈 화면은 그대로 유지됩니다.",
   "settings.sportScreens.hevy": "Hevy 운동은 근력 운동 화면에만 표시됩니다.",
 
   "settings.appearance.title": "화면 스타일",

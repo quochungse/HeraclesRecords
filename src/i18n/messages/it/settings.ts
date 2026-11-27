@@ -15,7 +15,7 @@ const settings: SettingsMessages = {
   "settings.opensOn.title": "Apri su",
   "settings.opensOn.detail": "La schermata mostrata a ogni avvio dell’app.",
   "settings.sportScreens.title": "Schermate degli sport",
-  "settings.sportScreens.detail": "Disattivane una per toglierla dalla barra laterale.",
+  "settings.sportScreens.detail": "Ognuna compare con il tuo primo allenamento di quello sport. Ciò che attivi o disattivi qui resta come l’hai scelto.",
   "settings.sportScreens.hevy": "Gli allenamenti di Hevy compaiono solo in Forza.",
 
   "settings.appearance.title": "Aspetto",

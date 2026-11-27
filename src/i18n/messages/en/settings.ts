@@ -16,7 +16,7 @@ const settings = {
   "settings.opensOn.title": "Opens on",
   "settings.opensOn.detail": "The screen shown each time the app starts.",
   "settings.sportScreens.title": "Sport screens",
-  "settings.sportScreens.detail": "Turn one off to take it off the sidebar.",
+  "settings.sportScreens.detail": "Each appears with your first session of its sport. What you turn on or off here stays as you set it.",
   "settings.sportScreens.hevy": "Hevy workouts are only on Strength.",
 
   "settings.appearance.title": "Appearance",
