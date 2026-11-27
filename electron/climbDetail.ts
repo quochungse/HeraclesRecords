@@ -135,9 +135,9 @@ function lapItems(raw: Record<string, unknown>): Record<string, unknown>[] {
   return [];
 }
 
-/** A lap's time in seconds, from `time` or its two timestamps. */
+/** A lap's time in seconds, from `time` or, where that is missing or 0, its two timestamps. */
 function lapSeconds(item: Record<string, unknown>): number {
-  let raw = num(item.time) ?? num(item.totalTime);
+  let raw = positive(item.time) ?? positive(item.totalTime);
   if (raw === undefined) {
     const start = num(item.startTimestamp);
     const end = num(item.endTimestamp);
@@ -248,7 +248,10 @@ export function parseClimbDetail(
   const items = lapItems(raw);
   const staged = sportType === OUTDOOR_CLIMB_SPORT_TYPE || sportType === MULTI_PITCH_SPORT_TYPE;
   const stageKey = sportType === MULTI_PITCH_SPORT_TYPE ? "mutliPitchStage" : "sportStage";
-  const hasStages = staged && items.some((item) => num(item[stageKey]) !== undefined && num(item[stageKey]) !== 0);
+  // As COROS's web app reads an outdoor day: only the climbing stage holds
+  // routes, so a day of approach laps alone climbed nothing. A payload with no
+  // stage field at all is read lap by lap.
+  const hasStages = staged && items.some((item) => num(item[stageKey]) !== undefined);
 
   let restSeconds = 0;
   let restLaps = 0;

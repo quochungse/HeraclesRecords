@@ -59,9 +59,16 @@ function formatMeasure(value: number, measure: ClimbVolumeMeasure): string {
   return plural("climb.climbCount", Math.round(value));
 }
 
-/** The trailing average ending at `end`, over buckets that start before the chart does. */
+/**
+ * The trailing average ending at `end`, over buckets that start before the
+ * chart does. Climbs and climbing time come off each session's summary: a
+ * week not read yet would count as a zero, so it is left out of the average
+ * rather than pulling it down.
+ */
 function trailing(buckets: readonly ClimbWeek[], end: number, measure: ClimbVolumeMeasure): number {
-  const window = buckets.slice(Math.max(0, end - MOVING_AVERAGE_WEEKS + 1), end + 1);
+  const window = buckets
+    .slice(Math.max(0, end - MOVING_AVERAGE_WEEKS + 1), end + 1)
+    .filter((bucket) => measure === "sessions" || bucket.unread === 0);
   return window.reduce((sum, bucket) => sum + measuredClimb(bucket, measure), 0) / Math.max(1, window.length);
 }
 

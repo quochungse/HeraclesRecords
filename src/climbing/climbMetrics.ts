@@ -17,7 +17,7 @@ import {
   type ClimbFamily,
   type LadderRung
 } from "../../electron/climbGrades";
-import { startOfRunWeekMs } from "../running/runMetrics";
+import { runWindowStartMs, startOfRunWeekMs } from "../running/runMetrics";
 import { getIntlLocale } from "../i18n/core";
 import { CLIMB_KINDS, classifyClimbKind, gradeLabel, type ClimbKind } from "./climbType";
 import type { ClimbStyleGroup } from "./climbColors";
@@ -25,8 +25,6 @@ import type { ClimbStyleGroup } from "./climbColors";
 // "The last N weeks" is one definition across the sport screens — calendar
 // weeks from a Monday, this one included — owned by the run module.
 export { runWindowStartMs as climbWindowStartMs } from "../running/runMetrics";
-
-const MS_PER_DAY = 86_400_000;
 
 function positive(value: number | undefined): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined;
@@ -186,13 +184,16 @@ export function sendRate(
   return { sent, marked };
 }
 
-/** Climbs of the sessions started inside the last `days`, by the page's clock. */
+/**
+ * Climbs of the sessions inside the last `weeks` calendar weeks, this one
+ * included — cut at a Monday, as every sport screen's "N weeks" and Overview's are.
+ */
 export function recordsWithin(
   records: readonly ClimbRecord[],
-  days: number,
+  weeks: number,
   nowMs: number
 ): ClimbRecord[] {
-  const from = nowMs - days * MS_PER_DAY;
+  const from = runWindowStartMs(weeks, nowMs);
   return records.filter((record) => (startedAtMs(record.activity) ?? 0) >= from);
 }
 

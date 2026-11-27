@@ -10,16 +10,17 @@
 // this is probed against a recorded session; it is what COROS's own page does
 // with the same payload.
 //
-// The web app reads a grade against one of two tables:
-// - an indoor climb or a boulder: the indoor rope scales (YDS, French, UIAA,
-//   Ewbank) and the bouldering ones (V, Font), each on a ladder of its own;
+// A grade is read against the scales COROS offers for its sport:
+// - an indoor climb: the rope scales (YDS, French, UIAA, Ewbank);
+// - a boulder: V and Font, on a ladder of their own;
 // - an outdoor climb or a multi-pitch: the outdoor scales, which add jugging
 //   the rope, an "easy" step and the aid, ice, mixed and British trad scales,
 //   on a rope ladder two steps above the indoor one (outdoor 5.6 is 6, indoor
 //   5.6 is 4; French 4a is 3 and 1).
 // So there are two ladders here, a route's and a boulder's, and an outdoor
 // grade is moved down two steps onto the route ladder. A route and a boulder
-// are never compared: the scales measure different things.
+// are never compared: the scales measure different things. Aid, ice and
+// mixed are named but not ranked: they are not free climbing.
 //
 // Node-free: the renderer reads the same grades.
 
@@ -97,11 +98,33 @@ export const BOULDERING_SPORT_TYPE = 801;
 export const OUTDOOR_CLIMB_SPORT_TYPE = 802;
 export const MULTI_PITCH_SPORT_TYPE = 10003;
 
-/** The table COROS's web app reads a climb of this sport against. */
-function tableFor(sportType: number | undefined, system: number): GradeTable | undefined {
+/**
+ * The table a climb of this sport is read against: the scales COROS's climb
+ * settings offer for it (indoor routes the rope scales, boulders V and Font),
+ * outdoors the outdoor list. One sport, one ladder: a climb graded in another
+ * family's scale reads as ungraded rather than crossing over.
+ */
+function tableFor(sportType: number | undefined): GradeTable | undefined {
   if (sportType === OUTDOOR_CLIMB_SPORT_TYPE || sportType === MULTI_PITCH_SPORT_TYPE) return OUTDOOR;
-  if (sportType === INDOOR_CLIMB_SPORT_TYPE || sportType === BOULDERING_SPORT_TYPE) return BOULDER[system] ? BOULDER : INDOOR;
+  if (sportType === INDOOR_CLIMB_SPORT_TYPE) return INDOOR;
+  if (sportType === BOULDERING_SPORT_TYPE) return BOULDER;
   return undefined;
+}
+
+/**
+ * Aid, ice and mixed are not free climbing: COROS lays them on the same
+ * ladder, but an A3 pitch is no 5.12b. Their grades are named, never ranked.
+ */
+const OFF_LADDER_SYSTEMS: ReadonlySet<number> = new Set([CLIMB_SYSTEM.aid, CLIMB_SYSTEM.ice, CLIMB_SYSTEM.mixed]);
+
+/** A grade as the climb's own scale writes it ("A3", "WI4", "6b+"), ranked or not. */
+export function recordedGradeName(
+  sportType: number | undefined,
+  system: number | undefined,
+  index: number | undefined
+): string | undefined {
+  if (system === undefined || index === undefined || system <= 0 || index < 0 || index === 255) return undefined;
+  return tableFor(sportType)?.[system]?.[index]?.[0];
 }
 
 /** A climb's grade, read as COROS reads it, placed on its ladder. */
@@ -118,9 +141,10 @@ export interface ClimbGrade {
 }
 
 /**
- * A climb's grade from COROS's two numbers, or undefined when there is none:
- * a scale of 0 is "not set", an index of 255 "no grade", and jugging the rope
- * is not a climb graded on anything.
+ * A climb's grade from COROS's two numbers, placed on its ladder, or undefined
+ * when there is none to rank: a scale of 0 is "not set", an index of 255 "no
+ * grade", jugging the rope is not a climb, and aid, ice and mixed are not free
+ * climbing (`recordedGradeName` still names them).
  */
 export function climbGradeOf(
   sportType: number | undefined,
@@ -130,9 +154,9 @@ export function climbGradeOf(
   if (system === undefined || index === undefined || system <= 0 || index < 0 || index === 255) {
     return undefined;
   }
-  const table = tableFor(sportType, system);
+  const table = tableFor(sportType);
   const row = table?.[system]?.[index];
-  if (!table || !row || row[0] === "@jug") {
+  if (!table || !row || row[0] === "@jug" || OFF_LADDER_SYSTEMS.has(system)) {
     return undefined;
   }
   const steps = row.slice(1) as number[];
@@ -150,27 +174,13 @@ export interface LadderRung {
 
 /**
  * A scale's grades on the ladder of its family, lowest first: the rows a
- * pyramid is drawn in. A rope scale COROS keeps only outdoors (aid, ice,
- * mixed, British trad) is moved down onto the route ladder as its grades are.
+ * pyramid is drawn in. Only the scales COROS's climb settings offer are shown
+ * (`CLIMB_DISPLAY_SYSTEMS`); another falls back to COROS's default.
  */
 export function ladderRungs(family: ClimbFamily, system: number): LadderRung[] {
-  if (family === "boulder") {
-    return (BOULDER[system] ?? BOULDER[DEFAULT_CLIMB_SYSTEM.boulder]!).map(([name, ...steps]) => ({ name, steps }));
-  }
-  const indoor = INDOOR[system];
-  if (indoor) {
-    return indoor.map(([name, ...steps]) => ({ name, steps }));
-  }
-  const outdoor = OUTDOOR[system];
-  if (!outdoor) {
-    return ladderRungs("route", DEFAULT_CLIMB_SYSTEM.route);
-  }
-  return outdoor
-    .filter(([name]) => name !== "@jug")
-    .map(([name, ...steps]) => ({
-      name,
-      steps: [...new Set(steps.map((step) => Math.max(1, step - OUTDOOR_LADDER_OFFSET)))]
-    }));
+  const table = family === "boulder" ? BOULDER : INDOOR;
+  const rows = table[system] ?? table[DEFAULT_CLIMB_SYSTEM[family]]!;
+  return rows.map(([name, ...steps]) => ({ name, steps }));
 }
 
 /**

@@ -11,6 +11,8 @@ interface ClimbKindPanelProps {
   sessions: readonly TrainingHubActivity[];
   summaries: ReadonlyMap<string, ActivityDetailSummary>;
   scales: ClimbScales;
+  /** Whether the summaries have all been read: until then a figure that needs them is on its way. */
+  settled: boolean;
 }
 
 /**
@@ -19,7 +21,7 @@ interface ClimbKindPanelProps {
  * kind filter does not narrow — the comparison is the content, as on
  * Hiking's kinds.
  */
-export function ClimbKindPanel({ sessions, summaries, scales }: ClimbKindPanelProps) {
+export function ClimbKindPanel({ sessions, summaries, scales, settled }: ClimbKindPanelProps) {
   const palette = useMemo(() => climbKindColors(), []);
   const breakdown = useMemo(() => climbKindBreakdown(sessions, summaries, scales), [scales, sessions, summaries]);
 
@@ -58,23 +60,27 @@ export function ClimbKindPanel({ sessions, summaries, scales }: ClimbKindPanelPr
             </tr>
           </thead>
           <tbody>
-            {breakdown.map((entry) => (
-              <tr key={entry.kind}>
-                <td>
-                  <span className="run-surface-swatch" style={{ background: palette[entry.kind] }} />
-                  {CLIMB_KIND_LABELS[entry.kind]}
-                </td>
-                <td className="is-numeric">{entry.sessions}</td>
-                <td className="is-numeric">{entry.climbs > 0 ? entry.climbs : "—"}</td>
-                <td className="is-numeric">{entry.hardest ?? "—"}</td>
-                <td className="is-numeric">
-                  {entry.sent ? `${Math.round((entry.sent.sent / entry.sent.marked) * 100)}%` : "—"}
-                </td>
-                <td className="is-numeric">
-                  {entry.climbingSeconds > 0 ? formatDurationSpan(entry.climbingSeconds) : "—"}
-                </td>
-              </tr>
-            ))}
+            {breakdown.map((entry) => {
+              // Read off the sessions' summaries: still reading is not none.
+              const none = settled ? "—" : "…";
+              return (
+                <tr key={entry.kind}>
+                  <td>
+                    <span className="run-surface-swatch" style={{ background: palette[entry.kind] }} />
+                    {CLIMB_KIND_LABELS[entry.kind]}
+                  </td>
+                  <td className="is-numeric">{entry.sessions}</td>
+                  <td className="is-numeric">{entry.climbs > 0 ? entry.climbs : none}</td>
+                  <td className="is-numeric">{entry.hardest ?? none}</td>
+                  <td className="is-numeric">
+                    {entry.sent ? `${Math.round((entry.sent.sent / entry.sent.marked) * 100)}%` : none}
+                  </td>
+                  <td className="is-numeric">
+                    {entry.climbingSeconds > 0 ? formatDurationSpan(entry.climbingSeconds) : none}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

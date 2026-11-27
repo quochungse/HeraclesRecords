@@ -90,7 +90,10 @@ export type BeyondKey = "ride" | "swim" | "hike" | "rideClimb";
 
 /** The hardest climb sent, a route's or a boulder's: a grade, how it went, and when. */
 export interface ClimbMark {
-  /** Named in the scale most of the athlete's climbs were graded in. */
+  family: ClimbFamily;
+  /** Its step on the family's ladder, for the page to name in the scale COROS's settings chose. */
+  ladder: number;
+  /** Named in the scale most of the athlete's climbs were graded in: the hall reads nothing but local data. */
   grade: string;
   style: ClimbStyle;
   day: string;
@@ -240,6 +243,8 @@ export function buildRecordBoard(input: RecordBoardInput): RecordBoard {
     const best = hardestSend(climbs, key);
     if (!best || best.ladder === undefined || !best.activity.startTime) return [];
     const mark: ClimbMark = {
+      family: key,
+      ladder: best.ladder,
       grade: gradeName(key, best.ladder, scales),
       style: best.style,
       day: localDay(best.activity.startTime),

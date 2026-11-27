@@ -65,7 +65,9 @@ export function GradePyramidPanel({
                 </span>
               </>
             ) : (
-              <span className="run-block-sub">{settled ? t("climb.pyramid.none") : t("climb.reading")}</span>
+              <span className="run-block-sub">
+                {!settled ? t("climb.reading") : pyramid.graded === 0 ? t("climb.pyramid.none") : t("climb.pyramid.noSend")}
+              </span>
             )}
           </h3>
         </div>

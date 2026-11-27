@@ -9,7 +9,7 @@ import type {
   TrainingHubClimb
 } from "../../electron/types";
 import { climbFamilyOfSport, isSend } from "../../electron/climbDetail";
-import { climbGradeOf, rungIndexFor } from "../../electron/climbGrades";
+import { climbGradeOf, recordedGradeName, rungIndexFor } from "../../electron/climbGrades";
 import type { TrainingHubLoadStatus } from "../training/types";
 import { activityCoachRequest } from "../training/askCoachAbout";
 import { useSessionChart } from "../training/useSessionChart";
@@ -119,12 +119,13 @@ export function ClimbDetailView({
       }
       const ladders = graded.flatMap(({ grade }) => (grade && grade.family === family ? [grade.ladder] : []));
       if (ladders.length > 0) {
+        // The middle graded climb, sent or not: a grade is a rung, not a quantity to average.
         const rungs = scaleRungs(family, scales);
-        const average =
-          ladders.map((ladder) => rungIndexFor(rungs, ladder)).reduce((sum, value) => sum + value, 0) / ladders.length;
+        const sorted = ladders.map((ladder) => rungIndexFor(rungs, ladder)).sort((left, right) => left - right);
+        const middle = sorted[Math.floor((sorted.length - 1) / 2)]!;
         stats.push({
           label: t("climb.detail.avgGrade"),
-          value: gradeLabel(rungs[Math.round(average)]?.name ?? ""),
+          value: gradeLabel(rungs[middle]?.name ?? ""),
           title: t("climb.detail.avgGradeTitle")
         });
       }
@@ -280,13 +281,15 @@ export function ClimbDetailView({
               <tbody>
                 {graded.map(({ entry, grade }) => {
                   const shown = grade ? gradeName(grade.family, grade.ladder, scales) : undefined;
-                  const recorded = grade ? gradeLabel(grade.name) : undefined;
+                  // As the watch recorded it — aid, ice and mixed are named here, never ranked.
+                  const raw = recordedGradeName(activity.sportType, entry.system, entry.gradeIndex);
+                  const recorded = raw ? gradeLabel(raw) : undefined;
                   return (
                     <tr key={entry.index}>
                       <td className="climb-route-index">{entry.index}</td>
                       <td>
-                        {shown ?? "—"}
-                        {recorded && recorded !== shown ? (
+                        {shown ?? recorded ?? "—"}
+                        {shown && recorded && recorded !== shown ? (
                           <span className="climb-recorded" title={t("climb.detail.recordedTitle")}>
                             {" "}
                             ({recorded})
@@ -369,7 +372,7 @@ function ClimbRoutesChart({ climbs, sportType, sessionSeconds, scales, measure, 
   const hasHeight = climbs.some((entry) => entry.heightMeters !== undefined);
 
   return (
-    <section className="panel run-block climb-routes">
+    <section className="panel run-block">
       <header className="run-block-head">
         <div>
           <p className="running-eyebrow">{t("climb.detail.routesTitle")}</p>

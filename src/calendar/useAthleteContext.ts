@@ -21,7 +21,7 @@ const cached = new Map<UnitSystem, { promise: Promise<WorkoutEditorContext | und
 const answered = new Map<UnitSystem, WorkoutEditorContext>();
 
 export function useAthleteContext(
-  api: HeraclesRecordsApi | undefined = typeof window === "undefined" ? undefined : window.heraclesRecords,
+  api: HeraclesRecordsApi | null | undefined = typeof window === "undefined" ? undefined : window.heraclesRecords,
   unitSystem: UnitSystem = "metric"
 ): WorkoutEditorContext | undefined {
   return useAthleteContextRead(api, unitSystem).context;
@@ -31,10 +31,11 @@ export function useAthleteContext(
  * `useAthleteContext`, and whether its read is still out: a figure waiting
  * for the thresholds (`StatedFigures.distanceAwaits`) is drawn as loading
  * while it is, and as only at least what it adds up to once it has answered
- * without them.
+ * without them. `null` asks nothing — `undefined` would fall back to the
+ * window's bridge and read the account anyway.
  */
 export function useAthleteContextRead(
-  api: HeraclesRecordsApi | undefined = typeof window === "undefined" ? undefined : window.heraclesRecords,
+  api: HeraclesRecordsApi | null | undefined = typeof window === "undefined" ? undefined : window.heraclesRecords,
   unitSystem: UnitSystem = "metric"
 ): { context?: WorkoutEditorContext; pending: boolean } {
   const [context, setContext] = useState(() => answered.get(unitSystem));

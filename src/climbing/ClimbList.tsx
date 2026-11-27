@@ -174,7 +174,7 @@ export function ClimbList({ sessions, summaries, scales, sort, onSortChange, onO
   };
 
   return (
-    <table className="run-list climb-list">
+    <table className="run-list">
       <thead>
         <tr>
           {COLUMNS.map((entry) => {

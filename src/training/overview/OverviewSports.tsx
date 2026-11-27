@@ -14,6 +14,7 @@ import { RunnerIcon } from "../../running/runnerIcon";
 import {
   buildRunWeeks,
   climbPerDistanceUnit,
+  runWindowStartMs,
   startOfRunWeekMs,
   runIntensityMix,
   runSurfaceBreakdown,
@@ -1097,6 +1098,8 @@ function ClimbingSection({
   const { weeks, values, average, loads, totals, records, last } = useMemo(() => {
     const climbWeeks = buildClimbWeeks(climbs, summaries, { weeks: SPORT_CHART_WEEKS, nowMs });
     const counts = climbWeeks.map((week) => week.climbs);
+    // A week whose sessions are not all read yet would pull the average down as a zero.
+    const readBefore = climbWeeks.slice(0, -1).filter((week) => week.unread === 0).map((week) => week.climbs);
     // COROS's load per week, which the climbs' weeks do not carry.
     const loadsByWeek = new Map<number, number>();
     for (const activity of climbs) {
@@ -1108,7 +1111,7 @@ function ClimbingSection({
     return {
       weeks: climbWeeks,
       values: counts,
-      average: previousWeeksAverage(counts),
+      average: readBefore.length > 0 ? readBefore.reduce((sum, value) => sum + value, 0) / readBefore.length : undefined,
       loads: loadsByWeek,
       totals: summariseClimbs(window, summaries),
       records: climbRecords(window, summaries),
@@ -1166,7 +1169,7 @@ function ClimbingSection({
           {
             label: periodLabel(WINDOW_DAYS),
             value: reading ? "…" : whole(totals.climbs),
-            note: t("climb.overview.onWall", { time: formatDurationSpan(totals.climbingSeconds) })
+            note: reading ? t("climb.reading") : t("climb.overview.onWall", { time: formatDurationSpan(totals.climbingSeconds) })
           },
           {
             label: t("climb.sessions"),
@@ -1308,6 +1311,11 @@ export function OverviewSports({
   const hikeWindow = useMemo(() => sportWindow(hikes, nowMs), [hikes, nowMs]);
   const swimWindow = useMemo(() => sportWindow(swims, nowMs), [swims, nowMs]);
   const climbWindow = useMemo(() => sportWindow(climbs, nowMs), [climbs, nowMs]);
+  // The chart reaches a week further back than the window: its climbs are read too.
+  const climbChart = useMemo(() => {
+    const from = runWindowStartMs(SPORT_CHART_WEEKS, nowMs);
+    return climbs.filter((activity) => (epochMsFromCorosTime(activity.startTime) ?? 0) >= from);
+  }, [climbs, nowMs]);
   const zoneScale = useMemo(
     () => hrZoneModel ?? { family: "lthr" as const, zones: lthrZones },
     [hrZoneModel, lthrZones]
@@ -1326,9 +1334,9 @@ export function OverviewSports({
       ...(showRuns ? runWindow : []),
       ...(showRides ? rideWindow : []),
       ...(showSwims ? swimWindow : []),
-      ...(showClimbs ? climbWindow : [])
+      ...(showClimbs ? climbChart : [])
     ],
-    [showRuns, showRides, showSwims, showClimbs, runWindow, rideWindow, swimWindow, climbWindow]
+    [showRuns, showRides, showSwims, showClimbs, runWindow, rideWindow, swimWindow, climbChart]
   );
   const { summaries, settled } = useActivityDetailSummariesState({
     api,
@@ -1339,10 +1347,10 @@ export function OverviewSports({
     requireClimb: showClimbs
   });
   // The grades in the scale chosen in COROS's climb settings, as the Climbing screen shows them.
-  const { context: athlete } = useAthleteContextRead(showClimbs ? api : undefined, unitSystem);
+  const { context: athlete } = useAthleteContextRead(showClimbs ? api : null, unitSystem);
   const climbScale = useMemo(
-    () => climbScales(athlete, showClimbs ? climbRecords(climbWindow, summaries) : []),
-    [athlete, showClimbs, climbWindow, summaries]
+    () => climbScales(athlete, showClimbs ? climbRecords(climbs, summaries) : []),
+    [athlete, showClimbs, climbs, summaries]
   );
   const context: SportContext = {
     unitSystem,

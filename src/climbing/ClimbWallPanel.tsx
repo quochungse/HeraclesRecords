@@ -33,7 +33,7 @@ export function ClimbWallPanel({ sessions, summaries, settled }: ClimbWallPanelP
   }
 
   return (
-    <section className="panel run-block climb-wall">
+    <section className="panel run-block">
       <header className="run-block-head">
         <div>
           <p className="running-eyebrow">{t("climb.wall.title")}</p>

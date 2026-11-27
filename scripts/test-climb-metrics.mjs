@@ -19,6 +19,7 @@ const {
   gradeNameOnLadder,
   ladderRungs,
   onsightLadder,
+  recordedGradeName,
   rungIndexFor
 } = await import(moduleUrl("electron", "climbGrades.ts"));
 const {
@@ -95,10 +96,21 @@ assert.equal(gradeNameOnLadder("route", CLIMB_SYSTEM.uiaa, 11), "VIII-");
 assert.equal(gradeNameOnLadder("boulder", CLIMB_SYSTEM.font, 5), "6A+");
 assert.equal(gradeNameOnLadder("route", CLIMB_SYSTEM.french, 0), "4a", "below the ladder is its first rung");
 assert.equal(gradeNameOnLadder("route", CLIMB_SYSTEM.french, 99), "9b+", "past it, its last");
-// A rope scale COROS keeps only outdoors is moved down onto the route ladder.
-const trad = ladderRungs("route", CLIMB_SYSTEM.ukTrad);
-assert.equal(trad[0].name, "VD");
-assert.equal(trad[rungIndexFor(trad, 9)].name, "E2", "E2 covers outdoor 10–11, the route ladder's 8–9");
+// British trad is free climbing, on the route ladder: E2 covers outdoor 10–11.
+assert.equal(climbGradeOf(802, CLIMB_SYSTEM.ukTrad, 7)?.name, "E2");
+assert.equal(climbGradeOf(802, CLIMB_SYSTEM.ukTrad, 7)?.ladder, 9);
+// Aid, ice and mixed are named, never ranked: an A3 pitch is no 5.12b.
+assert.equal(climbGradeOf(802, CLIMB_SYSTEM.aid, 3), undefined);
+assert.equal(climbGradeOf(802, CLIMB_SYSTEM.ice, 5), undefined);
+assert.equal(climbGradeOf(802, CLIMB_SYSTEM.mixed, 7), undefined);
+assert.equal(recordedGradeName(802, CLIMB_SYSTEM.aid, 3), "A3");
+assert.equal(recordedGradeName(802, CLIMB_SYSTEM.ice, 5), "WI5");
+// One sport, one ladder: an indoor route graded on a boulder scale is ungraded, and the other way round.
+assert.equal(climbGradeOf(800, CLIMB_SYSTEM.vScale, 3), undefined);
+assert.equal(climbGradeOf(801, CLIMB_SYSTEM.french, 8), undefined);
+// The rows are the scales COROS's settings offer; another falls back to its default.
+assert.equal(ladderRungs("route", CLIMB_SYSTEM.ukTrad)[0].name, "5.6");
+assert.equal(ladderRungs("boulder", CLIMB_SYSTEM.french)[0].name, "V0");
 assert.equal(onsightLadder("route", CLIMB_SYSTEM.french, 8), 9);
 assert.equal(onsightLadder("boulder", CLIMB_SYSTEM.vScale, 2), 3);
 
@@ -169,6 +181,21 @@ assert.equal(outdoor.climbs[0].style, "onsight", "and goes as its last marked pi
 assert.equal(outdoor.climbs[0].falls, 1);
 assert.equal(outdoor.climbs[0].heightMeters, 47);
 assert.equal(outdoor.climbs[1].pitches, undefined);
+// A day of approach laps alone climbed nothing, as COROS's web app reads stages.
+const walkOnly = parseClimbDetail(
+  { summary: { sportType: 802, startTimestamp: start }, lapList: [{ type: 2, lapItemList: [lap(0, 1500, { mode: 1, sportStage: 0 })] }] },
+  { sportType: 802 }
+);
+assert.deepEqual(walkOnly.climbs, []);
+// A lap whose time reads 0 is timed by its stamps.
+const stamped = parseClimbDetail(
+  {
+    summary: { sportType: 800, startTimestamp: start },
+    lapList: [{ type: 2, lapItemList: [{ ...lap(0, 95, { mode: 1, style: 2 }), time: 0 }] }]
+  },
+  { sportType: 800 }
+);
+assert.equal(stamped.climbs[0].seconds, 95);
 
 const summary = climbSummaryOf(indoor);
 assert.equal(summary.version, CLIMB_SUMMARY_VERSION);

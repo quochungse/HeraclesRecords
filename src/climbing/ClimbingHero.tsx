@@ -3,9 +3,9 @@ import type { ActivityDetailSummary, TrainingHubActivity } from "../../electron/
 import type { ClimbFamily } from "../../electron/climbGrades";
 import { DeltaChip } from "../running/RunningHero";
 import { MotionFigure } from "../motion/MotionFigure";
+import { isSend } from "../../electron/climbDetail";
 import {
   buildClimbWeeks,
-  climbRecords,
   gradeName,
   hardestSend,
   recordsWithin,
@@ -23,6 +23,8 @@ interface ClimbingHeroProps {
    * filter must not cut short.
    */
   sessions: readonly TrainingHubActivity[];
+  /** The climbs of those sessions whose summaries are read (`climbRecords`). */
+  records: readonly ClimbRecord[];
   summaries: ReadonlyMap<string, ActivityDetailSummary>;
   /** Whether those summaries have all been read: until then a missing figure is on its way. */
   settled: boolean;
@@ -33,10 +35,10 @@ interface ClimbingHeroProps {
 
 /** Weeks the baseline averages over, plus the current one being compared. */
 const BASELINE_WEEKS = 4;
-/** The window the hardest send is read over: a block of training. */
-export const CLIMB_HERO_DAYS = 84;
-/** The window the send rate is read over. */
-const SEND_RATE_DAYS = 28;
+/** The calendar weeks the hardest send is read over: a block of training. */
+export const CLIMB_HERO_WEEKS = 12;
+/** The calendar weeks the send rate is read over. */
+const SEND_RATE_WEEKS = 4;
 
 const FAMILIES: readonly ClimbFamily[] = ["route", "boulder"];
 
@@ -50,7 +52,7 @@ const FAMILIES: readonly ClimbFamily[] = ["route", "boulder"];
  * and the onsight grade the athlete set in COROS, which COROS's own climbing
  * workouts are written against.
  */
-export function ClimbingHero({ sessions, summaries, settled, scales, nowMs }: ClimbingHeroProps) {
+export function ClimbingHero({ sessions, records, summaries, settled, scales, nowMs }: ClimbingHeroProps) {
   const thisWeek = useMemo(() => {
     const weeks = buildClimbWeeks(sessions, summaries, { weeks: BASELINE_WEEKS + 1, nowMs });
     const current = weeks[weeks.length - 1];
@@ -62,9 +64,8 @@ export function ClimbingHero({ sessions, summaries, settled, scales, nowMs }: Cl
     return { current, read, ...(read && baseline > 0 ? { deltaRatio: (current.climbs - baseline) / baseline } : {}) };
   }, [sessions, summaries, nowMs]);
 
-  const records = useMemo(() => climbRecords(sessions, summaries), [sessions, summaries]);
-  const recent = useMemo(() => recordsWithin(records, CLIMB_HERO_DAYS, nowMs), [records, nowMs]);
-  const lastMonth = useMemo(() => recordsWithin(records, SEND_RATE_DAYS, nowMs), [records, nowMs]);
+  const recent = useMemo(() => recordsWithin(records, CLIMB_HERO_WEEKS, nowMs), [records, nowMs]);
+  const lastMonth = useMemo(() => recordsWithin(records, SEND_RATE_WEEKS, nowMs), [records, nowMs]);
 
   const hardest = useMemo(
     () => FAMILIES.flatMap((family) => {
@@ -95,7 +96,7 @@ export function ClimbingHero({ sessions, summaries, settled, scales, nowMs }: Cl
         <span className="run-hero-label">{t("activity.hero.thisWeek")}</span>
         <strong className="run-hero-value">
           <MotionFigure
-            text={count === 0 ? "—" : thisWeek?.current.unread ? "…" : plural("climb.climbCount", climbs)}
+            text={count === 0 ? "—" : thisWeek?.current.unread && !settled ? "…" : plural("climb.climbCount", climbs)}
           />
         </strong>
         <div className="run-hero-foot">
@@ -152,9 +153,11 @@ export function ClimbingHero({ sessions, summaries, settled, scales, nowMs }: Cl
         </strong>
         <div className="run-hero-foot">
           <span>
-            {onsight.length > 0
-              ? plural("climb.hero.onsightAbove", onsight.reduce((sum, entry) => sum + entry.above, 0))
-              : t("climb.hero.onsightNone")}
+            {onsight.length === 0
+              ? t("climb.hero.onsightNone")
+              : !settled
+                ? reading
+                : plural("climb.hero.onsightAbove", onsight.reduce((sum, entry) => sum + entry.above, 0))}
           </span>
         </div>
       </div>
@@ -174,11 +177,6 @@ function sentOn(record: ClimbRecord): string {
 /** Sends harder than the onsight grade, on one ladder. */
 function abovesOf(records: readonly ClimbRecord[], family: ClimbFamily, ladder: number): number {
   return records.filter(
-    (record) =>
-      record.family === family &&
-      record.ladder !== undefined &&
-      record.ladder > ladder &&
-      record.style !== "attempt" &&
-      record.style !== "unrecorded"
+    (record) => record.family === family && record.ladder !== undefined && record.ladder > ladder && isSend(record.style)
   ).length;
 }

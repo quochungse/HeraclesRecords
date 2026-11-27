@@ -33,11 +33,12 @@ import { ClimbKindPanel } from "./ClimbKindPanel";
 import { ClimbList, DEFAULT_CLIMB_SORT, type ClimbSort } from "./ClimbList";
 import { ClimbVolumeChart } from "./ClimbVolumeChart";
 import { ClimbWallPanel } from "./ClimbWallPanel";
-import { ClimbingHero, CLIMB_HERO_DAYS } from "./ClimbingHero";
+import { ClimbingHero, CLIMB_HERO_WEEKS } from "./ClimbingHero";
 import { GradePyramidPanel } from "./GradePyramidPanel";
 import { GradeTrendPanel } from "./GradeTrendPanel";
 import { ClimbIcon } from "./climbIcon";
-import { climbRecords, climbScales, summariseClimbs } from "./climbMetrics";
+import { climbRecords, climbScales, climbWindowStartMs, summariseClimbs } from "./climbMetrics";
+import { MOVING_AVERAGE_WEEKS } from "../running/sportVolume";
 import { CLIMB_KINDS, CLIMB_KIND_LABELS, climbsOfKind, classifyClimbKind, type ClimbKind } from "./climbType";
 import type { ClimbFamily } from "../../electron/climbGrades";
 import "../running/running.css";
@@ -75,8 +76,6 @@ export interface ClimbingViewProps {
 const PERIOD_OPTIONS = periodGroupOptions([28, 90, 365, null]);
 
 const DEFAULT_PERIOD_DAYS = 90;
-
-const MS_PER_DAY = 86_400_000;
 
 /**
  * Indoor routes, boulders, outdoor routes and multi-pitches on a screen of
@@ -164,19 +163,22 @@ export function ClimbingView({
   }, [availableKinds, kind]);
 
   // The climbs, their grades and how they went live in each session's
-  // detail, so the sessions on screen are read — and the hero's twelve weeks,
-  // which a short period would otherwise leave unread. No further: every
-  // session read is a payload fetched from COROS.
+  // detail, so the sessions on screen are read — and the hero's twelve weeks
+  // and the weeks the chart's four-week average reaches back past its first
+  // column, which a short period would otherwise leave unread. No further:
+  // every session read is a payload fetched from COROS.
   const summarySessions = useMemo(() => {
-    const heroFrom = (nowMs - CLIMB_HERO_DAYS * MS_PER_DAY) / 1000;
+    const from =
+      Math.min(
+        climbWindowStartMs(CLIMB_HERO_WEEKS, nowMs),
+        climbWindowStartMs(chartWeeks + MOVING_AVERAGE_WEEKS - 1, nowMs)
+      ) / 1000;
     const ids = new Set(sessionsInPeriod.map((activity) => activity.activityId));
     return [
       ...sessionsInPeriod,
-      ...allSessions.filter(
-        (activity) => !ids.has(activity.activityId) && (activity.startTime ?? 0) >= heroFrom
-      )
+      ...allSessions.filter((activity) => !ids.has(activity.activityId) && (activity.startTime ?? 0) >= from)
     ];
-  }, [allSessions, nowMs, sessionsInPeriod]);
+  }, [allSessions, chartWeeks, nowMs, sessionsInPeriod]);
   const { summaries, settled: summariesSettled } = useActivityDetailSummariesState({
     api,
     activities: summarySessions,
@@ -184,9 +186,12 @@ export function ClimbingView({
     requireClimb: true
   });
 
-  const { context: athlete } = useAthleteContextRead(api ?? undefined, unitSystem);
+  const { context: athlete } = useAthleteContextRead(api, unitSystem);
   const records = useMemo(() => climbRecords(sessions, summaries), [sessions, summaries]);
-  const allRecords = useMemo(() => climbRecords(summarySessions, summaries), [summarySessions, summaries]);
+  // Every read climb of the chosen kind, whatever the period: the hero's
+  // twelve weeks reach past a short one. Read once, handed to the blocks.
+  const recordsAllTime = useMemo(() => climbRecords(sessionsAllTime, summaries), [sessionsAllTime, summaries]);
+  const allRecords = useMemo(() => climbRecords(allSessions, summaries), [allSessions, summaries]);
   const scales = useMemo(() => climbScales(athlete, allRecords), [athlete, allRecords]);
   const totals = useMemo(() => summariseClimbs(sessions, summaries), [sessions, summaries]);
 
@@ -324,6 +329,7 @@ export function ClimbingView({
       <div className="running-body">
         <ClimbingHero
           sessions={sessionsAllTime}
+          records={recordsAllTime}
           summaries={summaries}
           settled={summariesSettled}
           scales={scales}
@@ -390,6 +396,7 @@ export function ClimbingView({
               />
               <GradeTrendPanel
                 sessions={sessions}
+                records={records}
                 summaries={summaries}
                 family={shownFamily}
                 scales={scales}
@@ -399,7 +406,7 @@ export function ClimbingView({
               />
             </div>
             <div className="running-columns">
-              <ClimbKindPanel sessions={sessionsInPeriod} summaries={summaries} scales={scales} />
+              <ClimbKindPanel sessions={sessionsInPeriod} summaries={summaries} scales={scales} settled={summariesSettled} />
               <ClimbWallPanel sessions={sessions} summaries={summaries} settled={summariesSettled} />
             </div>
           </>

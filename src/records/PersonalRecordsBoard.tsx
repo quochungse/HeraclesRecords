@@ -9,7 +9,7 @@ import {
   type ReactNode
 } from "react";
 import { Mountain, Route } from "lucide-react";
-import type { UnitSystem } from "../../electron/types";
+import type { UnitSystem, WorkoutEditorContext } from "../../electron/types";
 import {
   formatDistanceValue,
   formatElevationValue,
@@ -39,6 +39,9 @@ import {
 } from "./personalBests";
 import { LaurelWreath } from "./recordsIcons";
 import { CLIMB_STYLE_LABELS } from "../climbing/climbType";
+import { climbScales, gradeName } from "../climbing/climbMetrics";
+import { useAthleteContextRead } from "../calendar/useAthleteContext";
+import type { ClimbMark } from "./personalBests";
 
 type SessionRef = NonNullable<RecordRun["activity"]>;
 
@@ -83,6 +86,8 @@ export function PersonalRecordsBoard({ board, today, reading, onOpenActivity }: 
   const { unitSystem } = useUnitSystem();
   const [period, setPeriod] = useSelectionPreference(RECORD_PERIOD_PREFERENCE);
   const [chosen, setChosen] = useState<string | null>(null);
+  // Only asked when there is a climbing record to name.
+  const { context: athlete } = useAthleteContextRead(board.climbing.length > 0 ? undefined : null, unitSystem);
 
   const running = board.distances.some((row) => row.best.all);
   if (!running && !board.longestRun && board.beyond.length === 0 && board.climbing.length === 0) {
@@ -203,7 +208,7 @@ export function PersonalRecordsBoard({ board, today, reading, onOpenActivity }: 
               <span className="records-eyebrow">
                 {t(key === "boulder" ? "records.pr.climb.boulder" : "records.pr.climb.route")}
               </span>
-              <Figure text={mark.grade} />
+              <Figure text={climbGradeShown(mark, athlete)} />
               <p className="records-pr-session">
                 <span>{CLIMB_STYLE_LABELS[mark.style]}</span>
               </p>
@@ -669,6 +674,15 @@ function Figure({ text }: { text: string }) {
 }
 
 /** The session it was done in, which opens it, and the day. */
+/**
+ * A climbing record's grade in the scale COROS's climb settings chose, as the
+ * Climbing screen names it; without one, the scale most climbs used.
+ */
+function climbGradeShown(mark: ClimbMark, athlete: WorkoutEditorContext | undefined): string {
+  const setting = athlete?.climbSettings?.[mark.family === "boulder" ? "bouldering" : "indoorClimb"];
+  return setting ? gradeName(mark.family, mark.ladder, climbScales(athlete, [])) : mark.grade;
+}
+
 function SessionLine({
   mark,
   onOpenActivity

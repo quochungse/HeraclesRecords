@@ -140,18 +140,23 @@ load ratio.
   climb, 2 descent) and their laps are pitches gathered by `routeIndex`. `style`: 0 redpoint,
   1 onsight, 2 flash, 3 attempt, 5 repeat, 255 not marked; every one but the last two is a send.
 - **A grade is `gradingSystem` + `hardestGrade`, an index into COROS's list for that scale**
-  (`climbGrades.ts`, copied from the web app). Indoor and boulder sessions read the indoor rope
-  scales and the bouldering ones, outdoor and multi-pitch the outdoor ones, whose rope ladder is
-  two steps higher (`OUTDOOR_LADDER_OFFSET`). Each grade's `commonGrade` is COROS's own
+  (`climbGrades.ts`, copied from the web app). **One sport, one ladder**: an indoor route reads
+  the rope scales, a boulder V and Font, outdoor and multi-pitch the outdoor list, whose rope
+  ladder is two steps higher (`OUTDOOR_LADDER_OFFSET`); a grade from the other family's scale is
+  ungraded. **Aid, ice and mixed are named, never ranked** (`recordedGradeName`): on COROS's
+  ladder an A3 pitch would read 5.12b. Each grade's `commonGrade` is COROS's own
   conversion: **every grade is converted onto the scale chosen in COROS's climb settings**
   (`climbConfig`, read as `WorkoutEditorContext.climbSettings`), else the scale most climbs used,
-  else YDS / V. **A route and a boulder are never on one figure**: every grade figure is said
-  per family (`ClimbFamily`).
+  else YDS / V; Personal Records names its marks the same way once the page has read the settings.
+  **A route and a boulder are never on one figure**: every grade figure is said per family
+  (`ClimbFamily`). "N weeks" are calendar weeks from a Monday (`recordsWithin`), as everywhere.
 - `parseClimbDetail` → `detail.climb`; `climbSummaryOf` → `training_activity_summaries.climb`
   (`CLIMB_SUMMARY_VERSION`), swept by the Climbing screen (`requireClimb`) and the Hall's
   backfill. A climb session with no climbing laps still gets a summary (no climbs), so it is
   not read again and again. Climbs and climbing time wait for summaries (`settled`); sessions
-  and their time come off the list.
+  and their time come off the list. **A week not read is left out of an average, never a
+  zero**, and the screen reads the weeks its four-week average reaches back past the first
+  column (Overview its chart's five weeks).
 - `npm run test:climb-metrics`.
 
 ## Sample sessions for screenshots

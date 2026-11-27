@@ -18,12 +18,14 @@ import { useChartColors } from "../training/useChartColors";
 import { useChartMotion } from "../motion/useChartMotion";
 import { readStoredSportColors } from "../training/sportColors";
 import { startOfRunWeekMs } from "../running/runMetrics";
-import { buildClimbWeeks, climbRecords, scaleRungs, type ClimbScales } from "./climbMetrics";
+import { buildClimbWeeks, scaleRungs, type ClimbRecord, type ClimbScales } from "./climbMetrics";
 import { CLIMB_FAMILY_LABELS, gradeLabel } from "./climbType";
 import { t } from "../i18n/core";
 
 interface GradeTrendPanelProps {
   sessions: readonly TrainingHubActivity[];
+  /** The climbs of those sessions whose summaries are read (`climbRecords`). */
+  records: readonly ClimbRecord[];
   summaries: ReadonlyMap<string, ActivityDetailSummary>;
   family: ClimbFamily;
   scales: ClimbScales;
@@ -38,6 +40,8 @@ interface TrendRow {
   /** Rungs of the scale shown, 0 the easiest. */
   hardest?: number;
   average?: number;
+  /** The week's sends, on those rungs: what "lately" averages over, send by send. */
+  sends: readonly number[];
 }
 
 /** Weeks the "lately" figure averages over. */
@@ -50,7 +54,7 @@ const RECENT_WEEKS = 4;
  * time — the pyramid's — because a route's grade and a boulder's are not
  * on one axis.
  */
-export function GradeTrendPanel({ sessions, summaries, family, scales, weeks, nowMs, settled }: GradeTrendPanelProps) {
+export function GradeTrendPanel({ sessions, records, summaries, family, scales, weeks, nowMs, settled }: GradeTrendPanelProps) {
   const { colors } = useChartColors();
   const climbColor = useMemo(() => readStoredSportColors().climb, []);
   const rungs = useMemo(() => scaleRungs(family, scales), [family, scales]);
@@ -58,7 +62,7 @@ export function GradeTrendPanel({ sessions, summaries, family, scales, weeks, no
   const rows = useMemo<TrendRow[]>(() => {
     const buckets = buildClimbWeeks(sessions, summaries, { weeks, nowMs });
     const sends = new Map<number, number[]>();
-    for (const record of climbRecords(sessions, summaries)) {
+    for (const record of records) {
       if (record.family !== family || record.ladder === undefined || !isSend(record.style)) continue;
       const at = (record.activity.startTime ?? 0) * 1000;
       const week = startOfRunWeekMs(at);
@@ -71,12 +75,13 @@ export function GradeTrendPanel({ sessions, summaries, family, scales, weeks, no
       return {
         label: bucket.label,
         weekStartMs: bucket.weekStartMs,
+        sends: list,
         ...(list.length > 0
           ? { hardest: Math.max(...list), average: list.reduce((sum, value) => sum + value, 0) / list.length }
           : {})
       };
     });
-  }, [family, nowMs, rungs, sessions, summaries, weeks]);
+  }, [family, nowMs, records, rungs, sessions, summaries, weeks]);
   const motion = useChartMotion(rows, "weekStartMs");
 
   const onsight = scales.onsight[family];
@@ -87,7 +92,8 @@ export function GradeTrendPanel({ sessions, summaries, family, scales, weeks, no
   const ticks = values.length > 0 ? spacedTicks(low, high) : [];
   const nameAt = (index: number) => gradeLabel(rungs[Math.round(index)]?.name ?? "");
 
-  const recent = rows.slice(-RECENT_WEEKS).map((row) => row.average).filter((value): value is number => value !== undefined);
+  // Every send of the last four weeks counts once, not each week's mean.
+  const recent = rows.slice(-RECENT_WEEKS).flatMap((row) => row.sends);
   const lately = recent.length > 0 ? recent.reduce((sum, value) => sum + value, 0) / recent.length : undefined;
 
   return (
