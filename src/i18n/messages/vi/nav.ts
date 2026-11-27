@@ -18,6 +18,7 @@ const nav: NavMessages = {
   "nav.cycling": "Đạp xe",
   "nav.hiking": "Leo núi",
   "nav.swimming": "Bơi lội",
+  "nav.climbing": "Leo vách",
   "nav.strength": "Sức mạnh",
   "nav.timeline": "Dòng thời gian",
   "nav.personalRecords": "Kỷ lục cá nhân",

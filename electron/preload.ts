@@ -375,6 +375,7 @@ const api = {
       requireIntensity?: boolean;
       requirePerformance?: boolean;
       requireSwim?: boolean;
+      requireClimb?: boolean;
       requireHeartRate?: boolean;
     }
   ): Promise<ActivityDetailSummarySync> =>

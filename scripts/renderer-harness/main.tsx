@@ -33,6 +33,7 @@ import { RunningView } from "../../src/running/RunningView";
 import { CyclingView } from "../../src/cycling/CyclingView";
 import { HikingView } from "../../src/hiking/HikingView";
 import { SwimmingView } from "../../src/swimming/SwimmingView";
+import { ClimbingView } from "../../src/climbing/ClimbingView";
 import { StrengthHero } from "../../src/strength/StrengthHero";
 import { buildStrengthAnalytics } from "../../src/strength/strengthAnalytics";
 import { buildStrengthSessionIndex, sessionHeat } from "../../src/strength/sessionAnalytics";
@@ -57,6 +58,7 @@ import { AddWorkoutModal } from "../../src/calendar/AddWorkoutModal";
 import { CalendarView } from "../../src/calendar/CalendarView";
 import { CalendarSkeleton } from "../../src/calendar/CalendarSkeleton";
 import { OverviewComingUp } from "../../src/training/overview/OverviewComingUp";
+import { OverviewSports } from "../../src/training/overview/OverviewSports";
 import { TrainingSignIn } from "../../src/training/TrainingSignIn";
 import type { HeraclesRecordsApi } from "../../src/heraclesrecords-api";
 
@@ -480,6 +482,36 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
       </main>
     );
   },
+  /** Running's page built for the wall, in the same fixed-height column. */
+  ClimbingView: (options) => {
+    loadAppStyles();
+    return (
+      <main
+        className="content content-fill"
+        style={{
+          height: `${(options.height as number | undefined) ?? 700}px`,
+          ...(typeof options.width === "number" ? { width: `${options.width}px` } : {})
+        }}
+      >
+        <ClimbingView
+          api={api}
+          activities={(options.activities as never) ?? []}
+          connected={(options.connected as boolean | undefined) ?? true}
+          restoring={false}
+          activitiesStatus={(options.activitiesStatus as never) ?? "ready"}
+          detail={(options.detail as never) ?? null}
+          detailRequest={(options.detailRequest as never) ?? null}
+          busy={(options.busy as string | null | undefined) ?? null}
+          onSelectActivity={spy("onSelectActivity")}
+          onRetryActivities={spy("onRetryActivities")}
+          onOpenOverview={spy("onOpenOverview")}
+          openRequest={(options.openRequest as never) ?? null}
+          onOpenRequestHandled={spy("onOpenRequestHandled")}
+          onReturn={spy("onReturn")}
+        />
+      </main>
+    );
+  },
   /*
    * The summary strip on its own, inside the class that scopes its tokens.
    * Everything asserted about it is geometry — a tooltip that must not leave
@@ -722,6 +754,31 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
           sportTypes={[]}
           onOpenActivity={spy("onOpenActivity")}
           onOpenCalendar={spy("onOpenCalendar")}
+        />
+      </div>
+    );
+  },
+  // Overview's per-sport sections, each only when its sport was trained lately.
+  OverviewSports: (options) => {
+    loadOverviewStyles();
+    return (
+      <div
+        className="stack training-dashboard"
+        style={{ width: `${(options.width as number | undefined) ?? 1100}px` }}
+      >
+        <OverviewSports
+          api={api}
+          connected
+          activities={(options.activities as never) ?? []}
+          upcomingWorkouts={(options.upcoming as never) ?? []}
+          profile={null}
+          hrZoneModel={null}
+          zonesSettled
+          lthrZones={[]}
+          vo2Readings={[]}
+          hiddenSportScreens={(options.hiddenSportScreens as never) ?? []}
+          onOpenActivity={spy("onOpenActivity")}
+          onOpenView={spy("onOpenView")}
         />
       </div>
     );

@@ -18,6 +18,7 @@ const nav: NavMessages = {
   "nav.cycling": "사이클링",
   "nav.hiking": "하이킹",
   "nav.swimming": "수영",
+  "nav.climbing": "클라이밍",
   "nav.strength": "근력 운동",
   "nav.timeline": "타임라인",
   "nav.personalRecords": "개인 기록",

@@ -3,7 +3,7 @@
 ## Activities (`ActivitiesView.tsx`)
 
 The all-sport log, and the only home for sports no sport screen covers (Running 100–103,
-Cycling 200–205/299, Hiking 104/105, Swimming 300/301, Strength 400/402). Depth per sport belongs on the sport
+Cycling 200–205/299, Hiking 104/105, Swimming 300/301, Climbing 800–802/10003, Strength 400/402). Depth per sport belongs on the sport
 screens; Activities links out with the session (`SportScreenRequest`).
 - The arithmetic is out of the view: `activityFilters.ts` (periods cut at a Monday,
   categories, search, totals), `activityFacts.ts` (a row's facts, capped at three) and
@@ -171,7 +171,7 @@ sports), summed from each session's own `zoneSeconds` (`zoneTimeEntries`, throug
 `useActivityDetailSummaries`), never COROS's all-sport zone totals; time only, since no session
 carries load per zone. Read as the easy share against 80/20 with `intensityForZone`.
 
-**Sport sections** (`sportModel.ts`): Running, Cycling, Hiking, Swimming, each only when trained in the
+**Sport sections** (`sportModel.ts`): Running, Cycling, Hiking, Swimming, Climbing, each only when trained in the
 last four calendar weeks and shown on the rail, built from the screens' own builders, never a
 copy. "A week" figures divide by the weeks the window has run (`sportWindowWeeks`). **Strength**
 (`OverviewStrength`, lazy) is the Strength screen's own `StrengthHero` over four weeks

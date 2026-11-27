@@ -21,6 +21,7 @@ import { MentorIcon } from "../chat/mentorIcon";
 import { t, type MessageKey } from "../i18n/core.ts";
 import { LaurelIcon } from "../records/recordsIcons";
 import { RunnerIcon } from "../running/runnerIcon";
+import { ClimbIcon } from "../climbing/climbIcon";
 
 export type PrimaryView =
   | "overview"
@@ -30,6 +31,7 @@ export type PrimaryView =
   | "cycling"
   | "hiking"
   | "swimming"
+  | "climbing"
   | "library"
   | "strength"
   | "sleep"
@@ -143,7 +145,7 @@ export const PRIMARY_NAV_SECTIONS: PrimaryNavSection[] = [
       return t("nav.section.history");
     },
     // What is behind. Activities holds every sport; Running, Cycling,
-    // Hiking, Swimming and Strength are separate destinations because they
+    // Hiking, Swimming, Climbing and Strength are separate destinations because they
     // are read through different numbers, not because they are filters.
     items: [
       navItem("training", "nav.training", Activity),
@@ -151,6 +153,7 @@ export const PRIMARY_NAV_SECTIONS: PrimaryNavSection[] = [
       navItem("cycling", "nav.cycling", Bike),
       navItem("hiking", "nav.hiking", Mountain),
       navItem("swimming", "nav.swimming", Waves),
+      navItem("climbing", "nav.climbing", ClimbIcon),
       navItem("strength", "nav.strength", Dumbbell),
     ],
   },

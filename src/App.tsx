@@ -177,6 +177,11 @@ const LazySwimmingView = lazy(() =>
     default: SwimmingView,
   })),
 );
+const LazyClimbingView = lazy(() =>
+  import("./climbing/ClimbingView").then(({ ClimbingView }) => ({
+    default: ClimbingView,
+  })),
+);
 const LazyStrengthView = lazy(() =>
   import("./strength/StrengthView").then(({ StrengthView }) => ({
     default: StrengthView,
@@ -1088,7 +1093,8 @@ export default function App() {
         activeView !== "running" &&
         activeView !== "cycling" &&
         activeView !== "hiking" &&
-        activeView !== "swimming")
+        activeView !== "swimming" &&
+        activeView !== "climbing")
     ) {
       return;
     }
@@ -1961,7 +1967,7 @@ export default function App() {
           className={[
             "content",
             isOverviewDashboard && "content-overview",
-            (activeView === "coach" || activeView === "library" || activeView === "training" || activeView === "running" || activeView === "cycling" || activeView === "hiking" || activeView === "swimming") && "content-fill",
+            (activeView === "coach" || activeView === "library" || activeView === "training" || activeView === "running" || activeView === "cycling" || activeView === "hiking" || activeView === "swimming" || activeView === "climbing") && "content-fill",
           ]
             .filter(Boolean)
             .join(" ")}
@@ -2172,6 +2178,32 @@ export default function App() {
                   onOpenOverview={() => setActiveView("overview")}
                   openRequest={
                     sportScreenRequest?.view === "swimming"
+                      ? sportScreenRequest
+                      : null
+                  }
+                  onOpenRequestHandled={() => setSportScreenRequest(null)}
+                  onReturn={setActiveView}
+                  railReselect={railReselect}
+                  onAskCoach={askCoach}
+                />
+              </Suspense>
+            ) : null}
+            {activeView === "climbing" ? (
+              <Suspense fallback={<DeferredSurfaceFallback label={t("nav.climbing")} />}>
+                <LazyClimbingView
+                  api={api}
+                  activities={trainingHubActivities}
+                  connected={Boolean(trainingHubStatus?.authenticated)}
+                  restoring={Boolean(trainingHubStatus?.restoring)}
+                  activitiesStatus={trainingHubActivitiesStatus}
+                  detail={trainingHubActivityDetail}
+                  detailRequest={trainingHubDetailRequest}
+                  busy={busy}
+                  onRetryActivities={() => void handleRunningActivitiesRetry()}
+                  onSelectActivity={handleTrainingHubActivityDetail}
+                  onOpenOverview={() => setActiveView("overview")}
+                  openRequest={
+                    sportScreenRequest?.view === "climbing"
                       ? sportScreenRequest
                       : null
                   }

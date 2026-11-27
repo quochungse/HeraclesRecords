@@ -351,6 +351,7 @@
 .records-node.is-ride { --node-colour: var(--sport-bike); background: var(--sport-bike); }
 .records-node.is-hike { --node-colour: var(--sport-hiking); background: var(--sport-hiking); }
 .records-node.is-strength { --node-colour: var(--sport-strength); background: var(--sport-strength); }
+.records-node.is-climb { --node-colour: var(--sport-climb); background: var(--sport-climb); }
 .records-node.is-swim,
 .records-node.is-other { --node-colour: var(--sport-other); background: var(--sport-other); }
 .records-node.is-accent { --node-colour: var(--accent); background: var(--accent); }
@@ -369,6 +370,7 @@
 .records-dot.is-ride { background: var(--sport-bike); }
 .records-dot.is-hike { background: var(--sport-hiking); }
 .records-dot.is-strength { background: var(--sport-strength); }
+.records-dot.is-climb { background: var(--sport-climb); }
 .records-dot.is-swim { background: var(--sport-other); }
 
 .records-row {
@@ -1104,6 +1106,7 @@
 :root[data-theme="paper"] .records-milestone:has(.records-node.is-ride) { --row-sport: var(--sport-bike); }
 :root[data-theme="paper"] .records-milestone:has(.records-node.is-hike) { --row-sport: var(--sport-hiking); }
 :root[data-theme="paper"] .records-milestone:has(.records-node.is-strength) { --row-sport: var(--sport-strength); }
+:root[data-theme="paper"] .records-milestone:has(.records-node.is-climb) { --row-sport: var(--sport-climb); }
 :root[data-theme="paper"] .records-milestone:has(.records-node.is-swim),
 :root[data-theme="paper"] .records-milestone:has(.records-node.is-other) { --row-sport: var(--sport-other); }
 :root[data-theme="paper"] .records-milestone:has(.records-node.is-accent) { --row-sport: var(--hall-gold); }

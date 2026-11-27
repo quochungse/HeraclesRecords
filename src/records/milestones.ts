@@ -40,6 +40,7 @@ import { isRunSportType } from "../running/runSurface";
 import { formatDurationSeconds, getLocalHappenDayKey } from "../training/formatters";
 import { isStrengthSportType, isSwimSportType } from "../training/sportTypes";
 import { RECORDS_SUMMARY_VERSION } from "../../electron/activityMetrics";
+import { CLIMB_SUMMARY_VERSION, isClimbSportType } from "../../electron/climbDetail";
 import { isIndoorSportType } from "../../electron/corosSportTypes";
 import {
   VO2_RATINGS,
@@ -76,7 +77,7 @@ export type MilestoneCategory =
   | "anniversary";
 
 /** The sport a milestone wears: its dot and its card's edge. */
-export type RecordsSport = "run" | "ride" | "hike" | "swim" | "strength" | "other";
+export type RecordsSport = "run" | "ride" | "hike" | "swim" | "climb" | "strength" | "other";
 
 export interface MilestoneFigure {
   value: string;
@@ -499,6 +500,7 @@ export function recordsSportOf(sportType: number | undefined): RecordsSport {
   if (isRideSportType(sportType)) return "ride";
   if (isHikeSportType(sportType)) return "hike";
   if (isSwimSportType(sportType)) return "swim";
+  if (isClimbSportType(sportType)) return "climb";
   if (isStrengthSportType(sportType)) return "strength";
   return "other";
 }
@@ -508,6 +510,7 @@ const SPORT_NOUN = messageRecord<RecordsSport>({
   ride: "records.sport.ride",
   hike: "records.sport.hike",
   swim: "records.sport.swim",
+  climb: "records.sport.climb",
   strength: "records.sport.strength",
   other: "records.sport.other"
 });
@@ -518,6 +521,7 @@ const SPORT_IN_SENTENCE = messageRecord<RecordsSport>({
   ride: "records.sportLower.ride",
   hike: "records.sportLower.hike",
   swim: "records.sportLower.swim",
+  climb: "records.sportLower.climb",
   strength: "records.sportLower.strength",
   other: "records.sportLower.other"
 });
@@ -527,6 +531,7 @@ const FIRST_TITLE = messageRecord<Exclude<RecordsSport, "other">>({
   ride: "records.first.ride",
   hike: "records.first.hike",
   swim: "records.first.swim",
+  climb: "records.first.climb",
   strength: "records.first.strength"
 });
 
@@ -550,8 +555,10 @@ const LONGEST_BEFORE = messageRecord<"run" | "ride" | "swim">({
  */
 export function needsRecordsSummary(
   activity: Pick<TrainingHubActivity, "sportType" | "distance">,
-  summary: Pick<ActivityDetailSummary, "recordsVersion"> | undefined
+  summary: Pick<ActivityDetailSummary, "recordsVersion" | "climbVersion"> | undefined
 ): boolean {
+  // A climb's record is its hardest send, read off its climbs, not a distance.
+  if (isClimbSportType(activity.sportType)) return summary?.climbVersion !== CLIMB_SUMMARY_VERSION;
   if (summary?.recordsVersion === RECORDS_SUMMARY_VERSION) return false;
   if (isIndoorSportType(activity.sportType) || isStrengthSportType(activity.sportType)) return false;
   return (activity.distance ?? 0) > 0;
@@ -1134,6 +1141,7 @@ export function computeRecords(input: RecordsInput): RecordsResult {
     activities,
     groups: input.personalRecords,
     fell: records.fell,
+    summaries: input.summaries,
     ...(input.athlete ? { athlete: input.athlete } : {})
   });
 

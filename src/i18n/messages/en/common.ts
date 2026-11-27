@@ -20,6 +20,7 @@ const common = {
   "sport.run": "Running",
   "sport.bike": "Cycling",
   "sport.swim": "Swimming",
+  "sport.climb": "Climbing",
   "sport.hiking": "Hiking",
   "sport.strength": "Strength",
   "sport.other": "Other",

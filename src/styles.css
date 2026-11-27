@@ -46,6 +46,7 @@
   --sport-run: #2fbe91;
   --sport-bike: #e6b800;
   --sport-swim: #36c2f0;
+  --sport-climb: #e07b39;
   --sport-other: #7fd8cf;
 
   --bg-base: #05080b;
@@ -5694,6 +5695,10 @@ td span {
 
 .sport-chip[data-sport="swim"] {
   --sport-chip-color: var(--sport-swim);
+}
+
+.sport-chip[data-sport="climb"] {
+  --sport-chip-color: var(--sport-climb);
 }
 
 .sport-chip[data-sport="other"] {
@@ -15648,6 +15653,9 @@ button.chat-change-diff-more:focus-visible {
 .calendar-chip.calendar-sport-swim {
   --chip-sport: var(--sport-swim);
 }
+.calendar-chip.calendar-sport-climb {
+  --chip-sport: var(--sport-climb);
+}
 .calendar-chip.calendar-sport-other {
   --chip-sport: var(--sport-other);
 }
@@ -16272,6 +16280,7 @@ button.chat-change-diff-more:focus-visible {
 .sched-detail.is-bike { --detail-sport: var(--sport-bike); }
 .sched-detail.is-strength { --detail-sport: var(--sport-strength); }
 .sched-detail.is-swim { --detail-sport: var(--sport-swim); }
+.sched-detail.is-climb { --detail-sport: var(--sport-climb); }
 .sched-detail.is-other { --detail-sport: var(--sport-other); }
 
 /* hero */
@@ -21056,6 +21065,7 @@ button.chat-change-diff-more:focus-visible {
 .workout-editor-sport.is-bike { --workout-sport: var(--sport-bike); }
 .workout-editor-sport.is-strength { --workout-sport: var(--sport-strength); }
 .workout-editor-sport.is-swim { --workout-sport: var(--sport-swim); }
+.workout-editor-sport.is-climb { --workout-sport: var(--sport-climb); }
 
 /* An option group clips (`overflow: hidden`), which lets a flex item shrink to
    nothing: a long title beside it squeezed the switch and cut its chips. The

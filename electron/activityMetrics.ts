@@ -25,6 +25,7 @@ import {
   sportHasRunPerformance
 } from "./runPerformance";
 import { SWIM_SUMMARY_VERSION, isSwimSportType, swimSummaryOf } from "./swimDetail";
+import { CLIMB_SUMMARY_VERSION, climbSummaryOf, isClimbSportType } from "./climbDetail";
 
 const METERS_PER_KM = 1000;
 const SECONDS_PER_MINUTE = 60;
@@ -448,6 +449,7 @@ export interface ActivityDetailSummaryInput {
         | "adjustedPaceZones"
         | "duration"
         | "swim"
+        | "climb"
         | "avgHr"
         | "maxHr"
       >
@@ -492,6 +494,8 @@ export function summarizeActivityDetail(
     detail.swim && isSwimSportType(detail.sportType)
       ? swimSummaryOf(detail.swim, { duration: detail.duration })
       : undefined;
+  const climb =
+    detail.climb && isClimbSportType(detail.sportType) ? climbSummaryOf(detail.climb) : undefined;
 
   return {
     activityId,
@@ -509,6 +513,7 @@ export function summarizeActivityDetail(
     ...(intensity ? { intensityVersion: INTENSITY_SUMMARY_VERSION, intensity } : {}),
     ...(performance ? { performanceVersion: PERFORMANCE_SUMMARY_VERSION, performance } : {}),
     ...(swim ? { swimVersion: SWIM_SUMMARY_VERSION, swim } : {}),
+    ...(climb ? { climbVersion: CLIMB_SUMMARY_VERSION, climb } : {}),
     // Written whether or not the session kept a heart rate, so the screen that
     // asks for it does not ask again for one that has none.
     heartRateVersion: HEART_RATE_SUMMARY_VERSION,

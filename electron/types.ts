@@ -11,6 +11,7 @@ export interface SampleDataState {
   hikes: boolean;
   trailRuns: boolean;
   swims: boolean;
+  climbs: boolean;
 }
 
 /** A coordinate resolved to a human-readable place (Nominatim). */
@@ -865,6 +866,12 @@ export interface ActivityDetailSummary {
   swimVersion?: number;
   swim?: SwimSummary;
   /**
+   * A climbing session's climbs (`electron/climbDetail.ts`), versioned on its
+   * own for the reason the swim is. Absent on another sport and on an older row.
+   */
+  climbVersion?: number;
+  climb?: ClimbSummary;
+  /**
    * The session's average and highest heart rate, from its detail
    * (`HEART_RATE_SUMMARY_VERSION`): COROS's activity list carries the average
    * and never the highest, which the Heart rate screen's list draws. Empty on a
@@ -1021,6 +1028,69 @@ export interface TrainingHubActivityDetail {
   exerciseSets?: SessionSetExercise[];
   /** A swim's lengths, intervals and rests (`swimDetail.ts`). Swims only. */
   swim?: TrainingHubSwimDetail;
+  /** A climbing session's routes or problems (`climbDetail.ts`). Climbs only. */
+  climb?: TrainingHubClimbDetail;
+}
+
+/**
+ * How a climb went, as the athlete marked it on the watch — COROS's `style`
+ * (its web app's `CLIMB_STYLE`): 0 redpoint, 1 onsight, 2 flash, 3 attempt,
+ * 5 repeat, 255 not recorded. Every one but an attempt and "not recorded" is
+ * a send.
+ */
+export type ClimbStyle = "onsight" | "flash" | "redpoint" | "repeat" | "attempt" | "unrecorded";
+
+/** One route or problem of a climbing session, as `parseClimbDetail` reads its laps. */
+export interface TrainingHubClimb {
+  /** 1 for the first climb of the session. */
+  index: number;
+  /** Seconds from the session's start to the climb's, on the wall clock. */
+  startSeconds?: number;
+  /** Time on the wall, to the hundredth. */
+  seconds: number;
+  /** Time until the next climb began; absent after the last. */
+  restAfter?: number;
+  /** COROS's `gradingSystem` and `hardestGrade`, as recorded. Absent when the climb was not graded. */
+  system?: number;
+  gradeIndex?: number;
+  style: ClimbStyle;
+  falls?: number;
+  /** The height climbed, metres. */
+  heightMeters?: number;
+  avgHr?: number;
+  maxHr?: number;
+  /** A multi-pitch route's pitches, where the route took more than one. */
+  pitches?: number;
+}
+
+export interface TrainingHubClimbDetail {
+  climbs: TrainingHubClimb[];
+  /** The time spent on the wall: the climbs' own time. */
+  climbingSeconds: number;
+  /** COROS's rest laps between climbs, where it kept them. */
+  restSeconds?: number;
+  falls: number;
+  heightMeters?: number;
+}
+
+/** One climb as a session's summary keeps it: enough for a pyramid and a week. */
+export interface ClimbSummaryEntry {
+  system?: number;
+  gradeIndex?: number;
+  style: ClimbStyle;
+  seconds: number;
+  falls?: number;
+  heightMeters?: number;
+}
+
+/** What a climbing session's list row, pyramid and trend are read from (`climbSummaryOf`). */
+export interface ClimbSummary {
+  version: number;
+  climbs: ClimbSummaryEntry[];
+  climbingSeconds: number;
+  restSeconds?: number;
+  falls: number;
+  heightMeters?: number;
 }
 
 /**
@@ -4290,6 +4360,12 @@ export interface WorkoutEditorContext {
   lthrZones: WorkoutLthrZone[];
   defaultPoolLength: { value: number; unit: "m" | "yd" };
   climbSystems: Partial<Record<"indoorClimb" | "bouldering", WorkoutClimbSystem>>;
+  /**
+   * COROS's climb settings as stored (`climbConfig`): the scale (`gradingSystem`)
+   * and the onsight grade (`gradeIndex` in it) for indoor routes and boulders.
+   * Read by the Climbing screen; absent where the account set none.
+   */
+  climbSettings?: Partial<Record<"indoorClimb" | "bouldering", { system: number; gradeIndex: number }>>;
 }
 
 export interface WorkoutEditorDocument {

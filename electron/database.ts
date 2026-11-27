@@ -18,6 +18,7 @@ import type {
   RunPerformanceCurve,
   SessionIntensity,
   SwimSummary,
+  ClimbSummary,
   CoachAnalysisRunQuery,
   StrengthDetail,
   StrengthSession,
@@ -568,6 +569,9 @@ export function initializeDatabase(userDataPath: string): Database.Database {
   // own like the intensity.
   ensureColumn(db, "training_activity_summaries", "swim_version", "INTEGER");
   ensureColumn(db, "training_activity_summaries", "swim", "TEXT");
+  // A climbing session's climbs (climbDetail.ts), versioned on its own like the swim.
+  ensureColumn(db, "training_activity_summaries", "climb_version", "INTEGER");
+  ensureColumn(db, "training_activity_summaries", "climb", "TEXT");
   // A session's average and highest heart rate (`HEART_RATE_SUMMARY_VERSION`):
   // the list COROS sends carries the average only.
   ensureColumn(db, "training_activity_summaries", "heart_rate_version", "INTEGER");
@@ -2400,6 +2404,8 @@ interface ActivitySummaryRow {
   performance: string | null;
   swim_version: number | null;
   swim: string | null;
+  climb_version: number | null;
+  climb: string | null;
   heart_rate_version: number | null;
   heart_rate: string | null;
   computed_at: number;
@@ -2489,6 +2495,27 @@ function parseSwimSummary(value: string | null): SwimSummary | undefined {
   }
 }
 
+/** A stored climb summary, or nothing when the column is empty or not the shape this build reads. */
+function parseClimbSummary(value: string | null): ClimbSummary | undefined {
+  if (!value) return undefined;
+  try {
+    const parsed = JSON.parse(value) as Partial<ClimbSummary>;
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      typeof parsed.version !== "number" ||
+      typeof parsed.climbingSeconds !== "number" ||
+      typeof parsed.falls !== "number" ||
+      !Array.isArray(parsed.climbs)
+    ) {
+      return undefined;
+    }
+    return parsed as ClimbSummary;
+  } catch {
+    return undefined;
+  }
+}
+
 function parseBestEfforts(value: string | null): BestEffort[] | undefined {
   if (!value) return undefined;
   try {
@@ -2512,6 +2539,7 @@ function toActivityDetailSummary(row: ActivitySummaryRow): ActivityDetailSummary
   const intensity = parseIntensity(row.intensity);
   const performance = parsePerformance(row.performance);
   const swim = parseSwimSummary(row.swim);
+  const climb = parseClimbSummary(row.climb);
   const heartRate = parseHeartRateSummary(row.heart_rate);
   let zoneSeconds: number[] | undefined;
   if (row.zone_seconds) {
@@ -2551,6 +2579,7 @@ function toActivityDetailSummary(row: ActivitySummaryRow): ActivityDetailSummary
       ? { performanceVersion: row.performance_version, performance }
       : {}),
     ...(swim && row.swim_version !== null ? { swimVersion: row.swim_version, swim } : {}),
+    ...(climb && row.climb_version !== null ? { climbVersion: row.climb_version, climb } : {}),
     ...(heartRate && row.heart_rate_version !== null
       ? { heartRateVersion: row.heart_rate_version, heartRate }
       : {}),
@@ -2583,7 +2612,7 @@ export function getActivityDetailSummaries(
                 decoupling_percent, last_upload_time, records_version,
                 best_efforts, start_lat, start_lon, intensity_version, intensity,
                 performance_version, performance, swim_version, swim,
-                heart_rate_version, heart_rate, computed_at
+                climb_version, climb, heart_rate_version, heart_rate, computed_at
          FROM training_activity_summaries
          WHERE activity_id IN (${chunk.map(() => "?").join(", ")})`
       )
@@ -2606,13 +2635,13 @@ export function upsertActivityDetailSummary(
          decoupling_percent, last_upload_time, records_version,
          best_efforts, start_lat, start_lon, intensity_version, intensity,
          performance_version, performance, swim_version, swim,
-         heart_rate_version, heart_rate, computed_at
+         climb_version, climb, heart_rate_version, heart_rate, computed_at
        )
        VALUES (@activityId, @fingerprint, @summaryVersion, @zoneSeconds,
                @decouplingPercent, @lastUploadTime, @recordsVersion,
                @bestEfforts, @startLat, @startLon, @intensityVersion, @intensity,
                @performanceVersion, @performance, @swimVersion, @swim,
-               @heartRateVersion, @heartRate, @computedAt)
+               @climbVersion, @climb, @heartRateVersion, @heartRate, @computedAt)
        ON CONFLICT(activity_id) DO UPDATE SET
          fingerprint = excluded.fingerprint,
          summary_version = excluded.summary_version,
@@ -2629,6 +2658,8 @@ export function upsertActivityDetailSummary(
          performance = excluded.performance,
          swim_version = excluded.swim_version,
          swim = excluded.swim,
+         climb_version = excluded.climb_version,
+         climb = excluded.climb,
          heart_rate_version = excluded.heart_rate_version,
          heart_rate = excluded.heart_rate,
          computed_at = excluded.computed_at`
@@ -2654,6 +2685,8 @@ export function upsertActivityDetailSummary(
       performance: summary.performance ? JSON.stringify(summary.performance) : null,
       swimVersion: summary.swim ? (summary.swimVersion ?? null) : null,
       swim: summary.swim ? JSON.stringify(summary.swim) : null,
+      climbVersion: summary.climb ? (summary.climbVersion ?? null) : null,
+      climb: summary.climb ? JSON.stringify(summary.climb) : null,
       heartRateVersion: summary.heartRate ? (summary.heartRateVersion ?? null) : null,
       heartRate: summary.heartRate ? JSON.stringify(summary.heartRate) : null,
       computedAt: summary.computedAt

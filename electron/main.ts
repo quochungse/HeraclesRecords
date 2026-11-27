@@ -379,6 +379,13 @@ import {
   withSampleSwims,
   withSampleSwimSummaries
 } from "./sampleSwims";
+import {
+  isSampleClimbId,
+  sampleClimbDetail,
+  sampleClimbsEnabled,
+  withSampleClimbs,
+  withSampleClimbSummaries
+} from "./sampleClimbs";
 import type {
   AnthropicApiConfig,
   ChatMessage,
@@ -419,6 +426,7 @@ const DEVELOPMENT_ONLY_ENV = [
   "HERACLES_SAMPLE_HIKES",
   "HERACLES_SAMPLE_TRAIL_RUNS",
   "HERACLES_SAMPLE_SWIMS",
+  "HERACLES_SAMPLE_CLIMBS",
   "HERACLES_SIMULATE_PLAN_AI"
 ] as const;
 if (app.isPackaged) {
@@ -1673,13 +1681,15 @@ function registerIpcHandlers(): void {
     rides: "HERACLES_SAMPLE_RIDES",
     hikes: "HERACLES_SAMPLE_HIKES",
     trailRuns: "HERACLES_SAMPLE_TRAIL_RUNS",
-    swims: "HERACLES_SAMPLE_SWIMS"
+    swims: "HERACLES_SAMPLE_SWIMS",
+    climbs: "HERACLES_SAMPLE_CLIMBS"
   };
   const readSampleData = (): SampleDataState => ({
     rides: sampleRidesEnabled(),
     hikes: sampleHikesEnabled(),
     trailRuns: sampleTrailRunsEnabled(),
-    swims: sampleSwimsEnabled()
+    swims: sampleSwimsEnabled(),
+    climbs: sampleClimbsEnabled()
   });
 
   ipcMain.handle("dev:getSampleData", () => readSampleData());
@@ -2226,10 +2236,11 @@ function registerIpcHandlers(): void {
   );
 
   // HERACLES_SAMPLE_RIDES=1, HERACLES_SAMPLE_HIKES=1,
-  // HERACLES_SAMPLE_TRAIL_RUNS=1 and HERACLES_SAMPLE_SWIMS=1 add simulated
-  // rides, hikes, trail runs and swims here, at the window's door and nowhere
-  // behind it — see electron/sampleRides.ts, sampleHikes.ts,
-  // sampleTrailRuns.ts and sampleSwims.ts.
+  // HERACLES_SAMPLE_TRAIL_RUNS=1, HERACLES_SAMPLE_SWIMS=1 and
+  // HERACLES_SAMPLE_CLIMBS=1 add simulated rides, hikes, trail runs, swims and
+  // climbs here, at the window's door and nowhere behind it — see
+  // electron/sampleRides.ts, sampleHikes.ts, sampleTrailRuns.ts,
+  // sampleSwims.ts and sampleClimbs.ts.
   ipcMain.handle(
     "trainingHub:listActivities",
     async (_event, page: number, size: number, startDay?: string, endDay?: string) => {
@@ -2249,6 +2260,9 @@ function registerIpcHandlers(): void {
       }
       if (sampleSwimsEnabled()) {
         activities = withSampleSwims(activities, { page, startDay, endDay });
+      }
+      if (sampleClimbsEnabled()) {
+        activities = withSampleClimbs(activities, { page, startDay, endDay });
       }
       return withHeraclesLoads(activities);
     }
@@ -2446,7 +2460,9 @@ function registerIpcHandlers(): void {
             ? sampleTrailRunDetail(activityId)
             : sampleSwimsEnabled() && isSampleSwimId(activityId)
               ? sampleSwimDetail(activityId)
-              : getTrainingHubActivityDetail(activityId, sportType, listActivity)
+              : sampleClimbsEnabled() && isSampleClimbId(activityId)
+                ? sampleClimbDetail(activityId)
+                : getTrainingHubActivityDetail(activityId, sportType, listActivity)
   );
 
   // The unparsed payload, on its own channel: it is ~2.2 MB and only the
@@ -2462,7 +2478,9 @@ function registerIpcHandlers(): void {
             ? { simulated: true, detail: sampleTrailRunDetail(activityId) }
             : sampleSwimsEnabled() && isSampleSwimId(activityId)
               ? { simulated: true, detail: sampleSwimDetail(activityId) }
-              : getTrainingHubActivityDetailRaw(activityId, sportType)
+              : sampleClimbsEnabled() && isSampleClimbId(activityId)
+                ? { simulated: true, detail: sampleClimbDetail(activityId) }
+                : getTrainingHubActivityDetailRaw(activityId, sportType)
   );
 
   // The list-level figures that only a detail payload knows. Two channels
@@ -2493,6 +2511,9 @@ function registerIpcHandlers(): void {
       }
       if (sampleSwimsEnabled()) {
         summaries = withSampleSwimSummaries(activityIds, summaries);
+      }
+      if (sampleClimbsEnabled()) {
+        summaries = withSampleClimbSummaries(activityIds, summaries);
       }
       return summaries;
     }

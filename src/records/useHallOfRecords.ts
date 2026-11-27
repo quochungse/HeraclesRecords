@@ -415,7 +415,8 @@ export function useRecordsBackfill({
       const chunk = pendingIds.slice(cursor, cursor + BACKFILL_CHUNK);
       try {
         const pass = await api.syncActivityDetailSummaries(chunk, BACKFILL_CHUNK, {
-          requireRecords: true
+          requireRecords: true,
+          requireClimb: true
         });
         // Taken even when this loop has been superseded: main has stored these
         // and counts them as done, so no later pass would hand them over again.

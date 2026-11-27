@@ -1,7 +1,7 @@
 import type { TrainingHubActivity } from "../../electron/types";
 import { t } from "../i18n/core.ts";
 
-export type SportColorCategory = "strength" | "hiking" | "run" | "bike" | "swim" | "other";
+export type SportColorCategory = "strength" | "hiking" | "run" | "bike" | "swim" | "climb" | "other";
 
 export const SPORT_COLOR_CATEGORIES: SportColorCategory[] = [
   "strength",
@@ -9,6 +9,7 @@ export const SPORT_COLOR_CATEGORIES: SportColorCategory[] = [
   "run",
   "bike",
   "swim",
+  "climb",
   "other"
 ];
 
@@ -20,6 +21,7 @@ export const DEFAULT_SPORT_COLORS: Record<SportColorCategory, string> = {
   run: "#2fbe91",
   bike: "#e6b800",
   swim: "#36c2f0",
+  climb: "#e07b39",
   other: "#7fd8cf"
 };
 
@@ -39,6 +41,9 @@ export const SPORT_COLOR_LABELS: Readonly<Record<SportColorCategory, string>> = 
   },
   get swim() {
     return t("sport.swim");
+  },
+  get climb() {
+    return t("sport.climb");
   },
   get other() {
     return t("sport.other");
@@ -94,10 +99,11 @@ const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
 // Stable COROS sportType codes → color category; keep the codes in sync with
 // electron/corosSportTypes.ts. Everything not listed (triathlon, ski,
-// rowing, climbing, walk, unknown codes) falls back to "other". A trail run is
+// rowing, walk, unknown codes) falls back to "other". A trail run is
 // a run — it is on the Running screen, a surface there — and wears the run
 // colour; hiking is the hike and the mountain climb, the Hiking screen's two;
-// swim is the pool and open water, the Swimming screen's.
+// swim is the pool and open water, the Swimming screen's; climb the Climbing
+// screen's four.
 const SPORT_TYPE_CATEGORY: Record<number, SportColorCategory> = {
   100: "run", //      Run
   101: "run", //      Indoor Run
@@ -115,7 +121,11 @@ const SPORT_TYPE_CATEGORY: Record<number, SportColorCategory> = {
   300: "swim", //     Pool Swim
   301: "swim", //     Open Water
   400: "strength", // Gym Cardio
-  402: "strength" //  Strength
+  402: "strength", // Strength
+  800: "climb", //    Indoor Climb
+  801: "climb", //    Bouldering
+  802: "climb", //    Outdoor Climb
+  10003: "climb" //   Multi-Pitch Climb
 };
 
 /**

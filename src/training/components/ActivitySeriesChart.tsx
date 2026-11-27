@@ -199,6 +199,11 @@ interface ActivitySeriesChartProps {
    */
   motion?: ActivityMotion;
   /**
+   * What the whole session is called above its figures, where the motion's
+   * noun is not the sport's: a climbing session reads as a hike moves.
+   */
+  wholeLabel?: string;
+  /**
    * The activity's COROS sport, where the caller reads more than one: power
    * read as a pace is Running power only on a run (`activityChannel`).
    */
@@ -350,6 +355,7 @@ export function ActivitySeriesChart({
   activityTime,
   embedded = false,
   motion = "pace",
+  wholeLabel,
   sportType
 }: ActivitySeriesChartProps) {
   const { unitSystem } = useUnitSystem();
@@ -1154,7 +1160,7 @@ export function ActivitySeriesChart({
             <span className="activity-chart-segment-label">
               {segment.stretch
                 ? t("activity.chart.selection")
-                : t(`activity.chart.whole.${ACTIVITY_NOUN[motion]}` as const)}
+                : wholeLabel ?? t(`activity.chart.whole.${ACTIVITY_NOUN[motion]}` as const)}
             </span>
             {segment.stretch && segment.title ? (
               <strong className="activity-chart-segment-title">{segment.title}</strong>

@@ -1,0 +1,249 @@
+/*
+ * Climbing view.
+ *
+ * The page is Running's, as Swimming's is: it carries `.running-view` and draws
+ * with running.css. This file holds only what a climb has and a run does not —
+ * its kinds and their colours, how a climb went, the grade pyramid, a session's
+ * climbs as blocks on its clock.
+ *
+ * An indoor route is the athlete's own climbing colour, which climbs wear
+ * everywhere in the app; a boulder is mixed off it towards white; outdoors is a
+ * slate of its own. How a climb went is told by lightness, not hue: sent first
+ * go the colour itself, worked a dark shade, an attempt its outline, unmarked a
+ * grey. Resolved to hex for the charts in climbColors.ts; change both together.
+ */
+
+.climbing-view {
+  --climb-indoor: var(--sport-climb, #e07b39);
+  --climb-boulder: color-mix(in srgb, var(--sport-climb, #e07b39) 50%, #ffffff);
+  --climb-outdoor: #9aa7bd;
+  --climb-multi-pitch: #6f7d99;
+  --climb-first-go: var(--sport-climb, #e07b39);
+  --climb-worked: color-mix(in srgb, var(--sport-climb, #e07b39) 50%, #1a1d22);
+  --climb-unrecorded: #5c6167;
+}
+
+/* The chip is `.run-surface-chip` — its size and type are Running's — worn in
+   the kind's colour. */
+.climb-kind-indoor { --climb-kind: var(--climb-indoor); }
+.climb-kind-boulder { --climb-kind: var(--climb-boulder); }
+.climb-kind-outdoor { --climb-kind: var(--climb-outdoor); }
+.climb-kind-multiPitch { --climb-kind: var(--climb-multi-pitch); }
+
+.run-surface-chip:is(.climb-kind-indoor, .climb-kind-boulder, .climb-kind-outdoor, .climb-kind-multiPitch) {
+  background: color-mix(in srgb, var(--climb-kind) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--climb-kind) 45%, transparent);
+}
+
+/* How a climb went, wherever it is drawn: a pyramid's segment, a legend's
+   swatch, a list row's mark, a session's block. */
+.climbing-view .climb-group-firstGo { background: var(--climb-first-go); }
+.climbing-view .climb-group-worked { background: var(--climb-worked); }
+.climbing-view .climb-group-attempt {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--climb-first-go) 75%, transparent);
+}
+.climbing-view .climb-group-unrecorded { background: var(--climb-unrecorded); }
+
+/* ── Grade pyramid ─────────────────────────────────────────────────────── */
+
+.climb-pyramid-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.climb-pyramid-rows li {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 32px 64px;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 6px;
+  border-radius: var(--radius-xs);
+}
+
+/* The onsight grade from COROS's settings: a mark to climb past, neutral so it
+   never reads as one of the climbs. */
+.climb-pyramid-rows li.is-onsight {
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-primary) 20%, transparent);
+}
+
+.climb-pyramid-grade {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.climb-pyramid-bar {
+  display: flex;
+  gap: 2px;
+  height: 14px;
+  min-width: 0;
+}
+
+.climb-segment {
+  min-width: 3px;
+  border-radius: var(--radius-xs);
+}
+
+.climb-pyramid-count {
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.climb-pyramid-tag {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ── On the wall ───────────────────────────────────────────────────────── */
+
+.climb-wall-bar {
+  display: flex;
+  gap: 3px;
+  height: 8px;
+  margin: 4px 0 14px;
+}
+
+.climb-wall-on {
+  border-radius: var(--radius-xs);
+  background: var(--climb-first-go);
+}
+
+.climb-wall-off {
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+}
+
+.climb-wall-cells {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+/* ── The session list ──────────────────────────────────────────────────── */
+
+.climb-list-climbs {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.climb-strip {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 2px;
+  max-width: 180px;
+}
+
+.climb-strip i {
+  width: 6px;
+  height: 12px;
+  border-radius: var(--radius-xs);
+}
+
+/* Two sends, a route's and a boulder's: they wrap rather than set the card's
+   width, which a line that would not wrap did in a narrow column. */
+.climb-hero-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ── A session: its climbs on its clock ────────────────────────────────── */
+
+.climb-routes-plot {
+  position: relative;
+  height: 200px;
+  margin-top: 36px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.climb-routes-block {
+  position: absolute;
+  bottom: 0;
+  min-height: 3px;
+  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+}
+
+.climb-routes-label {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 4px;
+  transform: translateX(-50%);
+  color: var(--text-secondary);
+  font-family: var(--font-display);
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* A fall is said in words, not in the climbing colour: on a block of that
+   colour it read as part of the block. */
+.climb-routes-label em {
+  color: var(--text-primary);
+  font-style: normal;
+  font-weight: 600;
+}
+
+.climb-routes-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.climb-recorded {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.climb-style-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.climb-route-table .climb-route-index {
+  width: 36px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.climbing-view .climb-style-tag {
+  background: none;
+  box-shadow: none;
+}
+
+.climb-style-tag::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+}
+
+.climbing-view .climb-style-tag.climb-group-firstGo::before { background: var(--climb-first-go); }
+.climbing-view .climb-style-tag.climb-group-worked::before { background: var(--climb-worked); }
+.climbing-view .climb-style-tag.climb-group-attempt::before {
+  box-shadow: inset 0 0 0 1.5px var(--climb-first-go);
+}
+.climbing-view .climb-style-tag.climb-group-unrecorded::before { background: var(--climb-unrecorded); }
