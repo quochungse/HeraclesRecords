@@ -438,6 +438,19 @@ function readTrigger(
   };
 }
 
+/**
+ * An analysis has no role any more: it was a second box for what a playbook
+ * says, beside Coach style (tone) and the custom instructions (the athlete).
+ * A role written before is read as the playbook's opening, so nothing is lost,
+ * and the next save stores it there — `toRow` writes the column empty. Read
+ * here rather than moved once on open, because an older build on another
+ * machine can still sync a role in.
+ */
+function withRetiredRole(row: CoachAnalysisRow): string {
+  const role = optionalText(row.role);
+  return role ? `${role}\n\n${row.playbook}` : row.playbook;
+}
+
 function toAnalysis(
   row: CoachAnalysisRow,
   database: CoachAnalysisDatabase
@@ -447,7 +460,7 @@ function toAnalysis(
     id: row.id,
     sessionId: row.session_id,
     name: row.name,
-    playbook: row.playbook,
+    playbook: withRetiredRole(row),
     enabled: row.enabled === 1,
     runtime: normalizeAnalysisRuntime(parseJson(row.runtime_json)),
     trigger,
@@ -457,10 +470,6 @@ function toAnalysis(
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
-  const role = optionalText(row.role);
-  if (role) {
-    analysis.role = role;
-  }
   const presetId = optionalText(row.preset_id);
   if (presetId) {
     analysis.presetId = presetId;
@@ -512,7 +521,7 @@ function toRow(analysis: CoachAnalysis): CoachAnalysisRow {
     id: analysis.id,
     session_id: analysis.sessionId,
     name: analysis.name,
-    role: analysis.role ?? null,
+    role: null,
     playbook: analysis.playbook,
     enabled: analysis.enabled ? 1 : 0,
     preset_id: analysis.presetId ?? null,
@@ -688,10 +697,6 @@ export function createCoachAnalysis(
     createdAt: now,
     updatedAt: now
   };
-  const role = optionalText(input.role);
-  if (role) {
-    analysis.role = role;
-  }
   const presetId = optionalText(input.presetId);
   if (presetId) {
     analysis.presetId = presetId;
@@ -761,14 +766,6 @@ export function updateCoachAnalysis(
     updatedAt: new Date().toISOString()
   };
 
-  if ("role" in patch) {
-    const role = optionalText(patch.role);
-    if (role) {
-      next.role = role;
-    } else {
-      delete next.role;
-    }
-  }
   if ("presetId" in patch) {
     const presetId = optionalText(patch.presetId);
     if (presetId) {

@@ -128,14 +128,12 @@ const manual = createCoachAnalysis(
   {
     sessionId: SESSION,
     name: "  Morning briefing  ",
-    role: "Strict marathon coach, injury-prevention first",
     playbook: "Summarise yesterday and set today's focus."
   },
   db
 );
 
 assert.equal(manual.name, "Morning briefing");
-assert.equal(manual.role, "Strict marathon coach, injury-prevention first");
 assert.equal(manual.sessionId, SESSION);
 assert.equal(manual.enabled, true);
 assert.deepEqual(manual.runtime, {});
@@ -247,15 +245,27 @@ assert.equal(getCoachAnalysis("missing", db), null);
 const renamed = updateCoachAnalysis(manual.id, { name: "Evening briefing" }, db);
 assert.equal(renamed.name, "Evening briefing");
 assert.equal(renamed.playbook, manual.playbook);
-assert.equal(renamed.role, manual.role, "untouched role survives");
 assert.equal(renamed.sessionId, SESSION, "and so does the conversation");
 assert.equal(renamed.createdAt, manual.createdAt);
 assert.ok(renamed.updatedAt >= manual.updatedAt);
 
-// Clearing an optional string removes the key rather than storing "".
-const roleless = updateCoachAnalysis(manual.id, { role: "  " }, db);
-assert.equal(roleless.role, undefined);
-assert.equal(db._rows.get(manual.id).role, null);
+// A role from before the field was retired reads as the playbook's opening;
+// the next save stores it there and empties the column, so it folds once.
+{
+  const legacyDb = createMemoryDatabase();
+  const legacy = createCoachAnalysis(
+    { sessionId: SESSION, name: "Legacy", playbook: "Debrief this session." },
+    legacyDb
+  );
+  assert.equal(legacyDb._rows.get(legacy.id).role, null, "nothing writes a role");
+  legacyDb._rows.get(legacy.id).role = "Strict marathon coach";
+  const folded = getCoachAnalysis(legacy.id, legacyDb);
+  assert.equal(folded.playbook, "Strict marathon coach\n\nDebrief this session.");
+  assert.equal("role" in folded, false);
+  updateCoachAnalysis(legacy.id, { name: "Legacy debrief" }, legacyDb);
+  assert.equal(legacyDb._rows.get(legacy.id).role, null, "a save empties the column");
+  assert.equal(getCoachAnalysis(legacy.id, legacyDb).playbook, folded.playbook, "folded once");
+}
 
 assert.equal(updateCoachAnalysis("missing", { name: "x" }, db), null);
 assert.throws(() => updateCoachAnalysis(manual.id, { name: "" }, db), /needs a name/);
@@ -566,11 +576,10 @@ assert.equal(cancelStaleCoachAnalysisRuns(db), 0, "the second startup finds noth
       `${label} runtime did not survive normalisation`
     );
     assert.equal(created.name, preset.definition.name.trim());
-    assert.ok(created.role?.trim(), `${label} has a role`);
-    assert.ok(
-      created.playbook.includes("{{") || created.playbook.length > 80,
-      `${label} playbook is a real brief`
-    );
+    // One sentence of intent (coachAnalysisPresets.ts says why), with no
+    // variable only an activity fills: a manual run has none to give.
+    assert.ok(created.playbook.trim(), `${label} has a playbook`);
+    assert.doesNotMatch(created.playbook, /\{\{activity\./, `${label} needs no activity`);
 
     // Section 7: silence means `low`. Only a preset that genuinely wants more
     // says so, and it must say something the effort switch can offer.

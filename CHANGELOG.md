@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- An auto analysis has no Role any more: what it should do goes in its playbook, and Mentor's tone is the Coach style you chose. A role you wrote before is kept, at the start of the playbook.
+- The four starting points say in one sentence what the analysis is for. An analysis is already handed the session, the days before it and the conversation, and the longer checklists made a debrief stay quiet about a session that needed a word.
+
+### Fixed
+- An analysis that asks you something no longer tells you, in the same answer, that you have not replied.
+- What Mentor writes after reading your data starts a new paragraph instead of running on from the sentence before.
+- A long analysis headline in the run log ends at a word, with "…", instead of mid-word.
+
 ## [1.6.1] - 2026-11-27
 
 Climbing gets a screen of its own, and the sidebar shows the sports you train.

@@ -40,6 +40,16 @@ export interface CoachAnalysisPreset {
  *
  * Effort is left unset wherever `low` is right, because that is now the
  * documented default (section 7); only the two that genuinely want more say so.
+ *
+ * **A playbook says what the analysis is for, in one sentence.** The runner
+ * already hands a run its subject — the activity, the 72 hours before it, the
+ * sessions like it, what the calendar held — and the conversation carries
+ * everything the coach has set. In a blind replay (2026-11-27) a checklist
+ * with coaching rules did no better than one sentence or none, and its "only
+ * raise something if it is materially different" kept a debrief silent 3 times
+ * out of 3 on a session with a fault to name. Variables an activity fills stay
+ * out too: a manual run on a machine without the trigger has no activity, and
+ * they rendered "()".
  */
 
 /**
@@ -55,19 +65,7 @@ const POST_ACTIVITY_DEBRIEF: CoachAnalysisPreset = {
   definition: {
     name: "Post-activity debrief",
     presetId: "post-activity-debrief",
-    role:
-      "You are the athlete's endurance coach reviewing a session that has just finished. " +
-      "Injury prevention and consistency come before chasing numbers. Be concrete and brief.",
-    playbook:
-      "A new activity has just synced: {{activity.name}} ({{activity.sport}}) on {{date}}.\n\n" +
-      "Look at the activity against the athlete's recent training:\n" +
-      "- How it compares with similar recent sessions (pace, heart rate, load, duration).\n" +
-      "- Whether it fits the week's pattern, or breaks it.\n" +
-      "- Anything in recovery or accumulated load that this session changes.\n" +
-      "- Whether fatigue from the sessions listed before it — any sport, judged by duration, intensity and the muscles worked — shows in this one.\n\n" +
-      "Only raise something if it is materially different from recent history. " +
-      "If it means a session in the next few days should move, change or go, propose that with " +
-      "propose_schedule_changes — the athlete applies it from the card — rather than only saying so.",
+    playbook: "Debrief this session.",
     runtime: {}
   },
   suggestedTrigger: { kind: "activity", sportTypes: [], minDurationSec: 1200 },
@@ -88,15 +86,7 @@ const MORNING_BRIEFING: CoachAnalysisPreset = {
   definition: {
     name: "Morning briefing",
     presetId: "morning-briefing",
-    role:
-      "You are the athlete's endurance coach, writing the first thing they read today. " +
-      "Short, concrete, and about today — not a lecture. Injury prevention and consistency come first.",
-    playbook:
-      "Good morning. It is {{date}}.\n\n" +
-      "Look at what is scheduled for today and what the last few days of training actually were, then say:\n" +
-      "- What today should be, and why that follows from the last few days.\n" +
-      "- Anything in recovery or accumulated load that changes it.\n\n" +
-      "If today is a rest day and nothing is off, say so and stop. Only raise something if it is materially different from recent history.",
+    playbook: "Say what today's training should be.",
     runtime: {}
   },
   suggestedTrigger: { kind: "schedule", cadence: "daily", timeOfDay: "07:00" },
@@ -123,17 +113,7 @@ const WEEKLY_REVIEW: CoachAnalysisPreset = {
   definition: {
     name: "Weekly review",
     presetId: "weekly-review",
-    role:
-      "You are the athlete's endurance coach closing out a training week. " +
-      "Judge the week as a block rather than session by session, and be honest about what did not happen.",
-    playbook:
-      "Review the training week of {{week.range}}.\n\n" +
-      "- What the week actually was: volume, intensity distribution, how it compares with the weeks before it.\n" +
-      "- What was scheduled and did not happen, and whether that matters.\n" +
-      "- The one thing that should change next week, if anything should.\n\n" +
-      "A week that went to plan is a finding too — say so briefly rather than inventing concerns. " +
-      "When next week's calendar should change because of it, propose the changes with propose_schedule_changes " +
-      "for the athlete to apply.",
+    playbook: "Review the training week of {{week.range}} as a whole.",
     runtime: { effort: "medium" }
   },
   suggestedTrigger: {
@@ -159,14 +139,7 @@ const WEEK_AHEAD_PLAN: CoachAnalysisPreset = {
   definition: {
     name: "Next week's plan",
     presetId: "week-ahead-plan",
-    role:
-      "You are the athlete's endurance coach planning the week that is starting. " +
-      "Build from what they have actually been doing, not from an ideal template. Progress load gradually.",
-    playbook:
-      "Draft the training week starting {{date}}.\n\n" +
-      "Base it on the last two or three weeks of actual training and anything already on the calendar. " +
-      "Progress from where they are rather than where a plan says they should be.\n\n" +
-      "Draft the week as a training plan so it can be reviewed and approved, then say in one line what the week is for.",
+    playbook: "Draft the training week starting {{date}} as a plan the athlete can approve.",
     runtime: { effort: "medium" }
   },
   suggestedTrigger: {

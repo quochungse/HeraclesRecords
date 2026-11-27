@@ -173,7 +173,20 @@ export function parseAnalysisOutput(text: string): AnalysisOutput {
   // markdown constructs to skip: a line with no letters in it is not a
   // sentence, whatever syntax produced it.
   const line = lines.find((candidate) => /\p{L}/u.test(candidate)) ?? lines[0];
-  return { silent: false, summary: trimMarkup(line).slice(0, SUMMARY_MAX) };
+  return { silent: false, summary: clampSummary(trimMarkup(line)) };
+}
+
+/**
+ * Cut at a word, marked. Rule 2's limit is the model's to keep and it often
+ * runs a few characters over, which cut "nền aerobic vẫn m" mid-word.
+ */
+function clampSummary(text: string): string {
+  const chars = [...text];
+  if (chars.length <= SUMMARY_MAX) return text;
+  const cut = chars.slice(0, SUMMARY_MAX - 1).join("");
+  const space = cut.lastIndexOf(" ");
+  const word = space > SUMMARY_MAX / 2 ? cut.slice(0, space) : cut;
+  return `${word.replace(/[\s,;:–—-]+$/u, "")}…`;
 }
 
 // ---------------------------------------------------------------------------
@@ -698,7 +711,6 @@ export interface CoachAnalysisRunnerDeps {
       toolPolicy: "read-only";
       /** The conversation the run writes into; a proposal is filed under it (P3.4). */
       sessionId?: string;
-      roleInstructions?: string;
     }
   ): Promise<void>;
   emitRunUpdate(run: CoachAnalysisRun): void;
@@ -2032,8 +2044,7 @@ async function runInConversation(
         toolPolicy: "read-only",
         // What a run proposes is filed under its conversation (P3.4).
         sessionId: analysis.sessionId,
-        ...(conversation ? { sources: conversation.sources } : {}),
-        ...(analysis.role ? { roleInstructions: analysis.role } : {})
+        ...(conversation ? { sources: conversation.sources } : {})
       }
     );
     // Nothing awaits the stream once the watchdog has won the race, so a

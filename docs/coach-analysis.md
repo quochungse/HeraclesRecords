@@ -14,13 +14,13 @@ that are not. Where they disagree with this file, this one is right.
 
 ## What it is
 
-An **Analysis** is a coaching question written inside one conversation: a role,
-a playbook, and — if the athlete wants one — a trigger that asks it without
+An **Analysis** is a coaching question written inside one conversation:
+a playbook and — if the athlete wants one — a trigger that asks it without
 being asked.
 
 ```
 Conversation
-    ├── Analysis  (role + playbook + runtime)
+    ├── Analysis  (playbook + runtime)
     │      └── no trigger  → manual: Run now
     │      └── a trigger   → an auto analysis
     └── Analysis  … up to five
@@ -117,7 +117,7 @@ outside these tables:
 interface CoachAnalysis {
   id,
   sessionId: string,                    // one conversation, never null, never changed
-  name, role?, playbook, enabled, presetId?, runtime,
+  name, playbook, enabled, presetId?, runtime,
   trigger: AnalysisTrigger | null,      // null = manual
   conditions: AnalysisConditions,       // cooldown, daily cap, quiet hours
   deviceOnly: boolean,
@@ -300,7 +300,7 @@ versions only.
 | `ConversationAnalyses.tsx` | the conversation's analyses, and the only entry point: **Create Auto Analysis**, plus a **⋯** per row into its own screen |
 | `AnalysesModal.tsx` | the full-screen host for one analysis — the create form, or one detail screen. Its header shows the open screen's title (`analysesTitle.tsx`) and one way out |
 | `AnalysisCreate.tsx` | writing one, inside the conversation. Preset gallery, definition and trigger on one screen |
-| `AnalysisDefinitionForm.tsx` | name, role, playbook, model, effort |
+| `AnalysisDefinitionForm.tsx` | name, playbook, model, effort |
 | `TriggerForm.tsx` | the trigger, the guard rails, and "this device only" |
 | `AnalysisDetail.tsx` | Settings / Run log. No "Where it runs", no Run now, no back arrow |
 | `DeleteAnalysisDialog.tsx` | confirms, and says what is *not* lost |

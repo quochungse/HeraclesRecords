@@ -1520,8 +1520,6 @@ export interface StreamChatOptions {
   runtime?: AnalysisRuntime;
   /** Analysis runs narrow the tool set (decision 3). Defaults to interactive. */
   toolPolicy?: ChatToolPolicy;
-  /** Analysis role, injected as its own hardened instruction block. */
-  roleInstructions?: string;
   /**
    * Whether the turn may search the web through the provider's own search,
    * run on the provider's side. Asked for by a conversation's chat turn only, and
@@ -2072,7 +2070,6 @@ async function streamChatTurn(
     options.toolPolicy === "read-only" || options.toolPolicy === "none"
       ? options.toolPolicy
       : "interactive";
-  const roleInstructions = options.roleInstructions;
   const runtime = options.runtime ?? {};
   const job = options.textJob;
   // Only a chat turn the athlete is watching: what a page says is not the
@@ -2101,7 +2098,32 @@ async function streamChatTurn(
     const name = value?.trim();
     if (name) answeredModel = name;
   };
+  /**
+   * Words written after a tool call start a paragraph of their own. Every
+   * provider streams a round's words as they come, and a round resuming after
+   * a tool often began on the same line: "…đừng sốt ruột.Không có trả lời…".
+   * What was sent is then the answer (`sentText`), break included.
+   */
+  let sentText = "";
+  let toolSinceText = false;
+  let separated = false;
   const send = (channel: string, payload: unknown) => {
+    if (channel === "chat:streamToken") {
+      const record = payload as { delta?: unknown };
+      if (typeof record.delta === "string" && record.delta) {
+        let delta = record.delta;
+        if (toolSinceText && !/\n\s*$/.test(sentText) && !/^\s*\n/.test(delta)) {
+          delta = `\n\n${delta.replace(/^[ \t]+/, "")}`;
+          payload = { ...record, delta };
+          separated = true;
+        }
+        toolSinceText = false;
+        sentText += delta;
+      }
+    } else if (channel === "chat:streamInfo" && sentText) {
+      const record = payload as { kind?: unknown; status?: unknown };
+      if (record.kind === "mcp" && record.status === "call") toolSinceText = true;
+    }
     sink.emit(channel, payload);
   };
   /**
@@ -2114,7 +2136,7 @@ async function streamChatTurn(
   const sendStreamDone = (finishReason?: string): void => {
     send("chat:streamDone", {
       requestId,
-      fullText,
+      fullText: separated ? sentText : fullText,
       ...(finishReason ? { finishReason } : {}),
       ...(usage ? { usage } : {}),
       ...(answeredModel ? { model: answeredModel } : {})
@@ -2165,7 +2187,6 @@ async function streamChatTurn(
         : buildTrainingContext(
             unitSystem,
             settings.customInstructions,
-            roleInstructions,
             runTools.get(requestId)?.context,
             settings.coachStyle
           ).then((context) => withCreations(context, options.creations));
@@ -3398,7 +3419,7 @@ const CLAUDE_REMOTE_READ_TOOLS: ReadonlySet<string> = new Set([
  * already applied to non-COROS MCP servers one line down.
  *
  * `request_coach_input` is on the list deliberately: nobody is there to answer,
- * so it returns "state your assumption and continue" and leaves a `coachPrompt`
+ * so it returns "finish on your best assumption" and leaves a `coachPrompt`
  * card the athlete can answer later (6).
  *
  * Drafting stays allowed because it is already non-destructive — the draft
@@ -4192,14 +4213,12 @@ interface TrainingContext {
 async function buildTrainingContext(
   unitSystem: UnitSystem = "metric",
   customInstructions?: string,
-  roleInstructions?: string,
   scope?: TrainingContextScope,
   style?: CoachStyle
 ): Promise<TrainingContext> {
   // Rebuilt per request so edits to the athlete's custom instructions apply live.
   const coachInstructions = buildCoachInstructions(
     customInstructions,
-    roleInstructions,
     scope?.announce
       ? { activities: scope.activities === false, sleep: scope.sleep === false, zones: scope.zones === false }
       : undefined,

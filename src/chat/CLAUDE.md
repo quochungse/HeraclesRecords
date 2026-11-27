@@ -14,7 +14,7 @@ server `heracles` (tools `mcp__heracles__*`).
 
 **On screen it is Mentor** (the Odyssey's counsellor), in every language, with `MentorIcon`
 (`src/chat/mentorIcon.ts`); the code, channels, keys and stored kinds keep `coach`. "Coach"
-stays only where it is the generic word — an analysis role ("endurance coach"), "coaching".
+stays only where it is the generic word ("coaching").
 English stored before the rename says "Coach": `storedNotice.ts` and `screenKeyForEnglish`
 still read it, and the Canvas still hides the old placeholder overview.
 
@@ -330,10 +330,13 @@ Headless runs (`coachAnalysisService/Scheduler/Store.ts`, `coachActivityWatcher.
 the app lifecycle, read-only (drafts land as cards). [docs/coach-analysis.md](../../docs/coach-analysis.md)
 is current; `docs/coach-automations*.md` are the pre-refactor record (accurate on the pipeline,
 guard rails and cost; wrong on the data model).
-- **One analysis lives in exactly one conversation**: a role, a playbook, a runtime, a fixed
+- **One analysis lives in exactly one conversation**: a playbook, a runtime, a fixed
   `sessionId`, optionally a trigger. Created from a conversation, deleted with it
   (`applyAnalysisSessionDeleted`). No definition/attachment split and no cross-conversation
   list (`test:ipc-surface` fails on a channel spelling `Attach`).
+- **There is no role**: tone is Coach style's, the athlete is the custom instructions', and
+  a preset's playbook is one sentence (`coachAnalysisPresets.ts` says why). A role stored
+  before reads as the playbook's opening (`withRetiredRole`).
 - **Nothing in the feature creates a chat session.** Reaching the runner with the conversation
   gone switches the analysis off rather than deleting it.
 - **"This device only" is its own table** (`coach_analysis_local_triggers`, `device`): a

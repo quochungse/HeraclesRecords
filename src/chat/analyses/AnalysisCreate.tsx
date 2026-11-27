@@ -212,8 +212,8 @@ function presetText(id: string, field: "label" | "description"): string | undefi
 
 /**
  * What a preset fills the form with, written in the language on screen: the
- * name, the role and the playbook. Whatever language it is saved in is what
- * the analysis keeps — stored, synced and editable like anything typed there.
+ * name and the playbook. Whatever language it is saved in is what the analysis
+ * keeps — stored, synced and editable like anything typed there.
  * The `{{…}}` variables and the tool names stay as they are in every language.
  */
 function presetDefinition(preset: CoachAnalysisPreset): Omit<CoachAnalysisInput, "sessionId"> {
@@ -222,7 +222,6 @@ function presetDefinition(preset: CoachAnalysisPreset): Omit<CoachAnalysisInput,
   return {
     ...preset.definition,
     name: t(`chat.an.preset.${key}` as MessageKey),
-    role: t(`chat.an.preset.${key}.role` as MessageKey),
     playbook: t(`chat.an.preset.${key}.playbook` as MessageKey)
   };
 }

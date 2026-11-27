@@ -795,7 +795,6 @@ function addSession(world, id, entries = []) {
   const world = createWorld();
   addAnalysis(world, "a1", {
     name: "Morning briefing",
-    role: "Strict marathon coach",
     runtime: { model: "claude-opus-5", effort: "low" }
   });
   addSession(world, "s1", [
@@ -816,11 +815,10 @@ function addSession(world, id, entries = []) {
   assert.equal(run.effort, "low");
   assert.ok(run.finishedAt);
 
-  // streamChat is told this is a read-only run carrying the analysis's role.
+  // streamChat is told this is a read-only run.
   const call = world.streamCalls[0];
   assert.equal(call.runId, run.id);
   assert.equal(call.options.toolPolicy, "read-only");
-  assert.equal(call.options.roleInstructions, "Strict marathon coach");
   assert.deepEqual(call.options.runtime, { model: "claude-opus-5", effort: "low" });
 
   // Section 7: an explicit effort is honoured as written.

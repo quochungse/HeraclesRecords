@@ -47,19 +47,6 @@ export function AnalysisDefinitionForm({
       </label>
 
       <label className="chat-local-field">
-        <span>{t("chat.an.def.role")}</span>
-        <textarea
-          className="chat-custom-instructions"
-          rows={3}
-          value={draft.role ?? ""}
-          disabled={disabled}
-          placeholder={t("chat.an.def.rolePh")}
-          onChange={(event) => onChange({ role: event.target.value })}
-        />
-      </label>
-      <p className="chat-settings-copy">{t("chat.an.def.roleNote")}</p>
-
-      <label className="chat-local-field">
         <span>{t("chat.an.def.playbook")}</span>
         <textarea
           className="chat-custom-instructions"

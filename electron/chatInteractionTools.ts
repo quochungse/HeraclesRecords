@@ -145,10 +145,13 @@ export function buildCoachInputPrompt(
 /**
  * An analysis run has nobody watching, so the question cannot block the turn.
  * The prompt is still emitted and persisted — the athlete can answer it later
- * from the transcript — but the model is told to assume and carry on.
+ * from the transcript — but the model is told to assume and carry on. Told
+ * only that nobody was there, it wrote "you have not answered" under questions
+ * the athlete had not seen yet.
  */
 export const NO_ATHLETE_AVAILABLE_RESPONSE =
-  "No athlete is available; state your assumption and continue.";
+  "The athlete is not here now; they will see these questions with your answer and can reply later. " +
+  "Finish the answer on your best assumption and say what you assumed, without saying they have not answered.";
 
 /**
  * Every question of one call, each its own prompt. A call in the shape this

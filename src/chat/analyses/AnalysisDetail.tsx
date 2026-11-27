@@ -49,7 +49,6 @@ function toInput(analysis: CoachAnalysis): Draft {
     name: analysis.name,
     playbook: analysis.playbook,
     runtime: analysis.runtime,
-    ...(analysis.role ? { role: analysis.role } : {}),
     ...(analysis.presetId ? { presetId: analysis.presetId } : {})
   };
 }
@@ -64,15 +63,14 @@ function toTriggerDraft(analysis: CoachAnalysis): TriggerDraft {
 
 /**
  * A stable serialisation for telling an edited form from an untouched one.
- * Key order and empty optional fields are normalized away: typing into Role
- * and clearing it again leaves `role: ""` where the stored value simply has no
- * role, which a plain JSON compare would report as a change.
+ * Key order and empty optional fields are normalized away: a field typed into
+ * and cleared again leaves `""` where the stored value simply has none, which
+ * a plain JSON compare would report as a change.
  */
 function fingerprint(input: Draft, trigger: TriggerDraft): string {
   const trimmed = (value: string | undefined) => value?.trim() || undefined;
   return JSON.stringify({
     name: trimmed(input.name),
-    role: trimmed(input.role),
     playbook: trimmed(input.playbook),
     presetId: trimmed(input.presetId),
     runtime: {

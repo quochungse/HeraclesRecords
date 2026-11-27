@@ -1284,8 +1284,8 @@ assert.equal(
   const { COACH_STYLES, COACH_STYLE_CATALOG, coachStyleInstructions, normalizeCoachStyle } = await import(
     `${distUrl("coachStyles.js")}?cacheBust=${Date.now()}`
   );
-  assert.equal(buildCoachInstructions(undefined, undefined, undefined, "neutral"), baseCoachInstructions, "Neutral is the prompt as it was");
-  assert.equal(buildCoachInstructions(undefined, undefined, undefined, undefined), baseCoachInstructions);
+  assert.equal(buildCoachInstructions(undefined, undefined, "neutral"), baseCoachInstructions, "Neutral is the prompt as it was");
+  assert.equal(buildCoachInstructions(undefined, undefined, undefined), baseCoachInstructions);
   assert.equal(normalizeCoachStyle("shouty"), "neutral", "an unknown style reads as Neutral");
   for (const style of COACH_STYLES) {
     assert.ok(COACH_STYLE_CATALOG[style].label && COACH_STYLE_CATALOG[style].detail, `${style} has a label and a detail`);
@@ -1309,7 +1309,7 @@ assert.equal(
 
   // The style sits after the rules and before the athlete's own words, which
   // may still tune it.
-  const styled = buildCoachInstructions("Keep it short.", undefined, undefined, "unfiltered");
+  const styled = buildCoachInstructions("Keep it short.", undefined, "unfiltered");
   assert.ok(styled.startsWith(baseCoachInstructions));
   assert.ok(styled.indexOf("## Coach style") < styled.indexOf("<athlete_custom_instructions>"));
 
@@ -1366,7 +1366,7 @@ assert.equal(
   assert.match(lines[0], /sleep or HRV in this conversation/);
   assert.match(lines[1], /thresholds or zones in this conversation: prescribe by effort/);
   assert.match(
-    buildCoachInstructions(undefined, undefined, { activities: true }),
+    buildCoachInstructions(undefined, { activities: true }),
     /## What the athlete shares in this conversation\n- The athlete has not shared their training history/
   );
   assert.doesNotMatch(buildCoachInstructions(), /What the athlete shares in this conversation/);

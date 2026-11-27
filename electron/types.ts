@@ -2428,8 +2428,6 @@ export interface CoachAnalysis {
    */
   sessionId: string;
   name: string;
-  /** Persona and remit, injected into the run's system instructions. */
-  role?: string;
   playbook: string;
   enabled: boolean;
   presetId?: string;
@@ -2490,7 +2488,6 @@ export interface CoachAnalysis {
 export interface CoachAnalysisInput {
   sessionId: string;
   name: string;
-  role?: string;
   playbook: string;
   enabled?: boolean;
   presetId?: string;
