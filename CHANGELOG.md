@@ -7,8 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-11-27
+
+Climbing gets a screen of its own, and the sidebar shows the sports you train.
+
+### What's new
+- **Climbing** - a new screen for indoor climbs, bouldering, outdoor climbs and multi-pitch, after Swimming in the sidebar. It shows this week in climbs, your hardest send and how much you sent over the last weeks, the onsight grade set in the COROS app, weekly volume by kind, a grade pyramid of what you sent first go, sent after working it or only tried, your grade over time, your time on the wall, and every session with a strip of its climbs. A session's page draws each climb where it fell in the session, by grade, time on the wall or height, with the heart rate below and the climbs one by one. Every grade is shown in the scale chosen in the COROS app's climb settings, converted through COROS's own table, and a route's grade is never set against a boulder's.
+- **Climbing on Overview** - a section like the other sports' when you climbed in the last four weeks: climbs this week and over four weeks, the hardest send, the share sent and the grades you climbed most.
+- Personal Records adds the hardest route and the hardest boulder you sent, the Timeline marks your first climb, and a climbing session has Create image like every other sport.
+
 ### Changed
 - The sidebar shows a sport's screen once you have a session of that sport, rather than all six from the start. Strength stays while Hevy is connected. What you turn on or off under Settings → Navigation → Sport screens stays as you set it.
+- The sidebar's History heading reads Logbook.
+
+### Fixed
+- Heart rate, Sleep and Stress level stay on screen while the app signs back in to COROS at start-up (after a sign-in on another computer), instead of showing the connect panel for a few seconds, and a day that is still loading says so instead of showing the figures from before.
 
 ## [1.6.0] - 2026-11-23
 
