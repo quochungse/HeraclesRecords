@@ -1,0 +1,57 @@
+---
+// The app's languages (src/i18n) with the flags it draws beside them, so a
+// language added to the app reaches the site with a flag listed here.
+import type { ImageMetadata } from "astro";
+import { LOCALES, LOCALE_DETAILS } from "../../../src/i18n/locales";
+
+const flagFiles = import.meta.glob<{ default: ImageMetadata }>("../../../src/assets/flags/*.svg", { eager: true });
+const FLAG_CODES: Record<string, string> = {
+  en: "gb", vi: "vn", ja: "jp", ko: "kr", zh: "cn", es: "es", pt: "br", fr: "fr", de: "de", it: "it", ru: "ru", id: "id", th: "th",
+};
+const languages = LOCALES.map((locale) => {
+  const file = Object.keys(flagFiles).find((path) => path.endsWith(`/${FLAG_CODES[locale]}.svg`));
+  return { name: LOCALE_DETAILS[locale].nativeName, english: LOCALE_DETAILS[locale].englishName, flag: file ? flagFiles[file].default.src : undefined };
+});
+---
+
+<ul class="languages" aria-label={`The app's ${languages.length} languages`}>
+  {
+    languages.map((language) => (
+      <li title={language.english}>
+        {language.flag && <img src={language.flag} alt="" width="22" height="16" loading="lazy" />}
+        <span>{language.name}</span>
+      </li>
+    ))
+  }
+</ul>
+
+<style>
+  .languages {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 16px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .languages li {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    padding: 8px 14px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 15px;
+  }
+
+  .languages img {
+    width: 22px;
+    height: 16px;
+    border-radius: 2px;
+    object-fit: cover;
+  }
+</style>

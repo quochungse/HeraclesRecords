@@ -1,0 +1,209 @@
+---
+// The app in one frame: a tab per screen, named as the app's sidebar names
+// them, each a screenshot, a sentence and a link to the page that goes
+// further. The first tab shows without script. The other screenshots load
+// only once the visitor reaches for the tabs, and a tab keeps the screenshot
+// it shows until the next one can be drawn, so it never opens on a blank frame.
+import { getImage } from "astro:assets";
+import { shot, SHOT_WIDTHS } from "../assets";
+
+interface Tab {
+  /** The tab's name, as the app's sidebar says it. */
+  label: string;
+  /** The screenshot's file name without the extension. */
+  shot: string;
+  alt: string;
+  text: string;
+  href: string;
+  link: string;
+}
+
+interface Props {
+  tabs: Tab[];
+  label: string;
+}
+
+const { tabs, label } = Astro.props;
+const SIZES = "(max-width: 1120px) calc(100vw - 40px), 1080px";
+const panels = await Promise.all(
+  tabs.map(async (tab, index) => {
+    const image = shot(tab.shot);
+    const sized = await getImage({
+      src: image,
+      widths: SHOT_WIDTHS.filter((width) => width < image.width).concat(image.width),
+      sizes: SIZES,
+      format: "webp",
+      quality: 82,
+    });
+    return { ...tab, image, sized, id: `showcase-${index}` };
+  }),
+);
+---
+
+<div class="showcase">
+  <div class="showcase-tabs" role="tablist" aria-label={label}>
+    {
+      panels.map((panel, index) => (
+        <button
+          type="button"
+          role="tab"
+          id={`${panel.id}-tab`}
+          aria-controls={panel.id}
+          aria-selected={index === 0 ? "true" : "false"}
+          tabindex={index === 0 ? 0 : -1}
+        >
+          {panel.label}
+        </button>
+      ))
+    }
+  </div>
+  {
+    panels.map((panel, index) => (
+      <div class="showcase-panel" role="tabpanel" id={panel.id} aria-labelledby={`${panel.id}-tab`} hidden={index !== 0}>
+        <img
+          class="shot"
+          src={panel.sized.src}
+          srcset={panel.sized.srcSet.attribute}
+          sizes={SIZES}
+          width={panel.image.width}
+          height={panel.image.height}
+          alt={panel.alt}
+          loading={index === 0 ? "eager" : "lazy"}
+          fetchpriority={index === 0 ? "high" : undefined}
+          decoding="async"
+        />
+        <p class="showcase-caption">
+          {panel.text} <a href={panel.href}>{panel.link}</a>
+        </p>
+      </div>
+    ))
+  }
+</div>
+
+<script>
+  for (const showcase of document.querySelectorAll<HTMLElement>(".showcase")) {
+    const tablist = showcase.querySelector<HTMLElement>("[role=tablist]")!;
+    const tabs = [...tablist.querySelectorAll<HTMLButtonElement>("[role=tab]")];
+    const panels = [...showcase.querySelectorAll<HTMLElement>("[role=tabpanel]")];
+    const images = panels.map((panel) => panel.querySelector("img")!);
+    let wanted = 0;
+
+    const warm = () => images.forEach((image) => (image.loading = "eager"));
+    for (const event of ["pointerenter", "focusin", "touchstart"]) {
+      tablist.addEventListener(event, warm, { once: true, passive: true });
+    }
+
+    const select = async (index: number, focus: boolean) => {
+      wanted = index;
+      tabs.forEach((tab, i) => {
+        tab.setAttribute("aria-selected", String(i === index));
+        tab.tabIndex = i === index ? 0 : -1;
+      });
+      if (focus) tabs[index].focus();
+      const image = images[index];
+      image.loading = "eager";
+      if (!image.complete) await image.decode().catch(() => undefined);
+      // A later choice made while this screenshot loaded wins.
+      if (wanted === index) panels.forEach((panel, i) => (panel.hidden = i !== index));
+    };
+
+    tabs.forEach((tab, index) => {
+      tab.addEventListener("click", () => select(index, false));
+      tab.addEventListener("keydown", (event) => {
+        const last = tabs.length - 1;
+        const next =
+          event.key === "ArrowRight" ? (index === last ? 0 : index + 1)
+          : event.key === "ArrowLeft" ? (index === 0 ? last : index - 1)
+          : event.key === "Home" ? 0
+          : event.key === "End" ? last
+          : -1;
+        if (next < 0) return;
+        event.preventDefault();
+        select(next, true);
+      });
+    });
+  }
+</script>
+
+<style>
+  .showcase {
+    display: grid;
+    justify-items: center;
+    gap: 20px;
+  }
+
+  .showcase-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+  }
+
+  .showcase-tabs button {
+    min-height: 36px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 999px;
+    background: none;
+    color: var(--ink-2);
+    font: 500 15px/1 var(--font-sans);
+    cursor: pointer;
+  }
+
+  .showcase-tabs button:hover {
+    color: var(--ink);
+  }
+
+  .showcase-tabs button[aria-selected="true"] {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .showcase-panel {
+    display: grid;
+    justify-items: center;
+    gap: 20px;
+    width: 100%;
+  }
+
+  .showcase-panel[hidden] {
+    display: none;
+  }
+
+  /* Two lines held for every caption, so a short one does not pull the page up. */
+  .showcase-caption {
+    max-width: 640px;
+    min-height: 3.2em;
+    margin: 0;
+    color: var(--ink-2);
+    font-size: 16px;
+    line-height: 1.6;
+    text-align: center;
+    text-wrap: balance;
+  }
+
+  .showcase-caption a {
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .showcase-caption a::after {
+    content: " \2192";
+  }
+
+  @media (max-width: 560px) {
+    .showcase-tabs {
+      border-radius: var(--radius);
+    }
+
+    .showcase-tabs button {
+      padding: 0 12px;
+      font-size: 14px;
+    }
+  }
+</style>

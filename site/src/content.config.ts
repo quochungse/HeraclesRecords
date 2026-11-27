@@ -13,6 +13,8 @@ const guide = defineCollection({
     title: z.string(),
     description: z.string(),
     order: z.number(),
+    /** The app's languages and their flags, drawn after the guide's last section. */
+    languages: z.boolean().optional(),
   }),
 });
 

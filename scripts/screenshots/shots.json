@@ -123,31 +123,6 @@
   "theme": "dark"
  },
  {
-  "out": "17-settings",
-  "view": "overview",
-  "wait": 3500,
-  "ls": {
-   "heraclesrecords.hiddenSportScreens": "[\"cycling\"]"
-  },
-  "steps": [
-   "document.querySelector('[data-nav-label=\"Settings\"]').click(), true",
-   2500
-  ],
-  "theme": "dark"
- },
- {
-  "out": "18-sync",
-  "view": "overview",
-  "wait": 3500,
-  "steps": [
-   "document.querySelector('[data-nav-label=\"Settings\"]').click(), true",
-   2500,
-   "(() => { const e = [...document.querySelectorAll('*')].find((x) => x.scrollHeight > x.clientHeight + 50 && /auto|scroll/.test(getComputedStyle(x).overflowY)); e.scrollTop = e.scrollHeight; return true; })()",
-   800
-  ],
-  "theme": "dark"
- },
- {
   "out": "15-places",
   "view": "places",
   "wait": 9000,
