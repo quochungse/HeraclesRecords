@@ -4,7 +4,7 @@ import type { RouteMetric } from "../training/components/routeColoring";
 import type { PerformanceView } from "../training/components/routePerformance";
 
 /** The five sports a session can be shared from, each with its own remembered choices. */
-export type ShareSport = "run" | "ride" | "hike" | "swim" | "strength";
+export type ShareSport = "run" | "ride" | "hike" | "swim" | "climb" | "strength";
 
 export type ShareFormat = "story" | "feed" | "portrait" | "square" | "landscape";
 export type ShareLayout = "classic" | "minimal" | "poster" | "bold";

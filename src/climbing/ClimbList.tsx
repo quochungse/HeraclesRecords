@@ -145,6 +145,9 @@ function compareRows(left: ClimbRow, right: ClimbRow, key: ClimbSortKey, descend
   if (a === undefined && b === undefined) return 0;
   if (a === undefined) return 1;
   if (b === undefined) return -1;
+  // A route's grade and a boulder's are on different ladders: sorted by the
+  // hardest send, the routes come together and the boulders after them.
+  if (key === "hardest" && left.family !== right.family) return left.family === "route" ? -1 : 1;
   return descending ? b - a : a - b;
 }
 

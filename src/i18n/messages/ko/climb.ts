@@ -110,6 +110,7 @@ const climb: ClimbMessages = {
   "climb.detail.onWall": "벽에서",
   "climb.detail.restAfter": "이후 휴식",
   "climb.detail.recordedTitle": "기록된 그대로의 난이도(원래 척도)",
+  "climb.overview.unit": "회",
   "climb.overview.weekly": "주간 등반 수",
   "climb.overview.plannedAvg": "+ 예정 {count} · 평균 {avg}",
   "climb.overview.onWall": "벽에서 {time}",

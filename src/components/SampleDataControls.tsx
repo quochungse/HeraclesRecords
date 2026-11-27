@@ -22,7 +22,11 @@ const SAMPLE_OPTIONS: readonly { value: SampleKind; label: string; title: string
     title: "Simulated trail runs (electron/sampleTrailRuns.ts)",
   },
   { value: "swims", label: "Swims", title: "Simulated pool and open-water swims (electron/sampleSwims.ts)" },
-  { value: "climbs", label: "Climbs", title: "Simulated indoor, boulder and outdoor climbing (electron/sampleClimbs.ts)" },
+  {
+    value: "climbs",
+    label: "Climbs",
+    title: "Simulated indoor routes, boulders, outdoor days and multi-pitches, a trip in YDS (electron/sampleClimbs.ts)"
+  },
   {
     value: "strength",
     label: "Strength",
@@ -42,7 +46,7 @@ interface SampleDataControlsProps {
 /**
  * The switches `npm run dev:sample-*` and the Strength screen's "Preview with
  * sample data" used to be, as one menu of checkboxes. Rides, hikes, trail
- * runs and swims are added by the main process, so a change there reloads the
+ * runs, swims and climbs are added by the main process, so a change there reloads the
  * window: the activity list, the Calendar's range cache and the summaries all hold
  * what they read, and a reload is the one way to have every one of them read
  * again. Strength's is renderer state and switches in place, and so is the

@@ -120,6 +120,7 @@ const climb: ClimbMessages = {
   "climb.detail.onWall": "На стене",
   "climb.detail.restAfter": "Отдых после",
   "climb.detail.recordedTitle": "Категория, как она записана, в своей шкале",
+  "climb.overview.unit": "подходов",
   "climb.overview.weekly": "Подходов в неделю",
   "climb.overview.plannedAvg": "+ {count} запланировано · в среднем {avg}",
   "climb.overview.onWall": "{time} на стене",

@@ -213,6 +213,25 @@ async function main() {
     );
     assert.ok(boulders.length > 0 && boulders.every((name) => /^V\d+$/.test(name)), `the boulder pyramid reads in V: ${boulders}`);
 
+    // Sorted by the hardest send, routes and boulders stay apart: their grades are on different ladders.
+    await win.webContents.executeJavaScript(
+      `[...document.querySelectorAll(".running-list-panel th button")].find((b) => b.textContent.trim() === "Hardest").click()`,
+      true
+    );
+    await settle();
+    const kindsInOrder = await win.webContents.executeJavaScript(
+      `[...document.querySelectorAll(".running-list-panel tbody tr")].filter((row) => row.cells[2].textContent.trim() !== "—").map((row) => row.querySelector(".run-surface-chip").textContent.trim())`,
+      true
+    );
+    const firstBoulder = kindsInOrder.indexOf("Bouldering");
+    assert.ok(firstBoulder > 0, `routes come first: ${kindsInOrder}`);
+    assert.ok(kindsInOrder.slice(firstBoulder).every((kind) => kind === "Bouldering"), `then the boulders, together: ${kindsInOrder}`);
+    assert.equal(
+      await win.webContents.executeJavaScript(`[...document.querySelectorAll(".running-controls button")].some((b) => b.textContent.trim() === "Multi-pitch")`, true),
+      true,
+      "a multi-pitch day is a kind of its own"
+    );
+
     await clickChip("Bouldering");
     await settle();
     assert.equal(
@@ -254,6 +273,7 @@ async function main() {
     assert.equal(await harness("count", ".climb-route-table tbody tr"), detail.climb.climbs.length, "a row a climb");
     assert.equal(await statText("Climbs"), String(detail.climb.climbs.length));
     assert.match(await statText("Hardest send"), /^\d[abc]\+?$/, "the hardest send in French");
+    assert.equal(await harness("exists", ".activity-share"), true, "a session can be shared as an image");
     for (const label of ["Climbing time", "Off the wall", "Height", "Falls", "Climb by climb"]) {
       assert.equal(await hasText(label), true, `the session page states ${label}`);
     }
@@ -282,6 +302,8 @@ async function main() {
         `[...document.querySelector("[data-sport='climb']").querySelectorAll(${JSON.stringify(selector)})].map((node) => node.textContent.trim())`,
         true
       );
+    const units = await section(".overview-sport-kpis .overview-sport-unit");
+    assert.deepEqual(units.slice(0, 2), ["climbs", "climbs"], "this week and four weeks say what they count");
     const kpis = await section(".overview-sport-kpis dt");
     assert.deepEqual(kpis.slice(2), ["Sessions", "Hardest send", "Sent"], `the section's figures: ${kpis}`);
     const values = await section(".overview-sport-kpis .figure");

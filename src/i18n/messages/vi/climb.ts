@@ -110,6 +110,7 @@ const climb: ClimbMessages = {
   "climb.detail.onWall": "Trên vách",
   "climb.detail.restAfter": "Nghỉ sau đó",
   "climb.detail.recordedTitle": "Độ khó như đã ghi, theo thang của chính nó",
+  "climb.overview.unit": "lượt",
   "climb.overview.weekly": "Lượt leo mỗi tuần",
   "climb.overview.plannedAvg": "+ {count} theo kế hoạch · TB {avg}",
   "climb.overview.onWall": "{time} trên vách",

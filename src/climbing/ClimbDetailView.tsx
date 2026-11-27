@@ -24,6 +24,8 @@ import { formatClimbClock, gradeName, scaleRungs, styleGroupOf, type ClimbScales
 import { CLIMB_KIND_LABELS, CLIMB_STYLE_LABELS, classifyClimbKind, gradeLabel } from "./climbType";
 import { plural, t } from "../i18n/core";
 import { useI18n } from "../i18n/useI18n";
+import { ShareButton } from "../share/ShareButton";
+import { buildActivityShareSession } from "../share/buildShareSession";
 
 interface ClimbDetailViewProps {
   activity: TrainingHubActivity;
@@ -42,6 +44,8 @@ interface ClimbDetailViewProps {
 }
 
 interface Stat {
+  /** Stable across languages: what a share image remembers a figure by. */
+  id: string;
   label: string;
   value: string;
   title?: string;
@@ -101,9 +105,9 @@ export function ClimbDetailView({
     if (climb) {
       const marked = climbs.filter((entry) => entry.style !== "unrecorded");
       const sent = marked.filter((entry) => isSend(entry.style));
-      stats.push({ label: t("climb.climbs"), value: String(climbs.length), title: t("climb.climbsTitle") });
+      stats.push({ id: "climb.climbs", label: t("climb.climbs"), value: String(climbs.length), title: t("climb.climbsTitle") });
       if (marked.length > 0) {
-        stats.push({ label: t("climb.list.sent"), value: t("climb.detail.sentOf", { sent: sent.length, marked: marked.length }) });
+        stats.push({ id: "climb.list.sent", label: t("climb.list.sent"), value: t("climb.detail.sentOf", { sent: sent.length, marked: marked.length }) });
       }
       const sends = graded.filter(({ entry, grade }) => grade && grade.family === family && isSend(entry.style));
       const best = sends.reduce<(typeof sends)[number] | undefined>(
@@ -112,6 +116,7 @@ export function ClimbDetailView({
       );
       if (best?.grade) {
         stats.push({
+          id: "climb.detail.hardest",
           label: t("climb.detail.hardest"),
           value: gradeName(family, best.grade.ladder, scales),
           title: CLIMB_STYLE_LABELS[best.entry.style]
@@ -124,12 +129,14 @@ export function ClimbDetailView({
         const sorted = ladders.map((ladder) => rungIndexFor(rungs, ladder)).sort((left, right) => left - right);
         const middle = sorted[Math.floor((sorted.length - 1) / 2)]!;
         stats.push({
+          id: "climb.detail.avgGrade",
           label: t("climb.detail.avgGrade"),
           value: gradeLabel(rungs[middle]?.name ?? ""),
           title: t("climb.detail.avgGradeTitle")
         });
       }
       stats.push({
+        id: "climb.climbingTime",
         label: t("climb.climbingTime"),
         value: formatDurationSeconds(Math.round(climb.climbingSeconds)),
         title: t("climb.climbingTimeTitle")
@@ -137,6 +144,7 @@ export function ClimbDetailView({
       const offWall = sessionSeconds === undefined ? undefined : sessionSeconds - climb.climbingSeconds;
       if (offWall !== undefined && offWall > 0) {
         stats.push({
+          id: "climb.detail.offWall",
           label: t("climb.detail.offWall"),
           value: formatDurationSeconds(Math.round(offWall)),
           title: t("climb.detail.offWallTitle")
@@ -144,25 +152,26 @@ export function ClimbDetailView({
       }
       if (climb.heightMeters !== undefined) {
         stats.push({
+          id: "climb.height",
           label: t("climb.height"),
           value: `${Math.round(metersToElevation(climb.heightMeters, unitSystem))} ${elevationUnit(unitSystem)}`,
           title: t("climb.heightTitle")
         });
       }
-      stats.push({ label: t("climb.falls"), value: String(climb.falls) });
+      stats.push({ id: "climb.falls", label: t("climb.falls"), value: String(climb.falls) });
     }
-    stats.push({ label: t("activity.m.time"), value: formatDurationSeconds(sessionSeconds) });
+    stats.push({ id: "activity.m.time", label: t("activity.m.time"), value: formatDurationSeconds(sessionSeconds) });
     const avgHr = detail?.avgHr ?? activity.avgHr;
-    if (avgHr !== undefined) stats.push({ label: t("activity.m.avgHr"), value: `${avgHr} bpm` });
+    if (avgHr !== undefined) stats.push({ id: "activity.m.avgHr", label: t("activity.m.avgHr"), value: `${avgHr} bpm` });
     const maxHr = detail?.maxHr ?? activity.maxHr;
-    if (maxHr !== undefined) stats.push({ label: t("activity.m.maxHr"), value: `${maxHr} bpm` });
+    if (maxHr !== undefined) stats.push({ id: "activity.m.maxHr", label: t("activity.m.maxHr"), value: `${maxHr} bpm` });
     const load = detail?.trainingLoad ?? activity.trainingLoad;
     if (load !== undefined) {
-      stats.push({ label: t("overview.tiles.load"), value: formatOptionalNumber(Math.round(load)) });
+      stats.push({ id: "overview.tiles.load", label: t("overview.tiles.load"), value: formatOptionalNumber(Math.round(load)) });
     }
     const calories = detail?.calories ?? activity.calories;
     if (calories !== undefined && calories > 0) {
-      stats.push({ label: t("activity.m.calories"), value: `${Math.round(calories)} kcal` });
+      stats.push({ id: "activity.m.calories", label: t("activity.m.calories"), value: `${Math.round(calories)} kcal` });
     }
     return stats;
   }, [activity, climb, climbs, detail, family, graded, scales, unitSystem, locale]);
@@ -190,6 +199,25 @@ export function ClimbDetailView({
                   <MentorIcon size={15} aria-hidden="true" />
                   {t("activity.askCoach")}
                 </button>
+              ) : null}
+              {detail ? (
+                <ShareButton
+                  build={() =>
+                    buildActivityShareSession({
+                      sport: "climb",
+                      activity,
+                      detail,
+                      series,
+                      kind: kindLabel,
+                      name: activity.name?.trim() || kindLabel,
+                      stats: headline,
+                      defaultStats: ["climb.climbs", "climb.list.sent", "climb.climbingTime"],
+                      defaultHero: headline.some((stat) => stat.id === "climb.detail.hardest") ? "climb.detail.hardest" : "climb.climbs",
+                      charts: ["hr"],
+                      unitSystem
+                    })
+                  }
+                />
               ) : null}
             </div>
             <div className="run-detail-title">

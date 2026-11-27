@@ -2,8 +2,9 @@
 //
 // The sample swims' suite asked again of the wall: that, being fiction, they
 // only ever reach the window, never the store or Coach; that they read back
-// through the real parser as a climber's sessions would; and that two launches
-// give the same climbs.
+// through the real parser as a climber's sessions would — every kind, a trip
+// in YDS, multi-pitch routes, unmarked warm-ups; and that two launches give
+// the same climbs.
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -44,30 +45,41 @@ for (const call of ["withSampleClimbs(", "sampleClimbDetail(", "withSampleClimbS
 const list = samples.withSampleClimbs([], { page: 1 });
 assert.ok(list.length >= 30, `twelve weeks of climbing, ${list.length} sessions`);
 assert.deepEqual(samples.withSampleClimbs([], { page: 2 }), [], "the first page only");
-assert.deepEqual(new Set(list.map((activity) => activity.sportType)), new Set([800, 801, 802]));
+assert.deepEqual(new Set(list.map((activity) => activity.sportType)), new Set([800, 801, 802, 10003]), "every kind of climbing");
 for (let index = 1; index < list.length; index += 1) {
   assert.ok((list[index - 1].startTime ?? 0) >= (list[index].startTime ?? 0), "newest first");
 }
 assert.ok(list.every((activity) => (activity.startTime ?? 0) * 1000 <= Date.now()), "nothing climbed later this week");
 
 let grades = 0;
+let unmarked = 0;
+const outdoorSystems = new Set();
 for (const activity of list) {
   assert.ok(samples.isSampleClimbId(activity.activityId));
   const detail = samples.sampleClimbDetail(activity.activityId);
   assert.ok(detail.climb, `${activity.activityId} reads back as a climbing session`);
   const { climbs } = detail.climb;
-  assert.ok(climbs.length >= 5, "a session holds its climbs");
+  assert.ok(climbs.length >= (activity.sportType === 10003 ? 2 : 5), "a session holds its climbs");
   assert.ok(climbs.every((climb) => climb.seconds > 0 && climb.startSeconds !== undefined));
   assert.ok(detail.climb.climbingSeconds < activity.duration, "a session is more than its climbs");
-  assert.ok(climbs.some((climb) => climb.style === "attempt"), "every session tries something it does not send");
+  if (activity.sportType === 800 || activity.sportType === 801) {
+    assert.ok(climbs.some((climb) => climb.style === "attempt"), "every gym session tries something it does not send");
+  }
   grades += climbs.filter((climb) => climb.system !== undefined).length;
-  if (activity.sportType === 802) {
-    assert.ok(climbs.every((climb) => climb.system === 2), "outdoor in French");
+  unmarked += climbs.filter((climb) => climb.style === "unrecorded" && climb.system === undefined).length;
+  if (activity.sportType === 802 || activity.sportType === 10003) {
+    for (const climb of climbs) outdoorSystems.add(climb.system);
+  }
+  if (activity.sportType === 10003) {
+    assert.ok(climbs.every((climb) => (climb.pitches ?? 1) >= 3), "a multi-pitch route is three pitches or more");
+    assert.ok(climbs.every((climb) => climb.style !== "unrecorded"), "a route goes as its last marked pitch went");
   }
   assert.equal(detail.series.length, activity.duration, "a heart rate a second");
   assert.equal(activity.avgHr > 90 && activity.maxHr < 200, true);
 }
 assert.ok(grades > 300, "the climbs are graded");
+assert.ok(unmarked > 0, "a warm-up now and then is neither marked nor graded");
+assert.deepEqual([...outdoorSystems].sort(), [1, 2], "outdoors in French, and a trip in YDS");
 
 const [summary] = samples.withSampleClimbSummaries([list[0].activityId], []);
 assert.equal(summary.climbVersion, CLIMB_SUMMARY_VERSION);

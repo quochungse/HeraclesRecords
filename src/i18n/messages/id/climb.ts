@@ -110,6 +110,7 @@ const climb: ClimbMessages = {
   "climb.detail.onWall": "Di dinding",
   "climb.detail.restAfter": "Istirahat sesudahnya",
   "climb.detail.recordedTitle": "Grade seperti yang dicatat, dalam skalanya sendiri",
+  "climb.overview.unit": "panjatan",
   "climb.overview.weekly": "Panjatan per minggu",
   "climb.overview.plannedAvg": "+ {count} terencana · rata-rata {avg}",
   "climb.overview.onWall": "{time} di dinding",

@@ -110,6 +110,7 @@ const climb: ClimbMessages = {
   "climb.detail.onWall": "Na parede",
   "climb.detail.restAfter": "Descanso depois",
   "climb.detail.recordedTitle": "O grau como foi registrado, na sua própria escala",
+  "climb.overview.unit": "escaladas",
   "climb.overview.weekly": "Escaladas por semana",
   "climb.overview.plannedAvg": "+ {count} planejados · média {avg}",
   "climb.overview.onWall": "{time} na parede",

@@ -110,6 +110,7 @@ const climb: ClimbMessages = {
   "climb.detail.onWall": "壁にいた時間",
   "climb.detail.restAfter": "その後の休憩",
   "climb.detail.recordedTitle": "記録されたままのグレード（元のスケール）",
+  "climb.overview.unit": "本",
   "climb.overview.weekly": "週ごとの本数",
   "climb.overview.plannedAvg": "+ 予定 {count} · 平均 {avg}",
   "climb.overview.onWall": "壁にいた時間 {time}",

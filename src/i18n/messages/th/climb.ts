@@ -110,6 +110,7 @@ const climb: ClimbMessages = {
   "climb.detail.onWall": "บนผนัง",
   "climb.detail.restAfter": "พักหลังจากนั้น",
   "climb.detail.recordedTitle": "เกรดตามที่บันทึก ในสเกลของตัวเอง",
+  "climb.overview.unit": "ครั้ง",
   "climb.overview.weekly": "การปีนรายสัปดาห์",
   "climb.overview.plannedAvg": "+ วางแผนไว้ {count} · เฉลี่ย {avg}",
   "climb.overview.onWall": "{time} บนผนัง",

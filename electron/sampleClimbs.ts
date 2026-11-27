@@ -10,8 +10,10 @@
  * watcher. Turning the flag off leaves no trace.
  *
  * Twelve weeks of a gym climber: rope routes on Mondays and Fridays (French
- * grades), a boulder session on Wednesdays (V grades), and an outdoor day on
- * the rock every fourth Saturday. The climber's level rises about a grade
+ * grades), a boulder session on Wednesdays (V grades), an outdoor day on the
+ * rock every fourth Saturday, and two multi-pitch days. One weekend is a trip
+ * graded in YDS, so the screen converts it; a warm-up climb now and then is
+ * neither marked nor graded, as happens on a watch. The climber's level rises about a grade
  * over the weeks. Each climb is picked around that level and goes as a climb
  * at that distance from it goes — the easy ones flashed, the ones at the
  * limit worked or fallen off — with the time on the wall from its height and
@@ -50,16 +52,17 @@ export function isSampleClimbId(activityId: string | undefined): boolean {
 /** How many weeks back the history reaches, this one included. */
 const WEEKS = 12;
 
-type Kind = "indoor" | "boulder" | "outdoor";
+type Kind = "indoor" | "boulder" | "outdoor" | "multiPitch";
 
 const SPORT: Record<Kind, { sportType: number; sportName: string }> = {
   indoor: { sportType: 800, sportName: "Indoor Climb" },
   boulder: { sportType: 801, sportName: "Bouldering" },
-  outdoor: { sportType: 802, sportName: "Outdoor Climb" }
+  outdoor: { sportType: 802, sportName: "Outdoor Climb" },
+  multiPitch: { sportType: 10003, sportName: "Multi-Pitch Climb" }
 };
 
-/** COROS's style codes: 0 redpoint, 1 onsight, 2 flash, 3 attempt, 5 repeat. */
-const STYLE = { redpoint: 0, onsight: 1, flash: 2, attempt: 3, repeat: 5 } as const;
+/** COROS's style codes: 0 redpoint, 1 onsight, 2 flash, 3 attempt, 5 repeat, 255 not marked. */
+const STYLE = { redpoint: 0, onsight: 1, flash: 2, attempt: 3, repeat: 5, unmarked: 255 } as const;
 
 /**
  * The climber's level as an index into COROS's indoor French list (6a is 6,
@@ -81,11 +84,15 @@ interface SessionPlan {
   weekday: number;
   startHour: number;
   climbs: number;
+  /** The rope scale an outdoor day was graded in: a trip abroad reads YDS. */
+  scale?: "french" | "yds";
 }
 
 const ROPE_NAMES = ["Lead after work", "Endurance laps", "Project night", "Volume day", "Top-rope circuit"];
 const BOULDER_NAMES = ["Board session", "Bouldering", "Comp-style problems", "Power session"];
 const OUTDOOR_NAMES = ["Sport crag day", "Limestone day"];
+/** The week the climber was away on a trip graded in YDS, and climbed a multi-pitch. */
+const TRIP_WEEK = 10;
 
 function plans(): SessionPlan[] {
   const out: SessionPlan[] = [];
@@ -103,14 +110,29 @@ function plans(): SessionPlan[] {
       out.push({ ...plan, key: `${weeksAgo}-${index}`, weeksAgo });
     });
     if (weeksAgo % 4 === 2) {
+      const trip = weeksAgo === TRIP_WEEK;
       out.push({
         key: `${weeksAgo}-out`,
         kind: "outdoor",
-        name: OUTDOOR_NAMES[weeksAgo % OUTDOOR_NAMES.length]!,
+        name: trip ? "Red River Gorge" : OUTDOOR_NAMES[weeksAgo % OUTDOOR_NAMES.length]!,
         weeksAgo,
         weekday: 5,
         startHour: 8.5,
-        climbs: 5 + Math.floor(random() * 3)
+        climbs: 5 + Math.floor(random() * 3),
+        scale: trip ? "yds" : "french"
+      });
+    }
+    // Two multi-pitch days: the trip's, and one closer to home.
+    if (weeksAgo === TRIP_WEEK || weeksAgo === 3) {
+      out.push({
+        key: `${weeksAgo}-mp`,
+        kind: "multiPitch",
+        name: weeksAgo === TRIP_WEEK ? "Long route on the trip" : "Multi-pitch classic",
+        weeksAgo,
+        weekday: 6,
+        startHour: 7,
+        climbs: 2,
+        scale: weeksAgo === TRIP_WEEK ? "yds" : "french"
       });
     }
   }
@@ -144,14 +166,17 @@ function planClimbs(plan: SessionPlan, random: () => number): PlannedClimb[] {
     // Warm up, build to the limit two thirds in, then wind down.
     const phase = index / Math.max(1, plan.climbs - 1);
     const shape = phase < 0.66 ? -2.5 + (phase / 0.66) * 3.5 : 1 - ((phase - 0.66) / 0.34) * 3;
-    const stretch = Math.round(shape + (random() - 0.5) * 1.6);
+    const stretch = plan.kind === "multiPitch" ? -2 + Math.round(random()) : Math.round(shape + (random() - 0.5) * 1.6);
     const gradeIndex = Math.max(0, Math.round(level + stretch));
     const against = gradeIndex - level;
     let style: number;
     let falls = 0;
     const roll = random();
-    if (against <= -1.5) {
-      style = roll < 0.7 ? STYLE.flash : roll < 0.9 ? STYLE.onsight : STYLE.repeat;
+    if (plan.kind === "multiPitch") {
+      // A long route outside is climbed below the limit, mostly first go.
+      style = roll < 0.5 ? STYLE.onsight : roll < 0.75 ? STYLE.flash : STYLE.redpoint;
+    } else if (against <= -1.5) {
+      style = roll < 0.6 ? STYLE.flash : roll < 0.9 ? (plan.kind === "outdoor" ? STYLE.onsight : STYLE.repeat) : STYLE.onsight;
     } else if (against <= 0.5) {
       style = roll < 0.4 ? STYLE.flash : roll < 0.75 ? STYLE.redpoint : STYLE.attempt;
     } else {
@@ -159,26 +184,52 @@ function planClimbs(plan: SessionPlan, random: () => number): PlannedClimb[] {
     }
     if (style === STYLE.attempt) falls = 1 + Math.floor(random() * 2);
     else if (style === STYLE.redpoint && random() < 0.3) falls = 1;
-    const height = boulder ? 3 + random() * 1.5 : plan.kind === "outdoor" ? 18 + random() * 12 : 12 + random() * 4;
+    const height = boulder
+      ? 3 + random() * 1.5
+      : plan.kind === "multiPitch"
+        ? 90 + random() * 60
+        : plan.kind === "outdoor"
+          ? 18 + random() * 12
+          : 12 + random() * 4;
     const effort = 1 + Math.max(0, against) * 0.25;
     const seconds = boulder
       ? (25 + random() * 50) * effort * (style === STYLE.attempt ? 0.7 : 1)
       : (height * 9 + 20 + random() * 40) * effort * (style === STYLE.attempt ? 0.8 : 1);
-    const restAfter = boulder ? 120 + random() * 180 + Math.max(0, against) * 60 : 240 + random() * 300 + Math.max(0, against) * 120;
+    const restAfter = boulder
+      ? 120 + random() * 180 + Math.max(0, against) * 60
+      : plan.kind === "multiPitch"
+        ? 1200 + random() * 600
+        : 240 + random() * 300 + Math.max(0, against) * 120;
     out.push({ gradeIndex, style, falls, height, seconds, restAfter, stretch: against });
   }
   return out;
+}
+
+/**
+ * A climb's grade in its session's scale, from the climber's level as an
+ * index into COROS's indoor French list: a boulder keeps its V index; an
+ * outdoor French grade sits two places further down COROS's outdoor list
+ * (jugging and "easy" come first); an outdoor YDS grade is found by the
+ * ladder step it shares (5.6, index 2, covers steps up to 4).
+ */
+function gradeFor(plan: SessionPlan, index: number): { system: number; index: number } {
+  if (plan.kind === "boulder") return { system: CLIMB_SYSTEM.vScale, index };
+  if (plan.kind === "indoor") return { system: CLIMB_SYSTEM.french, index };
+  const ladder = index + 1;
+  return plan.scale === "yds"
+    ? { system: CLIMB_SYSTEM.yds, index: Math.max(1, ladder - 2) }
+    : { system: CLIMB_SYSTEM.french, index: index + 2 };
 }
 
 /** The session as COROS writes it, and a heart rate a second to go with it. */
 function simulate(plan: SessionPlan, startMs: number): Simulated {
   const random = seededRandom(`climb-${plan.key}`);
   const climbs = planClimbs(plan, random);
-  const outdoor = plan.kind === "outdoor";
   const boulder = plan.kind === "boulder";
-  const system = boulder ? CLIMB_SYSTEM.vScale : CLIMB_SYSTEM.french;
-  // The outdoor table has "jug" and "easy" below 4a: its French indexes are two higher.
-  const tableOffset = outdoor ? 2 : 0;
+  const outside = plan.kind === "outdoor" || plan.kind === "multiPitch";
+  // An outdoor day is told in stages; a multi-pitch under COROS's own spelling.
+  const stageKey = plan.kind === "multiPitch" ? "mutliPitchStage" : "sportStage";
+  const stage = (value: number) => (outside ? { [stageKey]: value } : {});
   const startHundredths = Math.round(startMs / 10);
 
   const laps: Record<string, unknown>[] = [];
@@ -207,28 +258,41 @@ function simulate(plan: SessionPlan, startMs: number): Simulated {
   };
 
   // A warm-up on the floor; outdoors, the walk in.
-  lap(outdoor ? 1500 : 600, outdoor ? { mode: 1, sportStage: 0 } : { mode: 3 }, () => (outdoor ? 118 : 100));
+  lap(outside ? 1500 : 600, outside ? { mode: 1, ...stage(0) } : { mode: 3 }, () => (outside ? 118 : 100));
   climbs.forEach((climb, index) => {
     const peak = 138 + Math.max(-2, climb.stretch) * 8 + (boulder ? 6 : 0) + random() * 6;
-    lap(
-      climb.seconds,
-      {
-        mode: 1,
-        ...(outdoor ? { sportStage: 1 } : {}),
-        routeIndex: index + 1,
-        gradingSystem: system,
-        hardestGrade: climb.gradeIndex + tableOffset,
-        style: climb.style,
-        falls: climb.falls,
-        elevGain: Math.round(climb.height * 10) / 10
-      },
-      (fraction) => 112 + (peak - 112) * Math.min(1, fraction * 1.4)
-    );
+    // A multi-pitch route is three or four pitches with belays between; the
+    // crux is one of them, the last says how the route went.
+    const pitches = plan.kind === "multiPitch" ? 3 + Math.floor(random() * 2) : 1;
+    const crux = Math.floor(random() * pitches);
+    for (let pitch = 0; pitch < pitches; pitch += 1) {
+      const last = pitch === pitches - 1;
+      const gradeIndex = pitches > 1 && pitch !== crux ? Math.max(0, climb.gradeIndex - 1 - Math.floor(random() * 2)) : climb.gradeIndex;
+      // A warm-up climb now and then is not marked or graded on the watch.
+      const unmarked = plan.kind === "indoor" && index === 0 && random() < 0.5;
+      const grade = gradeFor(plan, gradeIndex);
+      lap(
+        climb.seconds / pitches,
+        {
+          mode: 1,
+          ...stage(1),
+          routeIndex: index + 1,
+          ...(pitches > 1 ? { pitchIndex: pitch + 1 } : {}),
+          gradingSystem: unmarked ? 0 : grade.system,
+          hardestGrade: unmarked ? 255 : grade.index,
+          style: unmarked ? STYLE.unmarked : last ? climb.style : STYLE.unmarked,
+          falls: last ? climb.falls : 0,
+          elevGain: Math.round((climb.height / pitches) * 10) / 10
+        },
+        (fraction) => 112 + (peak - 112) * Math.min(1, fraction * 1.4)
+      );
+      if (!last) lap(360 + random() * 240, { mode: 3, ...stage(1) }, () => 104);
+    }
     if (index < climbs.length - 1) {
-      lap(climb.restAfter, outdoor ? { mode: 3, sportStage: 1 } : { mode: 3 }, () => 102);
+      lap(climb.restAfter, { mode: 3, ...stage(1) }, () => 102);
     }
   });
-  if (outdoor) lap(1200, { mode: 1, sportStage: 2 }, () => 110);
+  if (outside) lap(plan.kind === "multiPitch" ? 2400 : 1200, { mode: 1, ...stage(2) }, () => 110);
 
   const sport = SPORT[plan.kind];
   const raw: Record<string, unknown> = {

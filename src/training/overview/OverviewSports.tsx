@@ -1160,6 +1160,7 @@ function ClimbingSection({
           {
             label: t("overview.tiles.thisWeek"),
             value: reading ? "…" : whole(current),
+            unit: t("climb.overview.unit"),
             note: reading
               ? t("climb.reading")
               : planned > 0
@@ -1169,6 +1170,7 @@ function ClimbingSection({
           {
             label: periodLabel(WINDOW_DAYS),
             value: reading ? "…" : whole(totals.climbs),
+            unit: t("climb.overview.unit"),
             note: reading ? t("climb.reading") : t("climb.overview.onWall", { time: formatDurationSpan(totals.climbingSeconds) })
           },
           {

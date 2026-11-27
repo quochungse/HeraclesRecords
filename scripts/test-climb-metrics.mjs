@@ -45,7 +45,7 @@ const {
 const { sportScreenFor } = await import(moduleUrl("src", "navigation", "sportScreens.ts"));
 const { sportColorCategory } = await import(moduleUrl("src", "training", "sportColors.ts"));
 const { buildRecordBoard } = await import(moduleUrl("src", "records", "personalBests.ts"));
-const { needsRecordsSummary } = await import(moduleUrl("src", "records", "milestones.ts"));
+const { needsRecordsSummary, recordsSportOf } = await import(moduleUrl("src", "records", "milestones.ts"));
 
 // --- What a climb is -------------------------------------------------------------
 
@@ -311,5 +311,7 @@ assert.deepEqual(buildRecordBoard({ activities, groups: [], fell: new Map() }).c
 assert.equal(needsRecordsSummary({ sportType: 800, distance: 0 }, undefined), true);
 assert.equal(needsRecordsSummary({ sportType: 800, distance: 0 }, { climbVersion: CLIMB_SUMMARY_VERSION }), false);
 assert.equal(needsRecordsSummary({ sportType: 402, distance: 0 }, undefined), false, "strength still needs nothing");
+// The Timeline knows climbing as a sport: a first climb is its own milestone.
+for (const code of [800, 801, 802, 10003]) assert.equal(recordsSportOf(code), "climb");
 
 console.log("climb metrics: ok");

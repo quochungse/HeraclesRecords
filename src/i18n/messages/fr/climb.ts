@@ -110,6 +110,7 @@ const climb: ClimbMessages = {
   "climb.detail.onWall": "Sur le mur",
   "climb.detail.restAfter": "Repos après",
   "climb.detail.recordedTitle": "La cotation telle qu’enregistrée, dans sa propre échelle",
+  "climb.overview.unit": "ascensions",
   "climb.overview.weekly": "Ascensions par semaine",
   "climb.overview.plannedAvg": "+ {count} prévues · moy. {avg}",
   "climb.overview.onWall": "{time} sur le mur",
