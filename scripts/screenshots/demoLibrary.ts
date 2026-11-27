@@ -281,7 +281,10 @@ export const EDITOR_CONTEXT: WorkoutEditorContext = {
   zones: {},
   lthrZones: [],
   defaultPoolLength: { value: 25, unit: "m" },
-  climbSystems: {}
+  climbSystems: {},
+  // COROS's climb settings: French for routes, V for boulders, with the onsight
+  // grade set (6a+ and V3, a little under the sample climber's level).
+  climbSettings: { indoorClimb: { system: 2, gradeIndex: 7 }, bouldering: { system: 7, gradeIndex: 3 } }
 };
 
 export function workoutForEdit(ref: { kind: string; programId?: string }): WorkoutEditorDocument {

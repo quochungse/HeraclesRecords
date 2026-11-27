@@ -12,6 +12,7 @@ import { withSampleHikes, sampleHikeDetail, withSampleHikeSummaries, isSampleHik
 import { withSampleTrailRuns, sampleTrailRunDetail, withSampleTrailRunSummaries, isSampleTrailRunId } from "../../electron/sampleTrailRuns";
 import { withSampleRoadRuns, sampleRoadRunDetail, withSampleRoadRunSummaries, isSampleRoadRunId } from "./sampleRoadRuns";
 import { withSampleSwims, sampleSwimDetail, withSampleSwimSummaries, isSampleSwimId } from "../../electron/sampleSwims";
+import { withSampleClimbs, sampleClimbDetail, withSampleClimbSummaries, isSampleClimbId } from "../../electron/sampleClimbs";
 import { sampleRecordsInput } from "../../src/records/sampleRecords";
 import { buildSampleStrengthSessions } from "../../src/strength/sampleSessions";
 import { historyTrack } from "./demoTracks";
@@ -74,6 +75,16 @@ function recentExtras(): TrainingHubActivity[] {
   return rows;
 }
 
+// The climbs of electron/sampleClimbs.ts, for a shot that seeds `demo.climbs`
+// through `ls`: three sessions a week would crowd every other shot's athlete.
+const withClimbs = (): boolean => {
+  try {
+    return localStorage.getItem("demo.climbs") === "1";
+  } catch {
+    return false;
+  }
+};
+
 let all: TrainingHubActivity[] | null = null;
 
 export function allActivities(): TrainingHubActivity[] {
@@ -85,6 +96,7 @@ export function allActivities(): TrainingHubActivity[] {
   list = withSampleTrailRuns(list, req);
   list = withSampleRoadRuns(list, req);
   list = withSampleSwims(list, req);
+  if (withClimbs()) list = withSampleClimbs(list, req);
   // One outdoor session a day at most, besides the gym and the pool: a run beats a trail run beats a hike beats a ride.
   const rank = (a: TrainingHubActivity) => isSampleRoadRunId(a.activityId) ? 4 : isSampleTrailRunId(a.activityId) ? 3 : isSampleHikeId(a.activityId) ? 2 : isSampleRideId(a.activityId) ? 1 : 0;
   const best = new Map<string, number>();
@@ -130,6 +142,7 @@ export function activityDetail(id: string): TrainingHubActivityDetail {
   if (isSampleTrailRunId(id)) return sampleTrailRunDetail(id);
   if (isSampleRoadRunId(id)) return sampleRoadRunDetail(id);
   if (isSampleSwimId(id)) return sampleSwimDetail(id);
+  if (isSampleClimbId(id)) return sampleClimbDetail(id);
   const a = findActivity(id);
   if (!a) throw new Error(`No demo activity ${id}`);
   return minimalDetail(a);
@@ -145,6 +158,7 @@ export function activitySummaries(ids: string[]): ActivityDetailSummary[] {
   out = withSampleTrailRunSummaries(ids, out);
   out = withSampleRoadRunSummaries(ids, out);
   out = withSampleSwimSummaries(ids, out);
+  out = withSampleClimbSummaries(ids, out);
   // Drift is a road-run figure (see the Activities fix): rides, hikes and trail runs carry none.
   return out.map((s) => (isSampleRoadRunId(s.activityId) ? s : { ...s, decouplingPercent: undefined }));
 }

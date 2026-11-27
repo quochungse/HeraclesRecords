@@ -146,6 +146,8 @@ Nights and naps, stages, HRV and stress across the night, kept long after the ni
   </tr>
 </table>
 
+Swims and climbs have screens of their own too: [Swimming](https://heraclesrecords.com/activities/swimming) reads pace per 100, Critical Swim Speed and SWOLF length by length, and [Climbing](https://heraclesrecords.com/activities/climbing) reads your sends grade by grade, with a grade pyramid and every session climb by climb.
+
 ### Strength, done properly
 
 I run and I lift, and strength was the part of my training I could not trust COROS with. The watch records the sets well. What COROS does with them afterwards is the problem:
@@ -231,7 +233,7 @@ Every place your training has taken you, on a globe beside a list of places. Ope
 ### Settings
 
 - **Appearance.** Light or dark, your own accent and sport colours, metric or imperial, in any of thirteen languages.
-- **Your sports.** Running, Cycling, Hiking and Strength each have a screen; keep the ones you train.
+- **Your sports.** Running, Cycling, Hiking, Swimming, Climbing and Strength each have a screen, which joins the sidebar with your first session of its sport. Turn any of them on or off.
 - **Cloud sync.** Use two computers? Sync them through your own Google Drive. Passwords and sign-ins never leave the machine they were made on.
 
 <table>

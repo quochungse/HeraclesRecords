@@ -1,7 +1,7 @@
 # Screenshots
 
 Every screenshot in `docs/readme/` comes from here: the README uses `01`–`18`,
-`27`–`30` and `34`–`35`, the website `01`–`35`. They are taken of the real renderer (`src/main.tsx`) running on demo data, so no
+`27`–`30` and `34`–`35`, the website `01`–`38`. They are taken of the real renderer (`src/main.tsx`) running on demo data, so no
 athlete's own training ever appears in them.
 
 ```sh
@@ -32,6 +32,10 @@ Shots are 1512 × 982 at 2×, with the macOS window corners, written as WebP int
   how long to wait, localStorage to seed (`ls`), and `steps`, JavaScript run in the page in
   order (`demoClick(text, selector)` clicks the shortest element holding that text) with
   pauses in milliseconds between them. Add a shot by adding an entry.
+- **The climbs** of `electron/sampleClimbs.ts` join the demo only for a shot that seeds
+  `"demo.climbs": "1"` through `ls` (the Climbing shots): three sessions a week would crowd
+  every other shot's week. The demo's climb settings are French and V with an onsight grade
+  (`EDITOR_CONTEXT`).
 - **The sign-in screen** is shot by seeding `"demo.signin"` through `ls`: `fresh` (never
   signed in here), `saved` (a remembered account), `restoring` (the start-up re-login) or
   `code` (signing in asks for the emailed code; fill the form and press Sign in in `steps`).

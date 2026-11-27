@@ -35,6 +35,13 @@ const sports = [
     text: "Length by length: pace per 100, Critical Swim Speed, SWOLF in your pool, your strokes, and every swim's sets.",
   },
   {
+    href: "/activities/climbing",
+    shot: "36-climbing",
+    alt: "Climbing: this week in climbs, the hardest send, the share sent and weekly volume by kind",
+    title: "Climbing",
+    text: "Grade by grade: your hardest send, a grade pyramid, grade over time and every session climb by climb, routes and boulders apart.",
+  },
+  {
     href: "/activities/strength/",
     shot: "07-strength",
     alt: "Strength: sessions and a 3D muscle map",
@@ -46,7 +53,7 @@ const sports = [
 
 <Base og="activities"
   title="Activities and sports"
-  description="Every COROS session in one list, and a screen each for running, cycling, hiking, swimming and strength that reads what that sport is about."
+  description="Every COROS session in one list, and a screen each for running, cycling, hiking, swimming, climbing and strength that reads what that sport is about."
 >
   <SubNav pages={ACTIVITIES_PAGES} label="Activities" />
 
@@ -54,7 +61,7 @@ const sports = [
     <p class="eyebrow">Every session</p>
     <h1>Every session, read in depth.</h1>
     <p class="lede">
-      One list holds everything your watch has recorded. Running, Cycling, Hiking, Swimming and Strength
+      One list holds everything your watch has recorded. Running, Cycling, Hiking, Swimming, Climbing and Strength
       each get a screen of their own that reads what that sport is about, and every session a
       page with every channel the watch recorded.
     </p>
@@ -82,8 +89,8 @@ const sports = [
       <p class="eyebrow">A screen for each sport</p>
       <h2 class="section-title">Each sport, read for what it is.</h2>
       <p class="lede">
-        A run is read in pace, a ride in hours and power, a hike in height, a swim length by length, and a strength
-        session in sets. A sport's screen joins the sidebar with your first session of it; choose for yourself under
+        A run is read in pace, a ride in hours and power, a hike in height, a swim length by length, a climb by its grade, and a
+        strength session in sets. A sport's screen joins the sidebar with your first session of it; choose for yourself under
         <strong>Settings → Navigation → Sport screens</strong>.
       </p>
     </div>
@@ -132,7 +139,7 @@ const sports = [
       <p class="eyebrow">Share</p>
       <h2>Make an image of any session.</h2>
       <p>
-        Beside Ask Mentor on every run, ride, hike, swim and strength session sits
+        Beside Ask Mentor on every run, ride, hike, swim, climb and strength session sits
         <strong>Create image</strong>: a picture of the session to post, built in front of you
         with a live preview.
       </p>

@@ -344,6 +344,6 @@ export function demoHandlers(): Record<string, unknown> {
     getCorosMcpStatus: async () => ({ connected: true, authorized: true, tools: [] }),
     getMcpStatuses: async () => [{ id: "coros", name: "COROS", enabled: true, connected: true, authenticated: true, toolCount: 18 }],
     ensureMcpConnected: async () => [{ id: "coros", name: "COROS", enabled: true, connected: true, authenticated: true, toolCount: 18 }],
-    getSportTypeMap: async () => [[100,"Run"],[102,"Trail Run"],[104,"Hike"],[200,"Road Bike"],[201,"Indoor Bike"],[203,"Gravel Bike"],[300,"Pool Swim"],[402,"Strength"]].map(([sportType, sportName]) => ({ sportType, sportName })),
+    getSportTypeMap: async () => [[100,"Run"],[102,"Trail Run"],[104,"Hike"],[200,"Road Bike"],[201,"Indoor Bike"],[203,"Gravel Bike"],[300,"Pool Swim"],[402,"Strength"],[800,"Indoor Climb"],[801,"Bouldering"],[802,"Outdoor Climb"],[10003,"Multi-Pitch Climb"]].map(([sportType, sportName]) => ({ sportType, sportName })),
   };
 }

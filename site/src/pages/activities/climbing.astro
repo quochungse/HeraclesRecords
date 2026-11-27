@@ -1,0 +1,77 @@
+---
+import Base from "../../layouts/Base.astro";
+import FeatureRow from "../../components/FeatureRow.astro";
+import Shot from "../../components/Shot.astro";
+import SubNav from "../../components/SubNav.astro";
+import { ACTIVITIES_PAGES } from "../../sections";
+---
+
+<Base og="activities"
+  title="Climbing"
+  description="Climbing in Heracles Records: your hardest send, a grade pyramid, grade over time and every session climb by climb, in the scale you chose in COROS."
+>
+  <SubNav pages={ACTIVITIES_PAGES} label="Activities" />
+
+  <section class="wrap page-hero">
+    <p class="eyebrow">Climbing</p>
+    <h1>Grade by grade.</h1>
+    <p class="lede">
+      Indoor routes, bouldering, outdoor days and multi-pitch, read the way a climber counts
+      them: in climbs rather than kilometres, in grades rather than pace, and in what you sent
+      and how.
+    </p>
+  </section>
+
+  <section class="wrap section-tight">
+    <Shot name="36-climbing" alt="Climbing: this week in climbs, the hardest send, the share sent, the onsight grade and weekly volume by kind" eager />
+  </section>
+
+  <div class="wrap">
+    <section class="feature-text">
+      <p class="eyebrow">The screen</p>
+      <h2>A climber's numbers, not a runner's.</h2>
+      <ul class="ticks columns">
+        <li><strong>This week in climbs</strong>, routes and problems, sent or not, against the weeks before.</li>
+        <li><strong>Your hardest send</strong> of the last 12 weeks, a route's and a boulder's, with how and when you sent it.</li>
+        <li><strong>The share you sent</strong> of the climbs you marked over four weeks, routes and problems apart.</li>
+        <li><strong>Your onsight grade</strong> as set in the COROS app, and how many sends you made above it.</li>
+        <li><strong>Weekly volume</strong> in climbs, climbing time or sessions, by kind, with a four-week average.</li>
+        <li><strong>Time on the wall</strong>: how much of a session is spent climbing, the average route and problem, and falls a climb.</li>
+      </ul>
+    </section>
+
+    <FeatureRow shot="38-climb-grades" alt="A grade pyramid of sends and attempts beside the average send over the weeks, with the onsight grade marked">
+      <p class="eyebrow">Grades</p>
+      <h2>A pyramid of what you sent.</h2>
+      <ul class="ticks">
+        <li><strong>A row for every grade</strong>: sent first go, sent after working it, or tried, with your onsight grade marked.</li>
+        <li><strong>Grade over time</strong>: your average send and the hardest send of each week.</li>
+        <li><strong>One scale</strong>: every grade in the one you chose in COROS's climb settings, a grade logged in another converted through COROS's own table.</li>
+        <li><strong>Routes and boulders apart</strong>: a V5 is never set against a 6b. Aid, ice and mixed grades are named but not ranked.</li>
+      </ul>
+    </FeatureRow>
+
+    <FeatureRow shot="37-climb" alt="A climbing session: each climb as a block where it was climbed, by grade, above the session's heart rate" flip>
+      <p class="eyebrow">A session's page</p>
+      <h2>Every climb, in the order climbed.</h2>
+      <p>
+        Each climb is a block placed where it fell in the session and as wide as its time on the
+        wall, by grade, time on the wall or height, with the falls on it and the attempts drawn
+        open. Below, the heart rate on the same clock, then the climbs one by one: the grade,
+        how it went, the time on the wall and the rest after. An outdoor day gathers its pitches
+        into routes.
+      </p>
+    </FeatureRow>
+  </div>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <h2 class="section-title">What you mark is what is counted.</h2>
+      <p class="lede">
+        Your watch keeps a climb as a lap, from the foot of the route to its top, with the grade
+        and how it went if you mark them. A climb left unmarked still counts as climbed, but in
+        neither your sends nor your attempts, and one without a grade stays out of the pyramid.
+      </p>
+    </div>
+  </section>
+</Base>

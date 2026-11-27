@@ -339,5 +339,40 @@
    2000
   ],
   "theme": "dark"
+ },
+ {
+  "out": "36-climbing",
+  "view": "climbing",
+  "wait": 5000,
+  "ls": {
+   "demo.climbs": "1"
+  },
+  "theme": "dark"
+ },
+ {
+  "out": "37-climb",
+  "view": "climbing",
+  "wait": 5000,
+  "ls": {
+   "demo.climbs": "1"
+  },
+  "steps": [
+   "(() => { const rows = [...document.querySelectorAll('.climbing-view .run-list:not(.run-surface-table) tbody tr')]; const row = rows.find((r) => r.textContent.includes('Indoor climb')); if (!row) return 'no climb of ' + rows.length; row.click(); return true; })()",
+   3500
+  ],
+  "theme": "dark"
+ },
+ {
+  "out": "38-climb-grades",
+  "view": "climbing",
+  "wait": 5000,
+  "ls": {
+   "demo.climbs": "1"
+  },
+  "steps": [
+   "(() => { const panel = [...document.querySelectorAll('.climbing-view .panel')].find((p) => p.textContent.startsWith('Grade pyramid')); if (!panel) return 'no pyramid'; let page = panel.parentElement; while (page && !(page.scrollHeight > page.clientHeight + 50 && /auto|scroll/.test(getComputedStyle(page).overflowY))) page = page.parentElement; if (!page) return 'no scroller'; page.scrollTop += panel.getBoundingClientRect().top - 60; return true; })()",
+   1500
+  ],
+  "theme": "dark"
  }
 ]
